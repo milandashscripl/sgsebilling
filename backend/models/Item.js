@@ -5,6 +5,7 @@ const itemSchema = new mongoose.Schema({
   itemTypeId: { type: mongoose.Schema.Types.ObjectId, ref: 'ItemType' },
   itemType: { type: String, default: 'other' },
   category: { type: String, default: 'General' },
+  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
   specification: { type: String, default: '' },
   unit: { type: String, default: 'pcs' },
   purchasePrice: { type: Number, required: true, min: 0 },

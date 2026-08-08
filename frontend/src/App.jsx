@@ -10,6 +10,7 @@ const emptyItemForm = {
   name: '',
   itemTypeId: '',
   itemType: '',
+  categoryId: '',
   category: '',
   specification: '',
   unit: 'pcs',
@@ -28,6 +29,11 @@ const emptyItemTypeForm = {
   sgstRate: '0',
   cgstRate: '0',
   igstRate: '0',
+  description: ''
+};
+
+const emptyCategoryForm = {
+  name: '',
   description: ''
 };
 
@@ -219,19 +225,28 @@ function Dashboard({ user }) {
 function ItemsPage() {
   const [items, setItems] = useState([]);
   const [itemTypes, setItemTypes] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [form, setForm] = useState(emptyItemForm);
   const [typeForm, setTypeForm] = useState(emptyItemTypeForm);
+  const [categoryForm, setCategoryForm] = useState(emptyCategoryForm);
   const [editingItemId, setEditingItemId] = useState(null);
   const [editingTypeId, setEditingTypeId] = useState(null);
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [message, setMessage] = useState('');
 
   const load = async () => {
-    const [itemsRes, itemTypesRes] = await Promise.all([
-      api.get('/items'),
-      api.get('/item-types')
-    ]);
-    setItems(itemsRes.data);
-    setItemTypes(itemTypesRes.data);
+    try {
+      const [itemsRes, itemTypesRes, categoriesRes] = await Promise.all([
+        api.get('/items'),
+        api.get('/item-types'),
+        api.get('/categories')
+      ]);
+      setItems(itemsRes.data);
+      setItemTypes(itemTypesRes.data);
+      setCategories(categoriesRes.data);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to load items right now');
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -248,49 +263,81 @@ function ItemsPage() {
     setMessage('');
   };
 
+  const resetCategoryForm = () => {
+    setCategoryForm(emptyCategoryForm);
+    setEditingCategoryId(null);
+    setMessage('');
+  };
+
   const saveItem = async (e) => {
     e.preventDefault();
-    const payload = {
-      ...form,
-      purchasePrice: Number(form.purchasePrice) || 0,
-      salePrice: Number(form.salePrice) || 0,
-      sgstRate: Number(form.sgstRate) || 0,
-      cgstRate: Number(form.cgstRate) || 0,
-      igstRate: Number(form.igstRate) || 0,
-      stock: Number(form.stock) || 0
-    };
+    try {
+      const payload = {
+        ...form,
+        purchasePrice: Number(form.purchasePrice) || 0,
+        salePrice: Number(form.salePrice) || 0,
+        sgstRate: Number(form.sgstRate) || 0,
+        cgstRate: Number(form.cgstRate) || 0,
+        igstRate: Number(form.igstRate) || 0,
+        stock: Number(form.stock) || 0
+      };
 
-    if (editingItemId) {
-      await api.put(`/items/${editingItemId}`, payload);
-      setMessage('Item updated');
-    } else {
-      await api.post('/items', payload);
-      setMessage('Item created');
+      if (editingItemId) {
+        await api.put(`/items/${editingItemId}`, payload);
+        setMessage('Item updated');
+      } else {
+        await api.post('/items', payload);
+        setMessage('Item created');
+      }
+
+      resetItemForm();
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to save item');
     }
-
-    resetItemForm();
-    load();
   };
 
   const saveItemType = async (e) => {
     e.preventDefault();
-    const payload = {
-      ...typeForm,
-      sgstRate: Number(typeForm.sgstRate) || 0,
-      cgstRate: Number(typeForm.cgstRate) || 0,
-      igstRate: Number(typeForm.igstRate) || 0
-    };
+    try {
+      const payload = {
+        ...typeForm,
+        sgstRate: Number(typeForm.sgstRate) || 0,
+        cgstRate: Number(typeForm.cgstRate) || 0,
+        igstRate: Number(typeForm.igstRate) || 0
+      };
 
-    if (editingTypeId) {
-      await api.put(`/item-types/${editingTypeId}`, payload);
-      setMessage('Item type updated');
-    } else {
-      await api.post('/item-types', payload);
-      setMessage('Item type created');
+      if (editingTypeId) {
+        await api.put(`/item-types/${editingTypeId}`, payload);
+        setMessage('Item type updated');
+      } else {
+        await api.post('/item-types', payload);
+        setMessage('Item type created');
+      }
+
+      resetTypeForm();
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to save item type');
     }
+  };
 
-    resetTypeForm();
-    load();
+  const saveCategory = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingCategoryId) {
+        await api.put(`/categories/${editingCategoryId}`, categoryForm);
+        setMessage('Category updated');
+      } else {
+        await api.post('/categories', categoryForm);
+        setMessage('Category created');
+      }
+
+      resetCategoryForm();
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to save category');
+    }
   };
 
   const editItem = (item) => {
@@ -322,18 +369,46 @@ function ItemsPage() {
     setMessage('');
   };
 
+  const editCategory = (category) => {
+    setEditingCategoryId(category._id);
+    setCategoryForm({
+      ...emptyCategoryForm,
+      ...category
+    });
+    setMessage('');
+  };
+
   const deleteItem = async (id) => {
     if (!window.confirm('Delete this item?')) return;
-    await api.delete(`/items/${id}`);
-    if (editingItemId === id) resetItemForm();
-    load();
+    try {
+      await api.delete(`/items/${id}`);
+      if (editingItemId === id) resetItemForm();
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to delete item');
+    }
   };
 
   const deleteItemType = async (id) => {
     if (!window.confirm('Delete this item type?')) return;
-    await api.delete(`/item-types/${id}`);
-    if (editingTypeId === id) resetTypeForm();
-    load();
+    try {
+      await api.delete(`/item-types/${id}`);
+      if (editingTypeId === id) resetTypeForm();
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to delete item type');
+    }
+  };
+
+  const deleteCategory = async (id) => {
+    if (!window.confirm('Delete this category?')) return;
+    try {
+      await api.delete(`/categories/${id}`);
+      if (editingCategoryId === id) resetCategoryForm();
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to delete category');
+    }
   };
 
   const applyTypeDefaults = (itemType) => {
@@ -383,6 +458,33 @@ function ItemsPage() {
         ))}
       </div>
 
+      <form className="panel" onSubmit={saveCategory}>
+        <h4>Manage categories</h4>
+        <div className="form-grid">
+          <input placeholder="Category name" value={categoryForm.name} onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })} />
+          <input placeholder="Description" value={categoryForm.description} onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })} />
+        </div>
+        <div className="inline-actions">
+          <button className="btn primary" type="submit">{editingCategoryId ? 'Save category' : 'Add category'}</button>
+          {editingCategoryId && <button className="btn secondary" type="button" onClick={resetCategoryForm}>Cancel</button>}
+        </div>
+      </form>
+
+      <div className="panel">
+        {categories.map((category) => (
+          <div className="list-row" key={category._id}>
+            <div>
+              <strong>{category.name}</strong>
+              <div className="muted">{category.description || 'No description'}</div>
+            </div>
+            <div className="inline-actions">
+              <button className="btn secondary" type="button" onClick={() => editCategory(category)}>Edit</button>
+              <button className="btn secondary" type="button" onClick={() => deleteCategory(category._id)}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <form className="panel" onSubmit={saveItem}>
         <h4>Create item</h4>
         <div className="form-grid">
@@ -394,6 +496,19 @@ function ItemsPage() {
             <option value="">Select item type</option>
             {itemTypes.map((itemType) => (
               <option key={itemType._id} value={itemType._id}>{itemType.name}</option>
+            ))}
+          </select>
+          <select value={form.categoryId} onChange={(e) => {
+            const selectedCategory = categories.find((cat) => cat._id === e.target.value);
+            setForm((prev) => ({
+              ...prev,
+              categoryId: selectedCategory?._id || '',
+              category: selectedCategory?.name || prev.category || ''
+            }));
+          }}>
+            <option value="">Select category</option>
+            {categories.map((category) => (
+              <option key={category._id} value={category._id}>{category.name}</option>
             ))}
           </select>
           <input placeholder="Category / variant (e.g. 3KW, Hybrid, TopCon, 200Ah, 30x50mm)" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
@@ -448,36 +563,53 @@ function BillingPage() {
   const [partyPhone, setPartyPhone] = useState('');
   const [partyGSTIN, setPartyGSTIN] = useState('');
   const [type, setType] = useState('sale');
+  const [billingMessage, setBillingMessage] = useState('');
 
   useEffect(() => { api.get('/items').then((res) => setItems(res.data)); }, []);
 
   const addItem = (item) => {
-    const existing = selectedItems.find((x) => x.item === item._id);
-    if (existing) {
-      setSelectedItems(selectedItems.map((x) => x.item === item._id ? { ...x, quantity: x.quantity + 1 } : x));
-    } else {
+    setSelectedItems((prev) => {
+      const existing = prev.find((x) => x.item === item._id);
+      if (existing) {
+        return prev.map((x) => x.item === item._id ? { ...x, quantity: x.quantity + 1, total: (x.price * (x.quantity + 1)) } : x);
+      }
+
       const price = type === 'purchase' ? item.purchasePrice : item.salePrice;
-      setSelectedItems([...selectedItems, { item: item._id, name: item.name, quantity: 1, price, sgstRate: item.sgstRate || 0, cgstRate: item.cgstRate || 0, igstRate: item.igstRate || 0, total: price }]);
-    }
+      return [...prev, { item: item._id, name: item.name, quantity: 1, price, sgstRate: item.sgstRate || 0, cgstRate: item.cgstRate || 0, igstRate: item.igstRate || 0, total: price }];
+    });
   };
 
   const updateQty = (id, delta) => {
-    setSelectedItems(selectedItems.map((entry) => entry.item === id ? { ...entry, quantity: Math.max(1, entry.quantity + delta), total: (entry.price * (entry.quantity + delta)) } : entry));
+    setSelectedItems((prev) => prev.map((entry) => entry.item === id ? { ...entry, quantity: Math.max(1, entry.quantity + delta), total: (entry.price * Math.max(1, entry.quantity + delta)) } : entry));
   };
 
   const saveInvoice = async () => {
-    const payload = {
-      partyName: partyName || customerName,
-      partyPhone: partyPhone || customerPhone,
-      partyGSTIN,
-      customerName,
-      customerPhone,
-      type,
-      items: selectedItems.map((entry) => ({ ...entry, total: entry.quantity * entry.price }))
-    };
-    await api.post('/invoices', payload);
-    alert('Invoice created');
-    setSelectedItems([]);
+    if (!selectedItems.length) {
+      setBillingMessage('Please add at least one item before creating a bill');
+      return;
+    }
+
+    try {
+      const payload = {
+        partyName: partyName || customerName,
+        partyPhone: partyPhone || customerPhone,
+        partyGSTIN,
+        customerName,
+        customerPhone,
+        type,
+        items: selectedItems.map((entry) => ({ ...entry, total: entry.quantity * entry.price }))
+      };
+      await api.post('/invoices', payload);
+      setBillingMessage('Invoice created successfully');
+      setSelectedItems([]);
+      setPartyName('');
+      setPartyPhone('');
+      setPartyGSTIN('');
+      setCustomerName('');
+      setCustomerPhone('');
+    } catch (error) {
+      setBillingMessage(error.response?.data?.message || 'Unable to create invoice');
+    }
   };
 
   const subtotal = selectedItems.reduce((sum, entry) => sum + entry.quantity * entry.price, 0);
@@ -524,6 +656,7 @@ function BillingPage() {
             <div>GST: ₹{gstAmount.toFixed(2)}</div>
             <div><strong>Total: ₹{total.toFixed(2)}</strong></div>
           </div>
+          {billingMessage && <p className="muted">{billingMessage}</p>}
           <button className="btn primary" onClick={saveInvoice}>Create bill</button>
         </div>
       </div>
@@ -541,15 +674,19 @@ function ReportsPage() {
   }, []);
 
   const downloadReport = async (path, filename) => {
-    const res = await api.get(path, { responseType: 'blob' });
-    const url = window.URL.createObjectURL(new Blob([res.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    try {
+      const res = await api.get(path, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      window.alert(error.response?.data?.message || 'Unable to download report');
+    }
   };
 
   return (

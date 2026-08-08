@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5177,
     strictPort: true,
     proxy: {
-      '/api': 'http://localhost:5012'
+      '/api': 'http://localhost:5013'
     }
   },
   preview: {
@@ -16,7 +16,7 @@ export default defineConfig({
     port: 4175,
     strictPort: true,
     proxy: {
-      '/api': 'http://localhost:5012'
+      '/api': 'http://localhost:5013'
     }
   }
 });
