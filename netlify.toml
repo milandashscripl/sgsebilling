@@ -1,6 +1,12 @@
 [build]
+  base = "frontend"
   publish = "dist"
   command = "npm install && npm run build"
 
 [build.environment]
   NPM_FLAGS = "--include=dev"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
