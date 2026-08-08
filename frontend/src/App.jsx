@@ -6,6 +6,31 @@ const API = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({ baseURL: API });
 
+const emptyItemForm = {
+  name: '',
+  itemTypeId: '',
+  itemType: '',
+  category: '',
+  specification: '',
+  unit: 'pcs',
+  purchasePrice: '',
+  salePrice: '',
+  sgstRate: '0',
+  cgstRate: '0',
+  igstRate: '0',
+  stock: '0',
+  description: ''
+};
+
+const emptyItemTypeForm = {
+  name: '',
+  unit: 'pcs',
+  sgstRate: '0',
+  cgstRate: '0',
+  igstRate: '0',
+  description: ''
+};
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -193,39 +218,220 @@ function Dashboard({ user }) {
 
 function ItemsPage() {
   const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ name: '', sku: '', purchasePrice: '', salePrice: '', gstRate: '0', stock: '0', category: 'General' });
+  const [itemTypes, setItemTypes] = useState([]);
+  const [form, setForm] = useState(emptyItemForm);
+  const [typeForm, setTypeForm] = useState(emptyItemTypeForm);
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editingTypeId, setEditingTypeId] = useState(null);
+  const [message, setMessage] = useState('');
 
   const load = async () => {
-    const res = await api.get('/items');
-    setItems(res.data);
+    const [itemsRes, itemTypesRes] = await Promise.all([
+      api.get('/items'),
+      api.get('/item-types')
+    ]);
+    setItems(itemsRes.data);
+    setItemTypes(itemTypesRes.data);
   };
 
   useEffect(() => { load(); }, []);
 
-  const create = async (e) => {
+  const resetItemForm = () => {
+    setForm(emptyItemForm);
+    setEditingItemId(null);
+    setMessage('');
+  };
+
+  const resetTypeForm = () => {
+    setTypeForm(emptyItemTypeForm);
+    setEditingTypeId(null);
+    setMessage('');
+  };
+
+  const saveItem = async (e) => {
     e.preventDefault();
-    await api.post('/items', { ...form, purchasePrice: Number(form.purchasePrice), salePrice: Number(form.salePrice), gstRate: Number(form.gstRate), stock: Number(form.stock) });
-    setForm({ name: '', sku: '', purchasePrice: '', salePrice: '', gstRate: '0', stock: '0', category: 'General' });
+    const payload = {
+      ...form,
+      purchasePrice: Number(form.purchasePrice) || 0,
+      salePrice: Number(form.salePrice) || 0,
+      sgstRate: Number(form.sgstRate) || 0,
+      cgstRate: Number(form.cgstRate) || 0,
+      igstRate: Number(form.igstRate) || 0,
+      stock: Number(form.stock) || 0
+    };
+
+    if (editingItemId) {
+      await api.put(`/items/${editingItemId}`, payload);
+      setMessage('Item updated');
+    } else {
+      await api.post('/items', payload);
+      setMessage('Item created');
+    }
+
+    resetItemForm();
     load();
+  };
+
+  const saveItemType = async (e) => {
+    e.preventDefault();
+    const payload = {
+      ...typeForm,
+      sgstRate: Number(typeForm.sgstRate) || 0,
+      cgstRate: Number(typeForm.cgstRate) || 0,
+      igstRate: Number(typeForm.igstRate) || 0
+    };
+
+    if (editingTypeId) {
+      await api.put(`/item-types/${editingTypeId}`, payload);
+      setMessage('Item type updated');
+    } else {
+      await api.post('/item-types', payload);
+      setMessage('Item type created');
+    }
+
+    resetTypeForm();
+    load();
+  };
+
+  const editItem = (item) => {
+    setEditingItemId(item._id);
+    setForm({
+      ...emptyItemForm,
+      ...item,
+      itemTypeId: item.itemTypeId || '',
+      itemType: item.itemType || '',
+      purchasePrice: item.purchasePrice ?? '',
+      salePrice: item.salePrice ?? '',
+      sgstRate: item.sgstRate ?? 0,
+      cgstRate: item.cgstRate ?? 0,
+      igstRate: item.igstRate ?? 0,
+      stock: item.stock ?? 0
+    });
+    setMessage('');
+  };
+
+  const editItemType = (itemType) => {
+    setEditingTypeId(itemType._id);
+    setTypeForm({
+      ...emptyItemTypeForm,
+      ...itemType,
+      sgstRate: itemType.sgstRate ?? 0,
+      cgstRate: itemType.cgstRate ?? 0,
+      igstRate: itemType.igstRate ?? 0
+    });
+    setMessage('');
+  };
+
+  const deleteItem = async (id) => {
+    if (!window.confirm('Delete this item?')) return;
+    await api.delete(`/items/${id}`);
+    if (editingItemId === id) resetItemForm();
+    load();
+  };
+
+  const deleteItemType = async (id) => {
+    if (!window.confirm('Delete this item type?')) return;
+    await api.delete(`/item-types/${id}`);
+    if (editingTypeId === id) resetTypeForm();
+    load();
+  };
+
+  const applyTypeDefaults = (itemType) => {
+    setForm((prev) => ({
+      ...prev,
+      itemTypeId: itemType?._id || '',
+      itemType: itemType?.name || '',
+      unit: itemType?.unit || prev.unit || 'pcs',
+      sgstRate: itemType?.sgstRate ?? prev.sgstRate ?? '0',
+      cgstRate: itemType?.cgstRate ?? prev.cgstRate ?? '0',
+      igstRate: itemType?.igstRate ?? prev.igstRate ?? '0'
+    }));
   };
 
   return (
     <div>
-      <h3>Inventory items</h3>
-      <form className="panel" onSubmit={create}>
-        <input placeholder="Item name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <input placeholder="SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-        <input placeholder="Purchase price" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
-        <input placeholder="Sale price" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} />
-        <input placeholder="GST %" value={form.gstRate} onChange={(e) => setForm({ ...form, gstRate: e.target.value })} />
-        <input placeholder="Stock" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
-        <button className="btn primary" type="submit">Add item</button>
+      <h3>Item types and product masters</h3>
+
+      <form className="panel" onSubmit={saveItemType}>
+        <h4>Create item type first</h4>
+        <div className="form-grid">
+          <input placeholder="Item type name" value={typeForm.name} onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })} />
+          <input placeholder="Default unit" value={typeForm.unit} onChange={(e) => setTypeForm({ ...typeForm, unit: e.target.value })} />
+          <input placeholder="SGST %" value={typeForm.sgstRate} onChange={(e) => setTypeForm({ ...typeForm, sgstRate: e.target.value })} />
+          <input placeholder="CGST %" value={typeForm.cgstRate} onChange={(e) => setTypeForm({ ...typeForm, cgstRate: e.target.value })} />
+          <input placeholder="IGST %" value={typeForm.igstRate} onChange={(e) => setTypeForm({ ...typeForm, igstRate: e.target.value })} />
+          <input placeholder="Description" value={typeForm.description} onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })} />
+        </div>
+        <div className="inline-actions">
+          <button className="btn primary" type="submit">{editingTypeId ? 'Save type' : 'Add type'}</button>
+          {editingTypeId && <button className="btn secondary" type="button" onClick={resetTypeForm}>Cancel</button>}
+        </div>
       </form>
+
+      <div className="panel">
+        {itemTypes.map((itemType) => (
+          <div className="list-row" key={itemType._id}>
+            <div>
+              <strong>{itemType.name}</strong>
+              <div className="muted">Unit {itemType.unit} • SGST {itemType.sgstRate}% • CGST {itemType.cgstRate}% • IGST {itemType.igstRate}%</div>
+            </div>
+            <div className="inline-actions">
+              <button className="btn secondary" type="button" onClick={() => editItemType(itemType)}>Edit</button>
+              <button className="btn secondary" type="button" onClick={() => deleteItemType(itemType._id)}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <form className="panel" onSubmit={saveItem}>
+        <h4>Create item</h4>
+        <div className="form-grid">
+          <input placeholder="Item name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <select value={form.itemTypeId} onChange={(e) => {
+            const selectedType = itemTypes.find((type) => type._id === e.target.value);
+            applyTypeDefaults(selectedType);
+          }}>
+            <option value="">Select item type</option>
+            {itemTypes.map((itemType) => (
+              <option key={itemType._id} value={itemType._id}>{itemType.name}</option>
+            ))}
+          </select>
+          <input placeholder="Category / variant (e.g. 3KW, Hybrid, TopCon, 200Ah, 30x50mm)" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+          <input placeholder="Specification / size" value={form.specification} onChange={(e) => setForm({ ...form, specification: e.target.value })} />
+          <input placeholder="Unit" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+          <input placeholder="Purchase price" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
+          <input placeholder="Sale price" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} />
+          <input placeholder="SGST %" value={form.sgstRate} onChange={(e) => setForm({ ...form, sgstRate: e.target.value })} />
+          <input placeholder="CGST %" value={form.cgstRate} onChange={(e) => setForm({ ...form, cgstRate: e.target.value })} />
+          <input placeholder="IGST %" value={form.igstRate} onChange={(e) => setForm({ ...form, igstRate: e.target.value })} />
+          <input placeholder="Stock" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
+          <input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        </div>
+        <div className="inline-actions">
+          <button className="btn primary" type="submit">{editingItemId ? 'Save item' : 'Add item'}</button>
+          {editingItemId && <button className="btn secondary" type="button" onClick={resetItemForm}>Cancel</button>}
+        </div>
+        {message && <p className="muted">{message}</p>}
+      </form>
+
       <div className="panel">
         {items.map((item) => (
-          <div className="list-row" key={item._id}>
-            <div><strong>{item.name}</strong><div>{item.sku} • {item.category}</div></div>
-            <div>₹{item.salePrice} • Stock {item.stock}</div>
+          <div className="item-card" key={item._id}>
+            <div className="item-card-main">
+              <div>
+                <strong>{item.name}</strong>
+                <div className="muted">{item.itemType || 'General'} • {item.category || 'General'}</div>
+                <div className="muted">{item.specification || 'No specification added'}</div>
+              </div>
+              <div className="item-meta">
+                <span className="badge">Stock {item.stock}</span>
+                <span className="badge">₹{item.salePrice}</span>
+              </div>
+            </div>
+            <div className="inline-actions">
+              <button className="btn secondary" type="button" onClick={() => editItem(item)}>Edit</button>
+              <button className="btn secondary" type="button" onClick={() => deleteItem(item._id)}>Delete</button>
+            </div>
           </div>
         ))}
       </div>
@@ -238,6 +444,9 @@ function BillingPage() {
   const [selectedItems, setSelectedItems] = useState([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [partyName, setPartyName] = useState('');
+  const [partyPhone, setPartyPhone] = useState('');
+  const [partyGSTIN, setPartyGSTIN] = useState('');
   const [type, setType] = useState('sale');
 
   useEffect(() => { api.get('/items').then((res) => setItems(res.data)); }, []);
@@ -247,7 +456,8 @@ function BillingPage() {
     if (existing) {
       setSelectedItems(selectedItems.map((x) => x.item === item._id ? { ...x, quantity: x.quantity + 1 } : x));
     } else {
-      setSelectedItems([...selectedItems, { item: item._id, name: item.name, quantity: 1, price: item.salePrice, gstRate: item.gstRate, total: item.salePrice }]);
+      const price = type === 'purchase' ? item.purchasePrice : item.salePrice;
+      setSelectedItems([...selectedItems, { item: item._id, name: item.name, quantity: 1, price, sgstRate: item.sgstRate || 0, cgstRate: item.cgstRate || 0, igstRate: item.igstRate || 0, total: price }]);
     }
   };
 
@@ -256,14 +466,25 @@ function BillingPage() {
   };
 
   const saveInvoice = async () => {
-    const payload = { customerName, customerPhone, type, items: selectedItems.map((entry) => ({ ...entry, total: entry.quantity * entry.price })) };
+    const payload = {
+      partyName: partyName || customerName,
+      partyPhone: partyPhone || customerPhone,
+      partyGSTIN,
+      customerName,
+      customerPhone,
+      type,
+      items: selectedItems.map((entry) => ({ ...entry, total: entry.quantity * entry.price }))
+    };
     await api.post('/invoices', payload);
     alert('Invoice created');
     setSelectedItems([]);
   };
 
   const subtotal = selectedItems.reduce((sum, entry) => sum + entry.quantity * entry.price, 0);
-  const gstAmount = selectedItems.reduce((sum, entry) => sum + ((entry.quantity * entry.price) * (entry.gstRate || 0) / 100), 0);
+  const gstAmount = selectedItems.reduce((sum, entry) => {
+    const base = entry.quantity * entry.price;
+    return sum + (base * (entry.sgstRate || 0) / 100) + (base * (entry.cgstRate || 0) / 100) + (base * (entry.igstRate || 0) / 100);
+  }, 0);
   const total = subtotal + gstAmount;
 
   return (
@@ -276,11 +497,14 @@ function BillingPage() {
             <option value="purchase">Purchase</option>
             <option value="return">Return</option>
           </select>
+          <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
+          <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
+          <input placeholder="Party GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
           <input placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
           <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
           <div className="item-list">
             {items.map((item) => (
-              <button key={item._id} className="item-chip" onClick={() => addItem(item)}>{item.name} — ₹{item.salePrice}</button>
+              <button key={item._id} className="item-chip" onClick={() => addItem(item)}>{item.name} — ₹{type === 'purchase' ? item.purchasePrice : item.salePrice}</button>
             ))}
           </div>
         </div>
@@ -309,8 +533,24 @@ function BillingPage() {
 
 function ReportsPage() {
   const [summary, setSummary] = useState({ totalSales: 0, totalPurchases: 0, totalReturns: 0, invoiceCount: 0 });
+  const [stock, setStock] = useState([]);
 
-  useEffect(() => { api.get('/reports/summary').then((res) => setSummary(res.data)); }, []);
+  useEffect(() => {
+    api.get('/reports/summary').then((res) => setSummary(res.data));
+    api.get('/reports/stock').then((res) => setStock(res.data));
+  }, []);
+
+  const downloadReport = async (path, filename) => {
+    const res = await api.get(path, { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
 
   return (
     <div>
@@ -320,8 +560,46 @@ function ReportsPage() {
         <div className="stat-card"><h4>Total purchases</h4><p>₹{summary.totalPurchases.toLocaleString()}</p></div>
         <div className="stat-card"><h4>Total returns</h4><p>₹{summary.totalReturns.toLocaleString()}</p></div>
       </div>
+
       <div className="panel">
-        <button className="btn primary" onClick={() => window.print()}>Print report</button>
+        <h4>Stock report</h4>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Spec</th>
+              <th>Stock</th>
+              <th>Sale Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stock.map((item) => (
+              <tr key={item._id}>
+                <td>{item.name}</td>
+                <td>{item.itemType}</td>
+                <td>{item.category || 'General'}</td>
+                <td>{item.specification || '-'}</td>
+                <td>{item.stock}</td>
+                <td>₹{item.salePrice}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="inline-actions">
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/stock/export', 'stock.csv')}>Download stock CSV</button>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="inline-actions">
+          <button className="btn primary" type="button" onClick={() => downloadReport('/reports/invoices/export', 'invoices.csv')}>Download invoices</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/sales/export', 'sales.csv')}>Download sales</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/purchases/export', 'purchases.csv')}>Download purchases</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/returns/export', 'returns.csv')}>Download returns</button>
+          <button className="btn secondary" type="button" onClick={() => window.print()}>Print report</button>
+        </div>
       </div>
     </div>
   );

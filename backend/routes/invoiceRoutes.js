@@ -16,19 +16,27 @@ router.get('/', auth, async (req, res) => {
 
 router.post('/', auth, async (req, res) => {
   try {
-    const { items, customerName, customerPhone, type, paidAmount, notes } = req.body;
+    const { items, partyName, partyPhone, partyGSTIN, customerName, customerPhone, type, paidAmount, notes } = req.body;
     const invoiceNumber = `INV-${Date.now()}`;
 
     const subtotal = items.reduce((sum, it) => sum + (it.quantity * it.price), 0);
-    const gstAmount = items.reduce((sum, it) => sum + ((it.quantity * it.price) * (it.gstRate || 0) / 100), 0);
+    const gstAmount = items.reduce((sum, it) => {
+      const sgst = ((it.quantity * it.price) * (it.sgstRate || 0) / 100);
+      const cgst = ((it.quantity * it.price) * (it.cgstRate || 0) / 100);
+      const igst = ((it.quantity * it.price) * (it.igstRate || 0) / 100);
+      return sum + sgst + cgst + igst;
+    }, 0);
     const grandTotal = subtotal + gstAmount;
     const balance = grandTotal - (paidAmount || 0);
     const paymentStatus = balance <= 0 ? 'paid' : (paidAmount > 0 ? 'partial' : 'unpaid');
 
     const invoice = new Invoice({
       invoiceNumber,
-      customerName,
-      customerPhone,
+      partyName: partyName || customerName || 'Walk-in Customer',
+      partyPhone: partyPhone || customerPhone || '',
+      partyGSTIN: partyGSTIN || '',
+      customerName: customerName || partyName || 'Walk-in Customer',
+      customerPhone: customerPhone || partyPhone || '',
       type,
       items,
       subtotal,

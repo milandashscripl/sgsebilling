@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 
 const invoiceSchema = new mongoose.Schema({
   invoiceNumber: { type: String, required: true, unique: true },
+  partyName: { type: String, default: 'Walk-in Customer' },
+  partyPhone: { type: String, default: '' },
+  partyGSTIN: { type: String, default: '' },
   customerName: { type: String, default: 'Walk-in Customer' },
   customerPhone: { type: String, default: '' },
   type: { type: String, enum: ['sale', 'purchase', 'return'], default: 'sale' },
@@ -10,7 +13,9 @@ const invoiceSchema = new mongoose.Schema({
     name: String,
     quantity: Number,
     price: Number,
-    gstRate: Number,
+    sgstRate: Number,
+    cgstRate: Number,
+    igstRate: Number,
     total: Number
   }],
   subtotal: Number,
