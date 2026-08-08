@@ -33,6 +33,7 @@ input::placeholder { color: rgba(255,255,255,0.6); }
 .content { display: grid; gap: 16px; }
 .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .stat-card { padding: 16px; border-radius: 18px; }
+.accounting-grid { display: grid; gap: 16px; }
 .stat-card h4, .panel h4 { margin-top: 0; }
 .panel { padding: 16px; border-radius: 18px; display: grid; gap: 12px; }
 .list-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }

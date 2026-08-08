@@ -39,26 +39,43 @@ const emptyCategoryForm = {
 };
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem('user');
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
     if (!token) {
       setLoading(false);
       return;
     }
 
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+
     api.get('/auth/me')
-      .then((res) => setUser(res.data.user))
-      .catch(() => localStorage.removeItem('token'))
+      .then((res) => {
+        const nextUser = res.data.user;
+        localStorage.setItem('user', JSON.stringify(nextUser));
+        setUser(nextUser);
+      })
+      .catch(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
     navigate('/login');
   };
@@ -113,6 +130,7 @@ function AuthenticatedApp({ user, logout }) {
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/items">Items</Link>
           <Link to="/billing">Billing</Link>
+          <Link to="/accounting">Accounting</Link>
           <Link to="/reports">Reports</Link>
           {user.role === 'admin' && <Link to="/users">Users</Link>}
         </aside>
@@ -121,6 +139,7 @@ function AuthenticatedApp({ user, logout }) {
             <Route path="/dashboard" element={<Dashboard user={user} />} />
             <Route path="/items" element={<ItemsPage />} />
             <Route path="/billing" element={<BillingPage />} />
+            <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -145,6 +164,7 @@ function Login({ setUser }) {
       if (!token) throw new Error('No authentication token returned');
 
       localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
       api.defaults.headers.common.Authorization = `Bearer ${token}`;
       setUser(res.data.user);
       navigate('/dashboard');
@@ -179,6 +199,7 @@ function Register({ setUser }) {
       if (!token) throw new Error('No authentication token returned');
 
       localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
       api.defaults.headers.common.Authorization = `Bearer ${token}`;
       setUser(res.data.user);
       navigate('/dashboard');
@@ -675,6 +696,192 @@ function BillingPage() {
   );
 }
 
+function AccountingPage() {
+  const [accounts, setAccounts] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [summary, setSummary] = useState({ accounts: [], paymentMethods: [], incomeTotal: 0, expenseTotal: 0 });
+  const [accountForm, setAccountForm] = useState({ name: '', type: 'cash', openingBalance: '0', notes: '' });
+  const [transactionForm, setTransactionForm] = useState({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
+  const [expenseForm, setExpenseForm] = useState({ category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
+  const [message, setMessage] = useState('');
+
+  const load = async () => {
+    try {
+      const [accountsRes, transactionsRes, expensesRes, summaryRes] = await Promise.all([
+        api.get('/accounting/accounts'),
+        api.get('/accounting/transactions'),
+        api.get('/accounting/expenses'),
+        api.get('/accounting/summary')
+      ]);
+      setAccounts(accountsRes.data);
+      setTransactions(transactionsRes.data);
+      setExpenses(expensesRes.data);
+      setSummary(summaryRes.data);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to load accounting data');
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const addAccount = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/accounting/accounts', {
+        ...accountForm,
+        openingBalance: Number(accountForm.openingBalance || 0)
+      });
+      setAccountForm({ name: '', type: 'cash', openingBalance: '0', notes: '' });
+      setMessage('Account created');
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to create account');
+    }
+  };
+
+  const addTransaction = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/accounting/transactions', {
+        ...transactionForm,
+        amount: Number(transactionForm.amount || 0)
+      });
+      setTransactionForm({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
+      setMessage('Ledger entry saved');
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to save ledger');
+    }
+  };
+
+  const addExpense = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/accounting/expenses', {
+        ...expenseForm,
+        amount: Number(expenseForm.amount || 0)
+      });
+      setExpenseForm({ category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
+      setMessage('Expense saved');
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to save expense');
+    }
+  };
+
+  return (
+    <div>
+      <h3>Accounting and daily cash book</h3>
+      {message && <p className="muted">{message}</p>}
+
+      <div className="stats-grid">
+        <div className="stat-card"><h4>Income total</h4><p>₹{(summary.incomeTotal || 0).toLocaleString()}</p></div>
+        <div className="stat-card"><h4>Expense total</h4><p>₹{(summary.expenseTotal || 0).toLocaleString()}</p></div>
+      </div>
+
+      <div className="panel">
+        <h4>Account balances</h4>
+        {summary.accounts.map((account) => (
+          <div className="list-row" key={account._id}>
+            <div>
+              <strong>{account.name}</strong>
+              <div className="muted">{account.type} • {account.notes || 'No notes'}</div>
+            </div>
+            <div><strong>₹{Number(account.balance || 0).toLocaleString()}</strong></div>
+          </div>
+        ))}
+      </div>
+
+      <div className="panel">
+        <h4>Add account</h4>
+        <form className="form-grid" onSubmit={addAccount}>
+          <input placeholder="Account name" value={accountForm.name} onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })} />
+          <select value={accountForm.type} onChange={(e) => setAccountForm({ ...accountForm, type: e.target.value })}>
+            <option value="cash">Cash</option>
+            <option value="bank">Bank</option>
+            <option value="digital">Digital</option>
+          </select>
+          <input placeholder="Opening balance" value={accountForm.openingBalance} onChange={(e) => setAccountForm({ ...accountForm, openingBalance: e.target.value })} />
+          <input placeholder="Notes" value={accountForm.notes} onChange={(e) => setAccountForm({ ...accountForm, notes: e.target.value })} />
+          <button className="btn primary" type="submit">Create account</button>
+        </form>
+      </div>
+
+      <div className="panel">
+        <h4>Ledger / cash book entry</h4>
+        <form className="form-grid" onSubmit={addTransaction}>
+          <select value={transactionForm.accountId} onChange={(e) => setTransactionForm({ ...transactionForm, accountId: e.target.value })}>
+            <option value="">Select account</option>
+            {accounts.map((account) => (<option key={account._id} value={account._id}>{account.name}</option>))}
+          </select>
+          <select value={transactionForm.type} onChange={(e) => setTransactionForm({ ...transactionForm, type: e.target.value })}>
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+          </select>
+          <input placeholder="Amount" value={transactionForm.amount} onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })} />
+          <select value={transactionForm.paymentMethod} onChange={(e) => setTransactionForm({ ...transactionForm, paymentMethod: e.target.value })}>
+            <option value="cash">Cash</option>
+            <option value="phonepe">PhonePe</option>
+            <option value="gpay">GPay</option>
+            <option value="neft">NEFT</option>
+            <option value="rtgs">RTGS</option>
+            <option value="withdrawal">Withdrawal</option>
+          </select>
+          <input placeholder="Reference / receipt" value={transactionForm.reference} onChange={(e) => setTransactionForm({ ...transactionForm, reference: e.target.value })} />
+          <input placeholder="Note" value={transactionForm.note} onChange={(e) => setTransactionForm({ ...transactionForm, note: e.target.value })} />
+          <button className="btn primary" type="submit">Save ledger entry</button>
+        </form>
+      </div>
+
+      <div className="panel">
+        <h4>Daily expenses</h4>
+        <form className="form-grid" onSubmit={addExpense}>
+          <input placeholder="Expense category" value={expenseForm.category} onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })} />
+          <input placeholder="Amount" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} />
+          <select value={expenseForm.accountId} onChange={(e) => setExpenseForm({ ...expenseForm, accountId: e.target.value })}>
+            <option value="">Select account</option>
+            {accounts.map((account) => (<option key={account._id} value={account._id}>{account.name}</option>))}
+          </select>
+          <select value={expenseForm.paymentMethod} onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}>
+            <option value="cash">Cash</option>
+            <option value="phonepe">PhonePe</option>
+            <option value="gpay">GPay</option>
+            <option value="neft">NEFT</option>
+            <option value="rtgs">RTGS</option>
+            <option value="withdrawal">Withdrawal</option>
+          </select>
+          <input placeholder="Note" value={expenseForm.note} onChange={(e) => setExpenseForm({ ...expenseForm, note: e.target.value })} />
+          <button className="btn primary" type="submit">Save expense</button>
+        </form>
+      </div>
+
+      <div className="panel">
+        <h4>Payment method summary</h4>
+        {summary.paymentMethods.map((entry) => (
+          <div className="list-row" key={entry.method}>
+            <div><strong>{entry.method}</strong></div>
+            <div>₹{Number(entry.total || 0).toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="panel">
+        <h4>Recent ledger entries</h4>
+        {transactions.map((entry) => (
+          <div className="list-row" key={entry._id}>
+            <div>
+              <strong>{entry.reference || entry.note || 'Ledger entry'}</strong>
+              <div className="muted">{entry.date} • {entry.paymentMethod}</div>
+            </div>
+            <div>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ReportsPage() {
   const [summary, setSummary] = useState({ totalSales: 0, totalPurchases: 0, totalReturns: 0, invoiceCount: 0 });
   const [stock, setStock] = useState([]);
@@ -684,7 +891,7 @@ function ReportsPage() {
     api.get('/reports/stock').then((res) => setStock(res.data));
   }, []);
 
-  const downloadReport = async (path, filename) => {
+  const downloadReport = async (path, filename, type = 'csv') => {
     try {
       const res = await api.get(path, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data]));
@@ -700,6 +907,29 @@ function ReportsPage() {
     }
   };
 
+  const downloadPdfReport = async () => {
+    const content = [
+      'SGSE Billing Report',
+      `Sales: ₹${summary.totalSales.toLocaleString()}`,
+      `Purchases: ₹${summary.totalPurchases.toLocaleString()}`,
+      `Returns: ₹${summary.totalReturns.toLocaleString()}`,
+      `Invoice count: ${summary.invoiceCount}`,
+      '',
+      'Stock Report',
+      ...stock.map((item) => `${item.name} | ${item.itemType || '-'} | ${item.category || 'General'} | Stock: ${item.stock}`)
+    ].join('\n');
+
+    const blob = new Blob([content], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'sgse-report.pdf');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <h3>Reports and print-ready summaries</h3>
@@ -707,6 +937,7 @@ function ReportsPage() {
         <div className="stat-card"><h4>Total sales</h4><p>₹{summary.totalSales.toLocaleString()}</p></div>
         <div className="stat-card"><h4>Total purchases</h4><p>₹{summary.totalPurchases.toLocaleString()}</p></div>
         <div className="stat-card"><h4>Total returns</h4><p>₹{summary.totalReturns.toLocaleString()}</p></div>
+        <div className="stat-card"><h4>Invoice count</h4><p>{summary.invoiceCount}</p></div>
       </div>
 
       <div className="panel">
@@ -742,10 +973,11 @@ function ReportsPage() {
 
       <div className="panel">
         <div className="inline-actions">
-          <button className="btn primary" type="button" onClick={() => downloadReport('/reports/invoices/export', 'invoices.csv')}>Download invoices</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/sales/export', 'sales.csv')}>Download sales</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/purchases/export', 'purchases.csv')}>Download purchases</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/returns/export', 'returns.csv')}>Download returns</button>
+          <button className="btn primary" type="button" onClick={() => downloadReport('/reports/invoices/export', 'invoices.csv')}>Download invoices CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/sales/export', 'sales.csv')}>Download sales CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/purchases/export', 'purchases.csv')}>Download purchases CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/returns/export', 'returns.csv')}>Download returns CSV</button>
+          <button className="btn secondary" type="button" onClick={downloadPdfReport}>Download PDF report</button>
           <button className="btn secondary" type="button" onClick={() => window.print()}>Print report</button>
         </div>
       </div>

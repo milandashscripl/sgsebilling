@@ -35,6 +35,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const invoiceRoutes = require('./routes/invoiceRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
+const accountingRoutes = require('./routes/accountingRoutes');
 const { authStore } = require('./utils/authStore');
 
 app.use('/api/auth', authRoutes);
@@ -44,6 +45,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/accounting', accountingRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
