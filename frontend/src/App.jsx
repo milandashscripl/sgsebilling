@@ -93,14 +93,17 @@ function PublicApp({ setUser }) {
   return (
     <div className="public-screen">
       <div className="hero-card">
-        <div>
-          <p className="eyebrow">Modern billing & stock management</p>
-          <h1>SGSE Billing Suite</h1>
-          <p>Create invoices, manage stock, handle purchases, returns, payments, and reports from one polished workspace.</p>
-          <div className="hero-actions">
-            <Link className="btn primary" to="/login">Login</Link>
-            <Link className="btn secondary" to="/register">Create account</Link>
+        <div className="hero-header">
+          <img src="/logo.svg" alt="Suryaghar logo" className="hero-logo" />
+          <div>
+            <p className="eyebrow">Modern billing & stock management</p>
+            <h1>SGSE Billing Suite</h1>
           </div>
+        </div>
+        <p>Create invoices, manage stock, handle purchases, returns, payments, and reports from one polished workspace.</p>
+        <div className="hero-actions">
+          <Link className="btn primary" to="/login">Login</Link>
+          <Link className="btn secondary" to="/register">Create account</Link>
         </div>
       </div>
       <Routes>
