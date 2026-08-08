@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_BASE_URL } from './config';
 
-const API = import.meta.env.VITE_API_URL || 'https://sgsebilling.onrender.com/api';
+const API = API_BASE_URL;
 
 const api = axios.create({ baseURL: API });
 
@@ -137,14 +138,19 @@ function Login({ setUser }) {
 
   const submit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
       const res = await api.post('/auth/login', form);
-      localStorage.setItem('token', res.data.token);
-      api.defaults.headers.common.Authorization = `Bearer ${res.data.token}`;
+      const token = res?.data?.token;
+      if (!token) throw new Error('No authentication token returned');
+
+      localStorage.setItem('token', token);
+      api.defaults.headers.common.Authorization = `Bearer ${token}`;
       setUser(res.data.user);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      const message = err?.response?.data?.message || err?.message || 'Login failed';
+      setError(message);
     }
   };
 
@@ -166,14 +172,19 @@ function Register({ setUser }) {
 
   const submit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
       const res = await api.post('/auth/register', form);
-      localStorage.setItem('token', res.data.token);
-      api.defaults.headers.common.Authorization = `Bearer ${res.data.token}`;
+      const token = res?.data?.token;
+      if (!token) throw new Error('No authentication token returned');
+
+      localStorage.setItem('token', token);
+      api.defaults.headers.common.Authorization = `Bearer ${token}`;
       setUser(res.data.user);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      const message = err?.response?.data?.message || err?.message || 'Registration failed';
+      setError(message);
     }
   };
 

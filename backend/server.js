@@ -8,11 +8,12 @@ const path = require('path');
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = Number(process.env.PORT || 5001);
 const mongoUri = process.env.MONGODB_URI || (process.env.MONGODB_USERNAME && process.env.MONGODB_PASSWORD
   ? `mongodb+srv://${encodeURIComponent(process.env.MONGODB_USERNAME)}:${encodeURIComponent(process.env.MONGODB_PASSWORD)}@cluster0.vfl7zua.mongodb.net`
   : undefined);
 let isMongoConnected = false;
+let mongoMode = 'none';
 
 app.use(cors());
 app.use(express.json());
@@ -22,7 +23,8 @@ app.get('/health', (req, res) => {
   res.json({
     ok: true,
     message: 'SGSE billing API is running',
-    database: isMongoConnected ? 'connected' : 'disconnected'
+    database: isMongoConnected ? 'connected' : 'disconnected',
+    mode: mongoMode
   });
 });
 
@@ -33,6 +35,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const invoiceRoutes = require('./routes/invoiceRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
+const { authStore } = require('./utils/authStore');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/items', itemRoutes);
@@ -42,42 +45,71 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 
+app.get('/api/health', (req, res) => res.json({ ok: true }));
+
 const startServer = () => {
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. Stop the existing process and try again.`);
+      process.exit(1);
+    }
+    throw err;
+  });
 };
 
-if (!mongoUri) {
-  console.warn('Missing MongoDB connection string. Set MONGODB_URI or MONGODB_USERNAME/MONGODB_PASSWORD.');
-  startServer();
-} else {
+const connectToDatabase = async () => {
   mongoose.set('strictQuery', false);
-  mongoose.connect(mongoUri, {
-    serverSelectionTimeoutMS: 10000,
-    autoIndex: true
-  })
-    .then(() => {
-      isMongoConnected = true;
-      console.log('MongoDB connected');
-      startServer();
-    })
-    .catch((err) => {
-      isMongoConnected = false;
-      console.error('MongoDB connection error:', err.message);
-      startServer();
+
+  if (!mongoUri) {
+    console.warn('No MongoDB URI configured. Starting in local mode without a database.');
+    mongoMode = 'local';
+    return;
+  }
+
+  try {
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+      autoIndex: true
     });
-
-  mongoose.connection.on('connected', () => {
     isMongoConnected = true;
-    console.log('MongoDB connection established');
-  });
-
-  mongoose.connection.on('error', (err) => {
+    mongoMode = 'atlas';
+    console.log('MongoDB connected');
+  } catch (err) {
     isMongoConnected = false;
     console.error('MongoDB connection error:', err.message);
-  });
+    console.warn('Falling back to local mode without a database.');
+    mongoMode = 'local';
+  }
+};
 
-  mongoose.connection.on('disconnected', () => {
-    isMongoConnected = false;
-    console.warn('MongoDB disconnected');
-  });
-}
+(async () => {
+  try {
+    await connectToDatabase();
+  } catch (err) {
+    console.error('Database bootstrap failed:', err.message);
+  }
+
+  try {
+    await authStore.seedDefaultAdmin();
+  } catch (err) {
+    console.error('Admin seed failed:', err.message);
+  }
+
+  startServer();
+})();
+
+mongoose.connection.on('connected', () => {
+  isMongoConnected = true;
+  console.log('MongoDB connection established');
+});
+
+mongoose.connection.on('error', (err) => {
+  isMongoConnected = false;
+  console.error('MongoDB connection error:', err.message);
+});
+
+mongoose.connection.on('disconnected', () => {
+  isMongoConnected = false;
+  console.warn('MongoDB disconnected');
+});

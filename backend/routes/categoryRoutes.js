@@ -1,46 +1,38 @@
 const express = require('express');
 const auth = require('../middleware/auth');
-const Category = require('../models/Category');
 
 const router = express.Router();
 
+const categories = [];
+let nextId = 1;
+
 router.get('/', auth, async (req, res) => {
-  try {
-    const categories = await Category.find().sort({ createdAt: -1 });
-    res.json(categories);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  res.json(categories.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
 });
 
 router.post('/', auth, async (req, res) => {
-  try {
-    const category = new Category({ ...req.body, createdBy: req.user._id });
-    await category.save();
-    res.status(201).json(category);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  const category = {
+    _id: String(nextId++),
+    ...req.body,
+    createdBy: req.user?.id,
+    createdAt: Date.now()
+  };
+  categories.push(category);
+  res.status(201).json(category);
 });
 
 router.put('/:id', auth, async (req, res) => {
-  try {
-    const category = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!category) return res.status(404).json({ message: 'Category not found' });
-    res.json(category);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  const existing = categories.find((entry) => entry._id === req.params.id);
+  if (!existing) return res.status(404).json({ message: 'Category not found' });
+  Object.assign(existing, req.body, { _id: existing._id, createdAt: existing.createdAt, createdBy: existing.createdBy });
+  res.json(existing);
 });
 
 router.delete('/:id', auth, async (req, res) => {
-  try {
-    const category = await Category.findByIdAndDelete(req.params.id);
-    if (!category) return res.status(404).json({ message: 'Category not found' });
-    res.json({ message: 'Category deleted' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  const index = categories.findIndex((entry) => entry._id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Category not found' });
+  categories.splice(index, 1);
+  res.json({ message: 'Category deleted' });
 });
 
 module.exports = router;
