@@ -1,18 +1,19 @@
 const express = require('express');
 const cors = require('cors');
-
-// Change this line to include your new Vercel frontend URL:
-app.use(cors({
-  origin: ['https://sgsebilling.netlify.app', 'http://localhost:3000']
-}));
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const path = require('path');
 
+// Change this line to include your new Vercel frontend URL:
+
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
+
+app.use(cors({
+  origin: ['https://sgsebilling.netlify.app', 'http://localhost:3000']
+}));
 const PORT = Number(process.env.PORT || 5001);
 const mongoUri = process.env.MONGODB_URI || (process.env.MONGODB_USERNAME && process.env.MONGODB_PASSWORD
   ? `mongodb+srv://${encodeURIComponent(process.env.MONGODB_USERNAME)}:${encodeURIComponent(process.env.MONGODB_PASSWORD)}@cluster0.vfl7zua.mongodb.net`
@@ -42,6 +43,8 @@ const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
 const accountingRoutes = require('./routes/accountingRoutes');
 const { authStore } = require('./utils/authStore');
+const User = require('./models/User');
+const bcrypt = require('bcryptjs');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/items', itemRoutes);
@@ -98,7 +101,20 @@ const connectToDatabase = async () => {
   }
 
   try {
-    await authStore.seedDefaultAdmin();
+    if (mongoose.connection.readyState === 1) {
+      const existingAdmin = await User.findOne({ email: 'admin@example.com' });
+      if (!existingAdmin) {
+        const hashed = await bcrypt.hash('123456', 10);
+        await User.create({
+          name: 'Admin',
+          email: 'admin@example.com',
+          password: hashed,
+          role: 'admin'
+        });
+      }
+    } else {
+      await authStore.seedDefaultAdmin();
+    }
   } catch (err) {
     console.error('Admin seed failed:', err.message);
   }
