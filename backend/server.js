@@ -1,5 +1,10 @@
 const express = require('express');
 const cors = require('cors');
+
+// Change this line to include your new Vercel frontend URL:
+app.use(cors({
+  origin: ['https://sgsebilling.netlify.app', 'http://localhost:3000']
+}));
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
