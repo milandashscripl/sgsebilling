@@ -12,7 +12,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const app = express();
 
 app.use(cors({
-  origin: ['https://sgsebilling.netlify.app', 'http://localhost:3000']
+  origin: ['https://sgsebilling.netlify.app','https://sgsebilling.netlify.app', 'http://localhost:3000']
 }));
 const PORT = Number(process.env.PORT || 5001);
 const mongoUri = process.env.MONGODB_URI || (process.env.MONGODB_USERNAME && process.env.MONGODB_PASSWORD
