@@ -16,9 +16,23 @@ router.get('/', auth, async (req, res) => {
 
 router.post('/', auth, async (req, res) => {
   try {
-    const { items = [], partyName, partyPhone, partyGSTIN, customerName, customerPhone, type, paidAmount, notes } = req.body;
+    const {
+      items = [],
+      partyName,
+      partyPhone,
+      partyGSTIN,
+      customerName,
+      customerPhone,
+      type,
+      paidAmount,
+      notes,
+      subtotal: suppliedSubtotal,
+      gstAmount: suppliedGstAmount,
+      grandTotal: suppliedGrandTotal
+    } = req.body;
+
     const invoiceItems = (items || []).map((item) => ({
-      item: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : undefined,
+      item: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : item.item ? new mongoose.Types.ObjectId(item.item) : undefined,
       name: item.name || item.itemName || '',
       quantity: Number(item.quantity || 0),
       price: Number(item.price || 0),
@@ -28,15 +42,24 @@ router.post('/', auth, async (req, res) => {
       total: Number(item.total || ((Number(item.quantity || 0) * Number(item.price || 0))))
     }));
 
-    const subtotal = invoiceItems.reduce((sum, it) => sum + (it.total || (it.quantity * it.price)), 0);
-    const gstAmount = invoiceItems.reduce((sum, it) => {
-      const amount = it.quantity * it.price;
-      const sgst = (amount * (it.sgstRate || 0) / 100);
-      const cgst = (amount * (it.cgstRate || 0) / 100);
-      const igst = (amount * (it.igstRate || 0) / 100);
-      return sum + sgst + cgst + igst;
-    }, 0);
-    const grandTotal = subtotal + gstAmount;
+    const subtotal = typeof suppliedSubtotal === 'number' && !Number.isNaN(suppliedSubtotal)
+      ? suppliedSubtotal
+      : invoiceItems.reduce((sum, it) => sum + (it.total || (it.quantity * it.price)), 0);
+
+    const gstAmount = typeof suppliedGstAmount === 'number' && !Number.isNaN(suppliedGstAmount)
+      ? suppliedGstAmount
+      : invoiceItems.reduce((sum, it) => {
+        const amount = it.quantity * it.price;
+        const sgst = (amount * (it.sgstRate || 0) / 100);
+        const cgst = (amount * (it.cgstRate || 0) / 100);
+        const igst = (amount * (it.igstRate || 0) / 100);
+        return sum + sgst + cgst + igst;
+      }, 0);
+
+    const grandTotal = typeof suppliedGrandTotal === 'number' && !Number.isNaN(suppliedGrandTotal)
+      ? suppliedGrandTotal
+      : subtotal + gstAmount;
+
     const paid = Number(paidAmount || 0);
     const balance = grandTotal - paid;
     const paymentStatus = balance <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');

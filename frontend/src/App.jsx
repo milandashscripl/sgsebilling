@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
 
 const API = API_BASE_URL;
@@ -132,6 +133,7 @@ function AuthenticatedApp({ user, logout }) {
         <aside className="sidebar">
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/items">Items</Link>
+          <Link to="/stock">Stock</Link>
           <Link to="/billing">Billing</Link>
           <Link to="/accounting">Accounting</Link>
           <Link to="/reports">Reports</Link>
@@ -142,6 +144,7 @@ function AuthenticatedApp({ user, logout }) {
             <Route path="/dashboard" element={<Dashboard user={user} />} />
             <Route path="/items" element={<ItemsPage />} />
             <Route path="/billing" element={<BillingPage />} />
+            <Route path="/stock" element={<StockPage />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
@@ -589,6 +592,168 @@ function ItemsPage() {
   );
 }
 
+function StockPage() {
+  const [items, setItems] = useState([]);
+  const [itemTypes, setItemTypes] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [stockSearch, setStockSearch] = useState('');
+  const [typeSearch, setTypeSearch] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    const loadStock = async () => {
+      try {
+        const [itemsRes, itemTypesRes, categoriesRes] = await Promise.all([
+          api.get('/items'),
+          api.get('/item-types'),
+          api.get('/categories')
+        ]);
+        setItems(itemsRes.data);
+        setItemTypes(itemTypesRes.data);
+        setCategories(categoriesRes.data);
+      } catch (error) {
+        setMessage(error.response?.data?.message || 'Unable to load stock');
+      }
+    };
+    loadStock();
+  }, []);
+
+  const filteredItems = items.filter((item) => {
+    const matchesStock = item.name.toLowerCase().includes(stockSearch.toLowerCase());
+    const matchesType = item.itemType?.toLowerCase().includes(typeSearch.toLowerCase());
+    const matchesCategory = item.category?.toLowerCase().includes(categorySearch.toLowerCase());
+    return matchesStock && matchesType && matchesCategory;
+  });
+
+  const groupedByType = itemTypes.map((type) => ({
+    ...type,
+    items: filteredItems.filter((item) => item.itemType === type.name)
+  })).filter((group) => group.items.length > 0);
+
+  const untypedItems = filteredItems.filter((item) => !item.itemType);
+  const groupedByCategory = categories.map((category) => ({
+    ...category,
+    items: filteredItems.filter((item) => item.category === category.name)
+  })).filter((group) => group.items.length > 0);
+
+  const typeStockTotals = groupedByType.map((group) => ({
+    name: group.name,
+    totalStock: group.items.reduce((sum, item) => sum + (item.stock || 0), 0),
+    count: group.items.length
+  }));
+
+  return (
+    <div>
+      <h3>Stock overview</h3>
+      <div className="panel">
+        <div className="form-grid">
+          <input placeholder="Search item name" value={stockSearch} onChange={(e) => setStockSearch(e.target.value)} />
+          <input placeholder="Filter by type" value={typeSearch} onChange={(e) => setTypeSearch(e.target.value)} />
+          <input placeholder="Filter by category" value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="stats-grid">
+        {typeStockTotals.map((group) => (
+          <div key={group.name} className="stat-card">
+            <h4>{group.name}</h4>
+            <p>{group.count} item{group.count !== 1 ? 's' : ''}</p>
+            <p>{group.totalStock} total stock</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="panel">
+        <h4>Stock by item type</h4>
+        {groupedByType.map((group) => (
+          <div className="panel" key={group._id}>
+            <h5>{group.name} — {group.items.reduce((sum, item) => sum + (item.stock || 0), 0)} in stock</h5>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Spec</th>
+                  <th>Stock</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.items.map((item) => (
+                  <tr key={item._id}>
+                    <td>{item.name}</td>
+                    <td>{item.category || 'General'}</td>
+                    <td>{item.specification || '-'}</td>
+                    <td>{item.stock}</td>
+                    <td>₹{item.salePrice}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+        {untypedItems.length > 0 && (
+          <div className="panel">
+            <h5>Other items</h5>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Stock</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {untypedItems.map((item) => (
+                  <tr key={item._id}>
+                    <td>{item.name}</td>
+                    <td>{item.category || 'General'}</td>
+                    <td>{item.stock}</td>
+                    <td>₹{item.salePrice}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="panel">
+        <h4>Stock by category</h4>
+        {groupedByCategory.map((group) => (
+          <div className="panel" key={group._id}>
+            <h5>{group.name} — {group.items.reduce((sum, item) => sum + (item.stock || 0), 0)} in stock</h5>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Spec</th>
+                  <th>Stock</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.items.map((item) => (
+                  <tr key={item._id}>
+                    <td>{item.name}</td>
+                    <td>{item.itemType || 'General'}</td>
+                    <td>{item.specification || '-'}</td>
+                    <td>{item.stock}</td>
+                    <td>₹{item.salePrice}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BillingPage() {
   const [items, setItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
@@ -598,6 +763,11 @@ function BillingPage() {
   const [partyPhone, setPartyPhone] = useState('');
   const [partyGSTIN, setPartyGSTIN] = useState('');
   const [type, setType] = useState('sale');
+  const [billingMode, setBillingMode] = useState('auto');
+  const [manualSubtotal, setManualSubtotal] = useState('');
+  const [manualGst, setManualGst] = useState('');
+  const [manualTotal, setManualTotal] = useState('');
+  const [paidAmount, setPaidAmount] = useState('');
   const [billingMessage, setBillingMessage] = useState('');
 
   useEffect(() => { api.get('/items').then((res) => setItems(res.data)); }, []);
@@ -619,12 +789,21 @@ function BillingPage() {
   };
 
   const saveInvoice = async () => {
-    if (!selectedItems.length) {
+    if (billingMode === 'auto' && !selectedItems.length) {
       setBillingMessage('Please add at least one item before creating a bill');
       return;
     }
 
+    if (billingMode === 'manual' && (!manualTotal || Number(manualTotal) <= 0)) {
+      setBillingMessage('Enter a manual total amount before creating a bill');
+      return;
+    }
+
     try {
+      const itemsPayload = billingMode === 'manual'
+        ? [{ itemId: undefined, name: 'Manual billing', quantity: 1, price: Number(manualSubtotal) || 0, sgstRate: 0, cgstRate: 0, igstRate: 0, total: Number(manualTotal) || Number(manualSubtotal) || 0 }]
+        : selectedItems.map((entry) => ({ ...entry, itemId: entry.item, total: entry.quantity * entry.price }));
+
       const payload = {
         partyName: partyName || customerName,
         partyPhone: partyPhone || customerPhone,
@@ -632,9 +811,15 @@ function BillingPage() {
         customerName,
         customerPhone,
         type,
-        items: selectedItems.map((entry) => ({ ...entry, total: entry.quantity * entry.price }))
+        items: itemsPayload,
+        subtotal: billingMode === 'manual' ? Number(manualSubtotal) || 0 : undefined,
+        gstAmount: billingMode === 'manual' ? Number(manualGst) || 0 : undefined,
+        grandTotal: billingMode === 'manual' ? Number(manualTotal) || 0 : undefined,
+        paidAmount: Number(paidAmount) || 0
       };
-      await api.post('/invoices', payload);
+
+      const res = await api.post('/invoices', payload);
+      const invoice = res.data;
       setBillingMessage('Invoice created successfully');
       setSelectedItems([]);
       setPartyName('');
@@ -642,6 +827,12 @@ function BillingPage() {
       setPartyGSTIN('');
       setCustomerName('');
       setCustomerPhone('');
+      setManualSubtotal('');
+      setManualGst('');
+      setManualTotal('');
+      setPaidAmount('');
+      setBillingMode('auto');
+      downloadInvoicePdf(invoice);
     } catch (error) {
       setBillingMessage(error.response?.data?.message || 'Unable to create invoice');
     }
@@ -654,6 +845,46 @@ function BillingPage() {
   }, 0);
   const total = subtotal + gstAmount;
 
+  const downloadInvoicePdf = (invoice) => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('SGSE Billing Invoice', 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Invoice #: ${invoice.invoiceNumber}`, 14, 32);
+    doc.text(`Type: ${invoice.type}`, 14, 38);
+    doc.text(`Party: ${invoice.partyName || invoice.customerName}`, 14, 44);
+    doc.text(`Phone: ${invoice.partyPhone || invoice.customerPhone}`, 14, 50);
+    if (invoice.partyGSTIN) doc.text(`GSTIN: ${invoice.partyGSTIN}`, 14, 56);
+    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleString()}`, 14, 62);
+
+    let y = 74;
+    doc.setFontSize(12);
+    doc.text('Items', 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    invoice.items.forEach((item) => {
+      doc.text(`${item.name} x${item.quantity} @ ₹${item.price.toFixed(2)} = ₹${item.total.toFixed(2)}`, 14, y);
+      y += 6;
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
+    });
+
+    y += 8;
+    doc.text(`Subtotal: ₹${invoice.subtotal.toFixed(2)}`, 14, y);
+    y += 6;
+    doc.text(`GST: ₹${invoice.gstAmount.toFixed(2)}`, 14, y);
+    y += 6;
+    doc.text(`Total: ₹${invoice.grandTotal.toFixed(2)}`, 14, y);
+    y += 6;
+    doc.text(`Paid: ₹${invoice.paidAmount?.toFixed(2) || 0}`, 14, y);
+    y += 6;
+    doc.text(`Balance: ₹${invoice.balance?.toFixed(2) || 0}`, 14, y);
+
+    doc.save(`${invoice.invoiceNumber}.pdf`);
+  };
+
   return (
     <div>
       <h3>Single-price billing</h3>
@@ -664,19 +895,32 @@ function BillingPage() {
             <option value="purchase">Purchase</option>
             <option value="return">Return</option>
           </select>
+          <select value={billingMode} onChange={(e) => setBillingMode(e.target.value)}>
+            <option value="auto">Item-based billing</option>
+            <option value="manual">Manual total billing</option>
+          </select>
           <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
           <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
           <input placeholder="Party GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
           <input placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
           <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
-          <div className="item-list">
-            {items.map((item) => (
-              <button key={item._id} className="item-chip" onClick={() => addItem(item)}>{item.name} — ₹{type === 'purchase' ? item.purchasePrice : item.salePrice}</button>
-            ))}
-          </div>
+          {billingMode === 'auto' ? (
+            <div className="item-list">
+              {items.length ? items.map((item) => (
+                <button key={item._id} className="item-chip" onClick={() => addItem(item)}>{item.name} — ₹{type === 'purchase' ? item.purchasePrice : item.salePrice}</button>
+              )) : <p className="muted">No items available. Add items in the Items section first.</p>}
+            </div>
+          ) : (
+            <div className="form-grid">
+              <input type="number" min="0" step="0.01" placeholder="Subtotal amount" value={manualSubtotal} onChange={(e) => setManualSubtotal(e.target.value)} />
+              <input type="number" min="0" step="0.01" placeholder="GST amount" value={manualGst} onChange={(e) => setManualGst(e.target.value)} />
+              <input type="number" min="0" step="0.01" placeholder="Grand total" value={manualTotal} onChange={(e) => setManualTotal(e.target.value)} />
+              <p className="muted">Enter total billing and GST amounts manually. The invoice will be created from these values.</p>
+            </div>
+          )}
         </div>
         <div className="panel">
-          {selectedItems.map((entry) => (
+          {billingMode === 'auto' ? selectedItems.map((entry) => (
             <div className="list-row" key={entry.item}>
               <div><strong>{entry.name}</strong></div>
               <div className="row-actions">
@@ -685,11 +929,12 @@ function BillingPage() {
                 <button onClick={() => updateQty(entry.item, 1)}>+</button>
               </div>
             </div>
-          ))}
+          )) : <p className="muted">Manual billing mode: totals will be used directly.</p>}
           <div className="totals">
-            <div>Subtotal: ₹{subtotal.toFixed(2)}</div>
-            <div>GST: ₹{gstAmount.toFixed(2)}</div>
-            <div><strong>Total: ₹{total.toFixed(2)}</strong></div>
+            <div>Subtotal: ₹{billingMode === 'auto' ? subtotal.toFixed(2) : (Number(manualSubtotal) || 0).toFixed(2)}</div>
+            <div>GST: ₹{billingMode === 'auto' ? gstAmount.toFixed(2) : (Number(manualGst) || 0).toFixed(2)}</div>
+            <div><strong>Total: ₹{billingMode === 'auto' ? total.toFixed(2) : (Number(manualTotal) || 0).toFixed(2)}</strong></div>
+            <input type="number" min="0" step="0.01" placeholder="Paid amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
           </div>
           {billingMessage && <p className="muted">{billingMessage}</p>}
           <button className="btn primary" onClick={saveInvoice}>Create bill</button>
