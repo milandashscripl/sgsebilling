@@ -11,9 +11,24 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 
+const allowedOrigins = [
+  'https://sgsebilling.netlify.app',
+  'https://sgsebilling.vercel.app',
+  'https://sgsebilling.onrender.com',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000'
+];
+
 app.use(cors({
-  origin: ['https://sgsebilling.netlify.app','https://sgsebilling.vercel.app', 'http://localhost:3000']
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS origin not allowed: ${origin}`));
+  }
 }));
+app.options('*', cors({ origin: allowedOrigins }));
 const PORT = Number(process.env.PORT || 5001);
 const mongoUri = process.env.MONGODB_URI || (process.env.MONGODB_USERNAME && process.env.MONGODB_PASSWORD
   ? `mongodb+srv://${encodeURIComponent(process.env.MONGODB_USERNAME)}:${encodeURIComponent(process.env.MONGODB_PASSWORD)}@cluster0.vfl7zua.mongodb.net`
@@ -21,7 +36,6 @@ const mongoUri = process.env.MONGODB_URI || (process.env.MONGODB_USERNAME && pro
 let isMongoConnected = false;
 let mongoMode = 'none';
 
-app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
