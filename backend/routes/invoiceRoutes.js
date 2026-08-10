@@ -18,7 +18,7 @@ router.post('/', auth, async (req, res) => {
   try {
     const { items = [], partyName, partyPhone, partyGSTIN, customerName, customerPhone, type, paidAmount, notes } = req.body;
     const invoiceItems = (items || []).map((item) => ({
-      item: item.itemId ? mongoose.Types.ObjectId(item.itemId) : undefined,
+      item: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : undefined,
       name: item.name || item.itemName || '',
       quantity: Number(item.quantity || 0),
       price: Number(item.price || 0),
