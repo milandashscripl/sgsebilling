@@ -1,54 +1,70 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const auth = require('../middleware/auth');
+const Invoice = require('../models/Invoice');
 
 const router = express.Router();
 
-const invoices = global.__sgseInvoices || (global.__sgseInvoices = []);
-let nextId = global.__sgseInvoiceNextId || 1;
-
 router.get('/', auth, async (req, res) => {
-  res.json(invoices.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+  try {
+    const invoices = await Invoice.find().sort({ createdAt: -1 }).lean();
+    res.json(invoices.map((invoice) => ({ ...invoice, id: String(invoice._id) })));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 router.post('/', auth, async (req, res) => {
-  const { items = [], partyName, partyPhone, partyGSTIN, customerName, customerPhone, type, paidAmount, notes } = req.body;
-  const invoiceNumber = `INV-${Date.now()}`;
+  try {
+    const { items = [], partyName, partyPhone, partyGSTIN, customerName, customerPhone, type, paidAmount, notes } = req.body;
+    const invoiceItems = (items || []).map((item) => ({
+      item: item.itemId ? mongoose.Types.ObjectId(item.itemId) : undefined,
+      name: item.name || item.itemName || '',
+      quantity: Number(item.quantity || 0),
+      price: Number(item.price || 0),
+      sgstRate: Number(item.sgstRate || 0),
+      cgstRate: Number(item.cgstRate || 0),
+      igstRate: Number(item.igstRate || 0),
+      total: Number(item.total || ((Number(item.quantity || 0) * Number(item.price || 0))))
+    }));
 
-  const subtotal = items.reduce((sum, it) => sum + (it.quantity * it.price), 0);
-  const gstAmount = items.reduce((sum, it) => {
-    const sgst = ((it.quantity * it.price) * (it.sgstRate || 0) / 100);
-    const cgst = ((it.quantity * it.price) * (it.cgstRate || 0) / 100);
-    const igst = ((it.quantity * it.price) * (it.igstRate || 0) / 100);
-    return sum + sgst + cgst + igst;
-  }, 0);
-  const grandTotal = subtotal + gstAmount;
-  const balance = grandTotal - (paidAmount || 0);
-  const paymentStatus = balance <= 0 ? 'paid' : (paidAmount > 0 ? 'partial' : 'unpaid');
+    const subtotal = invoiceItems.reduce((sum, it) => sum + (it.total || (it.quantity * it.price)), 0);
+    const gstAmount = invoiceItems.reduce((sum, it) => {
+      const amount = it.quantity * it.price;
+      const sgst = (amount * (it.sgstRate || 0) / 100);
+      const cgst = (amount * (it.cgstRate || 0) / 100);
+      const igst = (amount * (it.igstRate || 0) / 100);
+      return sum + sgst + cgst + igst;
+    }, 0);
+    const grandTotal = subtotal + gstAmount;
+    const paid = Number(paidAmount || 0);
+    const balance = grandTotal - paid;
+    const paymentStatus = balance <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
+    const invoiceNumber = `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-  const invoice = {
-    _id: String(nextId++),
-    invoiceNumber,
-    partyName: partyName || customerName || 'Walk-in Customer',
-    partyPhone: partyPhone || customerPhone || '',
-    partyGSTIN: partyGSTIN || '',
-    customerName: customerName || partyName || 'Walk-in Customer',
-    customerPhone: customerPhone || partyPhone || '',
-    type,
-    items,
-    subtotal,
-    gstAmount,
-    grandTotal,
-    paidAmount: paidAmount || 0,
-    balance,
-    paymentStatus,
-    notes,
-    createdBy: req.user?.id,
-    createdAt: Date.now()
-  };
+    const invoice = await Invoice.create({
+      invoiceNumber,
+      partyName: partyName || customerName || 'Walk-in Customer',
+      partyPhone: partyPhone || customerPhone || '',
+      partyGSTIN: partyGSTIN || '',
+      customerName: customerName || partyName || 'Walk-in Customer',
+      customerPhone: customerPhone || partyPhone || '',
+      type: type || 'sale',
+      items: invoiceItems,
+      subtotal,
+      gstAmount,
+      grandTotal,
+      paidAmount: paid,
+      balance,
+      paymentStatus,
+      notes: notes || '',
+      createdBy: req.user._id
+    });
 
-  global.__sgseInvoiceNextId = nextId;
-  invoices.push(invoice);
-  res.status(201).json(invoice);
+    res.status(201).json({ ...invoice.toObject(), id: String(invoice._id) });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 module.exports = router;

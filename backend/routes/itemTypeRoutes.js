@@ -1,38 +1,65 @@
 const express = require('express');
 const auth = require('../middleware/auth');
+const ItemType = require('../models/ItemType');
 
 const router = express.Router();
 
-const itemTypes = [];
-let nextId = 1;
-
 router.get('/', auth, async (req, res) => {
-  res.json(itemTypes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+  try {
+    const itemTypes = await ItemType.find().sort({ createdAt: -1 }).lean();
+    res.json(itemTypes.map((type) => ({ ...type, id: String(type._id) })));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 router.post('/', auth, async (req, res) => {
-  const itemType = {
-    _id: String(nextId++),
-    ...req.body,
-    createdBy: req.user?.id,
-    createdAt: Date.now()
-  };
-  itemTypes.push(itemType);
-  res.status(201).json(itemType);
+  try {
+    const itemType = await ItemType.create({
+      name: req.body.name,
+      unit: req.body.unit || 'pcs',
+      sgstRate: Number(req.body.sgstRate || 0),
+      cgstRate: Number(req.body.cgstRate || 0),
+      igstRate: Number(req.body.igstRate || 0),
+      description: req.body.description || '',
+      createdBy: req.user._id
+    });
+    res.status(201).json({ ...itemType.toObject(), id: String(itemType._id) });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 router.put('/:id', auth, async (req, res) => {
-  const existing = itemTypes.find((entry) => entry._id === req.params.id);
-  if (!existing) return res.status(404).json({ message: 'Item type not found' });
-  Object.assign(existing, req.body, { _id: existing._id, createdAt: existing.createdAt, createdBy: existing.createdBy });
-  res.json(existing);
+  try {
+    const itemType = await ItemType.findByIdAndUpdate(
+      req.params.id,
+      {
+        name: req.body.name,
+        unit: req.body.unit,
+        sgstRate: Number(req.body.sgstRate || 0),
+        cgstRate: Number(req.body.cgstRate || 0),
+        igstRate: Number(req.body.igstRate || 0),
+        description: req.body.description
+      },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!itemType) return res.status(404).json({ message: 'Item type not found' });
+    res.json({ ...itemType, id: String(itemType._id) });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 router.delete('/:id', auth, async (req, res) => {
-  const index = itemTypes.findIndex((entry) => entry._id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Item type not found' });
-  itemTypes.splice(index, 1);
-  res.json({ message: 'Item type deleted' });
+  try {
+    const itemType = await ItemType.findByIdAndDelete(req.params.id);
+    if (!itemType) return res.status(404).json({ message: 'Item type not found' });
+    res.json({ message: 'Item type deleted' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 module.exports = router;

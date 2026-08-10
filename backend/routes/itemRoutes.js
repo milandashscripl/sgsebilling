@@ -1,40 +1,82 @@
 const express = require('express');
 const auth = require('../middleware/auth');
+const Item = require('../models/Item');
 
 const router = express.Router();
 
-const items = global.__sgseItems || (global.__sgseItems = []);
-let nextId = global.__sgseItemNextId || 1;
-
 router.get('/', auth, async (req, res) => {
-  res.json(items.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+  try {
+    const items = await Item.find().sort({ createdAt: -1 }).lean();
+    res.json(items.map((item) => ({ ...item, id: String(item._id) })));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 router.post('/', auth, async (req, res) => {
-  const item = {
-    _id: String(nextId++),
-    ...req.body,
-    createdBy: req.user?.id,
-    createdAt: Date.now(),
-    stock: Number(req.body.stock || 0)
-  };
-  global.__sgseItemNextId = nextId;
-  items.push(item);
-  res.status(201).json(item);
+  try {
+    const item = await Item.create({
+      name: req.body.name,
+      itemTypeId: req.body.itemTypeId,
+      itemType: req.body.itemType || 'other',
+      categoryId: req.body.categoryId,
+      category: req.body.category || 'General',
+      specification: req.body.specification || '',
+      unit: req.body.unit || 'pcs',
+      purchasePrice: Number(req.body.purchasePrice || 0),
+      salePrice: Number(req.body.salePrice || 0),
+      sgstRate: Number(req.body.sgstRate || 0),
+      cgstRate: Number(req.body.cgstRate || 0),
+      igstRate: Number(req.body.igstRate || 0),
+      stock: Number(req.body.stock || 0),
+      description: req.body.description || '',
+      createdBy: req.user._id
+    });
+
+    res.status(201).json({ ...item.toObject(), id: String(item._id) });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 router.put('/:id', auth, async (req, res) => {
-  const existing = items.find((entry) => entry._id === req.params.id);
-  if (!existing) return res.status(404).json({ message: 'Item not found' });
-  Object.assign(existing, req.body, { _id: existing._id, createdAt: existing.createdAt, createdBy: existing.createdBy });
-  res.json(existing);
+  try {
+    const item = await Item.findByIdAndUpdate(
+      req.params.id,
+      {
+        name: req.body.name,
+        itemTypeId: req.body.itemTypeId,
+        itemType: req.body.itemType,
+        categoryId: req.body.categoryId,
+        category: req.body.category,
+        specification: req.body.specification,
+        unit: req.body.unit,
+        purchasePrice: Number(req.body.purchasePrice || 0),
+        salePrice: Number(req.body.salePrice || 0),
+        sgstRate: Number(req.body.sgstRate || 0),
+        cgstRate: Number(req.body.cgstRate || 0),
+        igstRate: Number(req.body.igstRate || 0),
+        stock: Number(req.body.stock || 0),
+        description: req.body.description
+      },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!item) return res.status(404).json({ message: 'Item not found' });
+    res.json({ ...item, id: String(item._id) });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 router.delete('/:id', auth, async (req, res) => {
-  const index = items.findIndex((entry) => entry._id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Item not found' });
-  items.splice(index, 1);
-  res.json({ message: 'Item deleted' });
+  try {
+    const item = await Item.findByIdAndDelete(req.params.id);
+    if (!item) return res.status(404).json({ message: 'Item not found' });
+    res.json({ message: 'Item deleted' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 module.exports = router;

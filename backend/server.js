@@ -88,7 +88,11 @@ const connectToDatabase = async () => {
   } catch (err) {
     isMongoConnected = false;
     console.error('MongoDB connection error:', err.message);
-    console.warn('Falling back to local mode without a database.');
+    if (process.env.MONGODB_URI) {
+      console.error('MongoDB URI is configured, but connection failed. Exiting so the service does not run in local-memory mode.');
+      process.exit(1);
+    }
+    console.warn('No MongoDB connection available. Starting in local mode without a database.');
     mongoMode = 'local';
   }
 };
