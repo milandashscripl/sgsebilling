@@ -767,10 +767,16 @@ function BillingPage() {
   const [manualSubtotal, setManualSubtotal] = useState('');
   const [manualGst, setManualGst] = useState('');
   const [manualTotal, setManualTotal] = useState('');
+  const [paymentAccount, setPaymentAccount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paidAmount, setPaidAmount] = useState('');
+  const [accounts, setAccounts] = useState([]);
   const [billingMessage, setBillingMessage] = useState('');
 
-  useEffect(() => { api.get('/items').then((res) => setItems(res.data)); }, []);
+  useEffect(() => {
+    api.get('/items').then((res) => setItems(res.data));
+    api.get('/accounting/accounts').then((res) => setAccounts(res.data)).catch(() => setAccounts([]));
+  }, []);
 
   const addItem = (item) => {
     setSelectedItems((prev) => {
@@ -799,6 +805,11 @@ function BillingPage() {
       return;
     }
 
+      if (Number(paidAmount) > 0 && !paymentAccount) {
+        setBillingMessage('Select an account for the payment');
+        return;
+      }
+
     try {
       const itemsPayload = billingMode === 'manual'
         ? [{ itemId: undefined, name: 'Manual billing', quantity: 1, price: Number(manualSubtotal) || 0, sgstRate: 0, cgstRate: 0, igstRate: 0, total: Number(manualTotal) || Number(manualSubtotal) || 0 }]
@@ -815,12 +826,9 @@ function BillingPage() {
         subtotal: billingMode === 'manual' ? Number(manualSubtotal) || 0 : undefined,
         gstAmount: billingMode === 'manual' ? Number(manualGst) || 0 : undefined,
         grandTotal: billingMode === 'manual' ? Number(manualTotal) || 0 : undefined,
-        paidAmount: Number(paidAmount) || 0
-      };
-
-      const res = await api.post('/invoices', payload);
-      const invoice = res.data;
-      setBillingMessage('Invoice created successfully');
+        paidAmount: Number(paidAmount) || 0,
+        accountId: paymentAccount || undefined,
+        paymentMethod,
       setSelectedItems([]);
       setPartyName('');
       setPartyPhone('');
@@ -831,6 +839,8 @@ function BillingPage() {
       setManualGst('');
       setManualTotal('');
       setPaidAmount('');
+      setPaymentAccount('');
+      setPaymentMethod('cash');
       setBillingMode('auto');
       downloadInvoicePdf(invoice);
     } catch (error) {
@@ -904,6 +914,20 @@ function BillingPage() {
           <input placeholder="Party GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
           <input placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
           <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+          <select value={paymentAccount} onChange={(e) => setPaymentAccount(e.target.value)}>
+            <option value="">Select payment account</option>
+            {accounts.map((account) => (
+              <option key={account._id || account.id} value={account._id || account.id}>{account.name} ({account.type})</option>
+            ))}
+          </select>
+          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+            <option value="cash">Cash</option>
+            <option value="phonepe">PhonePe</option>
+            <option value="gpay">GPay</option>
+            <option value="neft">NEFT</option>
+            <option value="rtgs">RTGS</option>
+            <option value="withdrawal">Withdrawal</option>
+          </select>
           {billingMode === 'auto' ? (
             <div className="item-list">
               {items.length ? items.map((item) => (
@@ -1178,26 +1202,39 @@ function ReportsPage() {
   };
 
   const downloadPdfReport = async () => {
-    const content = [
-      'SGSE Billing Report',
-      `Sales: ₹${summary.totalSales.toLocaleString()}`,
-      `Purchases: ₹${summary.totalPurchases.toLocaleString()}`,
-      `Returns: ₹${summary.totalReturns.toLocaleString()}`,
-      `Invoice count: ${summary.invoiceCount}`,
-      '',
-      'Stock Report',
-      ...stock.map((item) => `${item.name} | ${item.itemType || '-'} | ${item.category || 'General'} | Stock: ${item.stock}`)
-    ].join('\n');
+    const doc = new jsPDF();
+    let y = 20;
 
-    const blob = new Blob([content], { type: 'application/pdf' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'sgse-report.pdf');
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    doc.setFontSize(16);
+    doc.text('SGSE Billing Report', 14, y);
+    y += 10;
+
+    doc.setFontSize(11);
+    doc.text(`Sales: ₹${summary.totalSales.toLocaleString()}`, 14, y);
+    y += 7;
+    doc.text(`Purchases: ₹${summary.totalPurchases.toLocaleString()}`, 14, y);
+    y += 7;
+    doc.text(`Returns: ₹${summary.totalReturns.toLocaleString()}`, 14, y);
+    y += 7;
+    doc.text(`Invoice count: ${summary.invoiceCount}`, 14, y);
+    y += 11;
+
+    doc.setFontSize(13);
+    doc.text('Stock report', 14, y);
+    y += 8;
+    doc.setFontSize(10);
+
+    stock.forEach((item) => {
+      const line = `${item.name} | ${item.itemType || '-'} | ${item.category || 'General'} | Stock: ${item.stock}`;
+      if (y > 280) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(line, 14, y);
+      y += 6;
+    });
+
+    doc.save('sgse-report.pdf');
   };
 
   return (

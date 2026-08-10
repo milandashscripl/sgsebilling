@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const auth = require('../middleware/auth');
 const Invoice = require('../models/Invoice');
+const Transaction = require('../models/Transaction');
 
 const router = express.Router();
 
@@ -83,6 +84,19 @@ router.post('/', auth, async (req, res) => {
       notes: notes || '',
       createdBy: req.user._id
     });
+
+    if (paid > 0 && req.body.accountId) {
+      await Transaction.create({
+        date: new Date().toISOString().slice(0, 10),
+        accountId: req.body.accountId,
+        type: 'income',
+        amount: paid,
+        paymentMethod: req.body.paymentMethod || 'cash',
+        reference: `Invoice ${invoiceNumber}`,
+        note: `Payment for invoice ${invoiceNumber}`,
+        createdBy: req.user._id
+      });
+    }
 
     res.status(201).json({ ...invoice.toObject(), id: String(invoice._id) });
   } catch (error) {
