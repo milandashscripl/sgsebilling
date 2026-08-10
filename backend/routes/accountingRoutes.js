@@ -110,16 +110,37 @@ router.post('/expenses', auth, async (req, res) => {
 
 router.get('/summary', auth, async (req, res) => {
   try {
-    const [incomeTotal, expenseTotal, accounts] = await Promise.all([
+    const [incomeTotalAgg, expenseTotalAgg, accountsData, paymentMethodIncome, paymentMethodExpense] = await Promise.all([
       Transaction.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
       Expense.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
-      Account.countDocuments()
+      Account.find().sort({ name: 1 }).lean(),
+      Transaction.aggregate([{ $group: { _id: '$paymentMethod', total: { $sum: '$amount' } } }]),
+      Expense.aggregate([{ $group: { _id: '$paymentMethod', total: { $sum: '$amount' } } }])
     ]);
+
+    const accounts = await Promise.all(accountsData.map(async (account) => ({
+      ...account,
+      id: String(account._id),
+      balance: await getAccountBalance(account._id, Number(account.openingBalance || 0))
+    })));
+
+    const paymentMethodsMap = {};
+    paymentMethodIncome.forEach((entry) => {
+      if (!entry._id) return;
+      paymentMethodsMap[entry._id] = (paymentMethodsMap[entry._id] || 0) + entry.total;
+    });
+    paymentMethodExpense.forEach((entry) => {
+      if (!entry._id) return;
+      paymentMethodsMap[entry._id] = (paymentMethodsMap[entry._id] || 0) - entry.total;
+    });
+
+    const paymentMethods = Object.entries(paymentMethodsMap).map(([method, total]) => ({ method, total }));
 
     res.json({
       accounts,
-      incomeTotal: incomeTotal[0]?.total || 0,
-      expenseTotal: expenseTotal[0]?.total || 0
+      incomeTotal: incomeTotalAgg[0]?.total || 0,
+      expenseTotal: expenseTotalAgg[0]?.total || 0,
+      paymentMethods
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
