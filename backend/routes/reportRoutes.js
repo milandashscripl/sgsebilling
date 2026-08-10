@@ -33,7 +33,14 @@ router.get('/summary', auth, async (req, res) => {
 
 router.get('/stock', auth, async (req, res) => {
   try {
-    const items = await Item.find().sort({ stock: 1, name: 1 }).lean();
+    const search = (req.query.search || '').trim();
+    const filter = {};
+
+    if (search) {
+      filter.name = { $regex: search, $options: 'i' };
+    }
+
+    const items = await Item.find(filter).sort({ stock: 1, name: 1 }).lean();
     res.json(items.map((item) => ({ ...item, id: String(item._id) })));
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -42,9 +49,38 @@ router.get('/stock', auth, async (req, res) => {
 
 const sanitizeCsvValue = (value) => String(value || '').replace(/,/g, ' ').replace(/\r|\n/g, ' ');
 
+router.get('/invoices', auth, async (req, res) => {
+  try {
+    const search = (req.query.search || '').trim();
+    const filter = {};
+
+    if (search) {
+      filter.$or = [
+        { partyName: { $regex: search, $options: 'i' } },
+        { customerName: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const invoices = await Invoice.find(filter).sort({ createdAt: -1 }).lean();
+    res.json(invoices.map((invoice) => ({ ...invoice, id: String(invoice._id) })));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.get('/invoices/export', auth, async (req, res) => {
   try {
-    const invoices = await Invoice.find().lean();
+    const search = (req.query.search || '').trim();
+    const filter = {};
+
+    if (search) {
+      filter.$or = [
+        { partyName: { $regex: search, $options: 'i' } },
+        { customerName: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const invoices = await Invoice.find(filter).lean();
     const csv = ['invoiceNumber,type,partyName,partyPhone,partyGSTIN,subtotal,gstAmount,grandTotal,paymentStatus']
       .concat(invoices.map((inv) => `${sanitizeCsvValue(inv.invoiceNumber)},${sanitizeCsvValue(inv.type)},${sanitizeCsvValue(inv.partyName)},${sanitizeCsvValue(inv.partyPhone)},${sanitizeCsvValue(inv.partyGSTIN)},${inv.subtotal || 0},${inv.gstAmount || 0},${inv.grandTotal || 0},${sanitizeCsvValue(inv.paymentStatus)}`))
       .join('\n');
@@ -59,7 +95,14 @@ router.get('/invoices/export', auth, async (req, res) => {
 
 router.get('/stock/export', auth, async (req, res) => {
   try {
-    const items = await Item.find().lean();
+    const search = (req.query.search || '').trim();
+    const filter = {};
+
+    if (search) {
+      filter.name = { $regex: search, $options: 'i' };
+    }
+
+    const items = await Item.find(filter).lean();
     const csv = ['name,itemType,category,specification,unit,stock,purchasePrice,salePrice,sgstRate,cgstRate,igstRate']
       .concat(items.map((item) => `${sanitizeCsvValue(item.name)},${sanitizeCsvValue(item.itemType)},${sanitizeCsvValue(item.category)},${sanitizeCsvValue(item.specification)},${sanitizeCsvValue(item.unit)},${item.stock || 0},${item.purchasePrice || 0},${item.salePrice || 0},${item.sgstRate || 0},${item.cgstRate || 0},${item.igstRate || 0}`))
       .join('\n');

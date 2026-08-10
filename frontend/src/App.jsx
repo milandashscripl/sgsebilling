@@ -888,15 +888,37 @@ function AccountingPage() {
 function ReportsPage() {
   const [summary, setSummary] = useState({ totalSales: 0, totalPurchases: 0, totalReturns: 0, invoiceCount: 0 });
   const [stock, setStock] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [stockSearch, setStockSearch] = useState('');
+  const [invoiceSearch, setInvoiceSearch] = useState('');
 
   useEffect(() => {
     api.get('/reports/summary').then((res) => setSummary(res.data));
-    api.get('/reports/stock').then((res) => setStock(res.data));
   }, []);
 
-  const downloadReport = async (path, filename, type = 'csv') => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      api.get('/reports/stock', { params: { search: stockSearch } })
+        .then((res) => setStock(res.data))
+        .catch(() => setStock([]));
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [stockSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      api.get('/reports/invoices', { params: { search: invoiceSearch } })
+        .then((res) => setInvoices(res.data))
+        .catch(() => setInvoices([]));
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [invoiceSearch]);
+
+  const downloadReport = async (path, filename, params = {}) => {
     try {
-      const res = await api.get(path, { responseType: 'blob' });
+      const res = await api.get(path, { responseType: 'blob', params });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -945,6 +967,14 @@ function ReportsPage() {
 
       <div className="panel">
         <h4>Stock report</h4>
+        <div className="form-row">
+          <input
+            type="text"
+            placeholder="Search item name in stock"
+            value={stockSearch}
+            onChange={(e) => setStockSearch(e.target.value)}
+          />
+        </div>
         <table className="table">
           <thead>
             <tr>
@@ -958,7 +988,7 @@ function ReportsPage() {
           </thead>
           <tbody>
             {stock.map((item) => (
-              <tr key={item._id}>
+              <tr key={item._id || item.id}>
                 <td>{item.name}</td>
                 <td>{item.itemType}</td>
                 <td>{item.category || 'General'}</td>
@@ -970,16 +1000,49 @@ function ReportsPage() {
           </tbody>
         </table>
         <div className="inline-actions">
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/stock/export', 'stock.csv')}>Download stock CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/stock/export', 'stock.csv', { search: stockSearch })}>Download stock CSV</button>
         </div>
       </div>
 
       <div className="panel">
+        <h4>Invoice report</h4>
+        <div className="form-row">
+          <input
+            type="text"
+            placeholder="Search party or customer name"
+            value={invoiceSearch}
+            onChange={(e) => setInvoiceSearch(e.target.value)}
+          />
+        </div>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Party / Customer</th>
+              <th>Type</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map((invoice) => (
+              <tr key={invoice._id || invoice.id}>
+                <td>{invoice.invoiceNumber}</td>
+                <td>{invoice.partyName || invoice.customerName}</td>
+                <td>{invoice.type}</td>
+                <td>₹{invoice.grandTotal || 0}</td>
+                <td>{invoice.paymentStatus}</td>
+                <td>{invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
         <div className="inline-actions">
-          <button className="btn primary" type="button" onClick={() => downloadReport('/reports/invoices/export', 'invoices.csv')}>Download invoices CSV</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/sales/export', 'sales.csv')}>Download sales CSV</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/purchases/export', 'purchases.csv')}>Download purchases CSV</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/returns/export', 'returns.csv')}>Download returns CSV</button>
+          <button className="btn primary" type="button" onClick={() => downloadReport('/reports/invoices/export', 'invoices.csv', { search: invoiceSearch })}>Download invoices CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/sales/export', 'sales.csv', { search: invoiceSearch })}>Download sales CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/purchases/export', 'purchases.csv', { search: invoiceSearch })}>Download purchases CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/returns/export', 'returns.csv', { search: invoiceSearch })}>Download returns CSV</button>
           <button className="btn secondary" type="button" onClick={downloadPdfReport}>Download PDF report</button>
           <button className="btn secondary" type="button" onClick={() => window.print()}>Print report</button>
         </div>
