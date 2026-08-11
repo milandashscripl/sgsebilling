@@ -1417,6 +1417,11 @@ function AccountingPage() {
     }
   };
 
+  const getAccountName = (accountId) => {
+    const account = accounts.find((acc) => String(acc._id || acc.id) === String(accountId));
+    return account ? account.name : 'Unknown account';
+  };
+
   return (
     <div>
       <h3>Accounting and daily cash book</h3>
@@ -1511,6 +1516,40 @@ function AccountingPage() {
             <div>₹{Number(entry.total || 0).toLocaleString()}</div>
           </div>
         ))}
+      </div>
+
+      <div className="panel">
+        <h4>Expenses list</h4>
+        {expenses.length === 0 ? (
+          <p className="muted">No expenses recorded yet.</p>
+        ) : (
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th>Account</th>
+                  <th>Payment</th>
+                  <th>Amount</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expenses.map((expense) => (
+                  <tr key={expense._id || expense.id}>
+                    <td>{expense.date || '-'}</td>
+                    <td>{expense.category || '-'}</td>
+                    <td>{getAccountName(expense.accountId)}</td>
+                    <td>{expense.paymentMethod || '-'}</td>
+                    <td>₹{Number(expense.amount || 0).toLocaleString()}</td>
+                    <td>{expense.note || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="panel">
