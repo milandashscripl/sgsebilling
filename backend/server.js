@@ -56,6 +56,7 @@ const invoiceRoutes = require('./routes/invoiceRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
 const accountingRoutes = require('./routes/accountingRoutes');
+const contactRoutes = require('./routes/contactRoutes');
 const { authStore } = require('./utils/authStore');
 const User = require('./models/User');
 const bcrypt = require('bcryptjs');
@@ -68,6 +69,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/accounting', accountingRoutes);
+app.use('/api/contacts', contactRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

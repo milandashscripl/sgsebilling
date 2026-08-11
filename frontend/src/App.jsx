@@ -136,6 +136,7 @@ function AuthenticatedApp({ user, logout }) {
           <Link to="/stock">Stock</Link>
           <Link to="/billing">Billing</Link>
           <Link to="/accounting">Accounting</Link>
+          <Link to="/contacts">Contacts</Link>
           <Link to="/reports">Reports</Link>
           {user.role === 'admin' && <Link to="/users">Users</Link>}
         </aside>
@@ -146,6 +147,7 @@ function AuthenticatedApp({ user, logout }) {
             <Route path="/billing" element={<BillingPage />} />
             <Route path="/stock" element={<StockPage />} />
             <Route path="/accounting" element={<AccountingPage />} />
+            <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -1333,6 +1335,157 @@ function ReportsPage() {
           <button className="btn secondary" type="button" onClick={downloadPdfReport}>Download PDF report</button>
           <button className="btn secondary" type="button" onClick={() => window.print()}>Print report</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactsPage() {
+  const [contacts, setContacts] = useState([]);
+  const [form, setForm] = useState({
+    name: '',
+    contactNumber: '',
+    consumerNumber: '',
+    status: 'Warm Lead',
+    review: '',
+    followUpStrategy: '',
+    followUpCount: '0',
+    nextFollowUp: ''
+  });
+  const [editingContactId, setEditingContactId] = useState(null);
+  const [message, setMessage] = useState('');
+
+  const loadContacts = async () => {
+    try {
+      const res = await api.get('/contacts');
+      setContacts(res.data);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to load contacts');
+    }
+  };
+
+  useEffect(() => { loadContacts(); }, []);
+
+  const resetForm = () => {
+    setForm({
+      name: '',
+      contactNumber: '',
+      consumerNumber: '',
+      status: 'Warm Lead',
+      review: '',
+      followUpStrategy: '',
+      followUpCount: '0',
+      nextFollowUp: ''
+    });
+    setEditingContactId(null);
+    setMessage('');
+  };
+
+  const saveContact = async (e) => {
+    e.preventDefault();
+    if (!form.name || !form.contactNumber) {
+      setMessage('Name and contact number are required');
+      return;
+    }
+
+    try {
+      const payload = {
+        ...form,
+        followUpCount: Number(form.followUpCount || 0),
+        nextFollowUp: form.nextFollowUp || null
+      };
+
+      if (editingContactId) {
+        await api.put(`/contacts/${editingContactId}`, payload);
+        setMessage('Contact updated');
+      } else {
+        await api.post('/contacts', payload);
+        setMessage('Contact added');
+      }
+      resetForm();
+      await loadContacts();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to save contact');
+    }
+  };
+
+  const editContact = (contact) => {
+    setEditingContactId(contact.id || contact._id);
+    setForm({
+      name: contact.name || '',
+      contactNumber: contact.contactNumber || '',
+      consumerNumber: contact.consumerNumber || '',
+      status: contact.status || 'Warm Lead',
+      review: contact.review || '',
+      followUpStrategy: contact.followUpStrategy || '',
+      followUpCount: String(contact.followUpCount || 0),
+      nextFollowUp: contact.nextFollowUp ? contact.nextFollowUp.slice(0, 10) : ''
+    });
+    setMessage('Editing contact');
+  };
+
+  const deleteContact = async (id) => {
+    if (!window.confirm('Delete this contact?')) return;
+    try {
+      await api.delete(`/contacts/${id}`);
+      setMessage('Contact deleted');
+      await loadContacts();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to delete contact');
+    }
+  };
+
+  return (
+    <div>
+      <h3>Calling & Customer follow-up</h3>
+      {message && <p className="muted">{message}</p>}
+      <div className="panel">
+        <h4>{editingContactId ? 'Edit contact' : 'Add contact'}</h4>
+        <form className="form-grid" onSubmit={saveContact}>
+          <input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <input placeholder="Contact number" value={form.contactNumber} onChange={(e) => setForm({ ...form, contactNumber: e.target.value })} />
+          <input placeholder="Consumer number" value={form.consumerNumber} onChange={(e) => setForm({ ...form, consumerNumber: e.target.value })} />
+          <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+            <option value="Hot Lead">Hot Lead</option>
+            <option value="Warm Lead">Warm Lead</option>
+            <option value="Cool Lead">Cool Lead</option>
+            <option value="May Convert">May Convert</option>
+            <option value="Not Interested">Not Interested</option>
+            <option value="Following Up">Following Up</option>
+          </select>
+          <input placeholder="Next follow-up date" type="date" value={form.nextFollowUp} onChange={(e) => setForm({ ...form, nextFollowUp: e.target.value })} />
+          <input placeholder="Follow-up count" type="number" min="0" value={form.followUpCount} onChange={(e) => setForm({ ...form, followUpCount: e.target.value })} />
+          <input placeholder="Review by caller" value={form.review} onChange={(e) => setForm({ ...form, review: e.target.value })} />
+          <input placeholder="Follow-up strategy" value={form.followUpStrategy} onChange={(e) => setForm({ ...form, followUpStrategy: e.target.value })} />
+          <div className="inline-actions">
+            <button className="btn primary" type="submit">{editingContactId ? 'Save contact' : 'Add contact'}</button>
+            <button className="btn secondary" type="button" onClick={resetForm}>Reset</button>
+          </div>
+        </form>
+      </div>
+
+      <div className="panel">
+        <h4>Contact list</h4>
+        {contacts.length === 0 ? <p className="muted">No contacts yet. Add one to start following up.</p> : contacts.map((contact) => (
+          <div key={contact.id || contact._id} className="panel" style={{ padding: '12px' }}>
+            <div className="list-row">
+              <div>
+                <strong>{contact.name}</strong>
+                <div className="muted">{contact.contactNumber} • {contact.consumerNumber || 'No consumer number'}</div>
+                <div className="muted">Status: {contact.status}</div>
+              </div>
+              <div className="inline-actions">
+                <button className="btn secondary" type="button" onClick={() => editContact(contact)}>Edit</button>
+                <button className="btn secondary" type="button" onClick={() => deleteContact(contact.id || contact._id)}>Delete</button>
+              </div>
+            </div>
+            <div className="muted">Review: {contact.review || 'No review yet'}</div>
+            <div className="muted">Follow-up: {contact.followUpStrategy || 'No strategy defined'}</div>
+            <div className="muted">Follow-ups completed: {contact.followUpCount || 0}</div>
+            <div className="muted">Last contacted: {contact.lastContacted ? new Date(contact.lastContacted).toLocaleDateString() : 'Never'}</div>
+            <div className="muted">Next follow-up: {contact.nextFollowUp ? new Date(contact.nextFollowUp).toLocaleDateString() : 'Not scheduled'}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
