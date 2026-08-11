@@ -14,6 +14,7 @@ const app = express();
 const allowedOrigins = [
   'https://sgsebillings.netlify.app',
   'https://sgsebillings.vercel.app',
+  'https://sgsebilling.vercel.app',
   'https://sgsebilling.onrender.com',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
