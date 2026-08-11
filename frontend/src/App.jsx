@@ -889,12 +889,13 @@ function BillingPage() {
   const [partyPhone, setPartyPhone] = useState('');
   const [partyGSTIN, setPartyGSTIN] = useState('');
   const [type, setType] = useState('sale');
-  const [billingMode, setBillingMode] = useState('auto');
-  const [manualName, setManualName] = useState('Full setup');
-  const [manualBasePrice, setManualBasePrice] = useState('');
-  const [manualSgstRate, setManualSgstRate] = useState('0');
-  const [manualCgstRate, setManualCgstRate] = useState('0');
-  const [manualIgstRate, setManualIgstRate] = useState('0');
+  const [billingMode, setBillingMode] = useState('normal');
+  const [singleDescription, setSingleDescription] = useState('Full setup');
+  const [singleTotalAfterGst, setSingleTotalAfterGst] = useState('');
+  const [singleGstType, setSingleGstType] = useState('cgst-sgst');
+  const [singleCgstRate, setSingleCgstRate] = useState('0');
+  const [singleSgstRate, setSingleSgstRate] = useState('0');
+  const [singleIgstRate, setSingleIgstRate] = useState('0');
   const [paymentAccount, setPaymentAccount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paidAmount, setPaidAmount] = useState('');
@@ -928,13 +929,13 @@ function BillingPage() {
   };
 
   const saveInvoice = async () => {
-    if (billingMode === 'auto' && !selectedItems.length) {
+    if (billingMode === 'normal' && !selectedItems.length) {
       setBillingMessage('Please add at least one item before creating a bill');
       return;
     }
 
-    if (billingMode === 'manual' && (!manualBasePrice || Number(manualBasePrice) <= 0)) {
-      setBillingMessage('Enter a valid full setup price before creating a bill');
+    if (billingMode === 'single' && (!singleTotalAfterGst || Number(singleTotalAfterGst) <= 0)) {
+      setBillingMessage('Enter a valid total amount after GST before creating a bill');
       return;
     }
 
@@ -944,18 +945,34 @@ function BillingPage() {
     }
 
     try {
-      const itemsPayload = billingMode === 'manual'
-        ? selectedItems.map((entry) => ({
+      const singleTaxRate = singleGstType === 'igst'
+        ? Number(singleIgstRate) || 0
+        : (Number(singleCgstRate) || 0) + (Number(singleSgstRate) || 0);
+      const totalAfter = Number(singleTotalAfterGst) || 0;
+      const baseAmount = singleTaxRate > 0 ? totalAfter / (1 + singleTaxRate / 100) : totalAfter;
+      const gstAmountSingle = totalAfter - baseAmount;
+
+      const itemsPayload = billingMode === 'single'
+        ? (selectedItems.length ? selectedItems.map((entry) => ({
             itemId: entry.item,
             name: entry.name,
             quantity: entry.quantity,
             unit: entry.unit,
-            price: 0,
-            sgstRate: Number(manualSgstRate) || 0,
-            cgstRate: Number(manualCgstRate) || 0,
-            igstRate: Number(manualIgstRate) || 0,
-            total: 0
-          }))
+            price: entry.price,
+            sgstRate: entry.sgstRate,
+            cgstRate: entry.cgstRate,
+            igstRate: entry.igstRate,
+            total: entry.quantity * entry.price
+          })) : [{
+            name: singleDescription || 'Single price service',
+            quantity: 1,
+            unit: 'pcs',
+            price: Number(baseAmount.toFixed(2)),
+            sgstRate: singleGstType === 'cgst-sgst' ? Number(singleSgstRate) || 0 : 0,
+            cgstRate: singleGstType === 'cgst-sgst' ? Number(singleCgstRate) || 0 : 0,
+            igstRate: singleGstType === 'igst' ? Number(singleIgstRate) || 0 : 0,
+            total: Number(baseAmount.toFixed(2))
+          }])
         : selectedItems.map((entry) => ({
             itemId: entry.item,
             name: entry.name,
@@ -976,9 +993,9 @@ function BillingPage() {
         customerPhone,
         type,
         items: itemsPayload,
-        subtotal: billingMode === 'manual' ? Number(manualBasePrice) || 0 : undefined,
-        gstAmount: billingMode === 'manual' ? ((Number(manualBasePrice) || 0) * ((Number(manualSgstRate) || 0) + (Number(manualCgstRate) || 0) + (Number(manualIgstRate) || 0)) / 100) : undefined,
-        grandTotal: billingMode === 'manual' ? Number(manualBasePrice || 0) + ((Number(manualBasePrice) || 0) * ((Number(manualSgstRate) || 0) + (Number(manualCgstRate) || 0) + (Number(manualIgstRate) || 0)) / 100) : undefined,
+        subtotal: billingMode === 'single' ? Number(baseAmount.toFixed(2)) : undefined,
+        gstAmount: billingMode === 'single' ? Number(gstAmountSingle.toFixed(2)) : undefined,
+        grandTotal: billingMode === 'single' ? totalAfter : undefined,
         paidAmount: Number(paidAmount) || 0,
         accountId: paymentAccount || undefined,
         paymentMethod,
@@ -994,16 +1011,17 @@ function BillingPage() {
       setPartyGSTIN('');
       setCustomerName('');
       setCustomerPhone('');
-      setManualName('Full setup');
-      setManualBasePrice('');
-      setManualSgstRate('0');
-      setManualCgstRate('0');
-      setManualIgstRate('0');
+      setSingleDescription('Full setup');
+      setSingleTotalAfterGst('');
+      setSingleGstType('cgst-sgst');
+      setSingleCgstRate('0');
+      setSingleSgstRate('0');
+      setSingleIgstRate('0');
       setPaidAmount('');
       setNotes('');
       setPaymentAccount('');
       setPaymentMethod('cash');
-      setBillingMode('auto');
+      setBillingMode('normal');
       downloadInvoicePdf(invoice);
     } catch (error) {
       setBillingMessage(error.response?.data?.message || 'Unable to create invoice');
@@ -1017,12 +1035,13 @@ function BillingPage() {
   }, 0);
   const total = subtotal + gstAmount;
 
-  const manualBase = Number(manualBasePrice) || 0;
-  const manualSgstAmount = manualBase * (Number(manualSgstRate) || 0) / 100;
-  const manualCgstAmount = manualBase * (Number(manualCgstRate) || 0) / 100;
-  const manualIgstAmount = manualBase * (Number(manualIgstRate) || 0) / 100;
-  const manualGstAmount = manualSgstAmount + manualCgstAmount + manualIgstAmount;
-  const manualTotal = manualBase + manualGstAmount;
+  const singleTaxRate = singleGstType === 'igst'
+    ? Number(singleIgstRate) || 0
+    : (Number(singleCgstRate) || 0) + (Number(singleSgstRate) || 0);
+  const singleTotal = Number(singleTotalAfterGst) || 0;
+  const singleBaseAmount = singleTaxRate > 0 ? singleTotal / (1 + singleTaxRate / 100) : singleTotal;
+  const singleGstAmount = singleTotal - singleBaseAmount;
+  const singleBalance = singleTotal - Number(paidAmount || 0);
 
   const loadImageAsDataUrl = async (url) => {
     try {
@@ -1057,9 +1076,11 @@ function BillingPage() {
     }
 
     const headerX = invoice.sellerLogoUrl ? 52 : marginLeft;
-    doc.setFontSize(14);
+    doc.setFontSize(18);
+    doc.setTextColor('#1F3A13');
     doc.text(invoice.sellerName || 'SGSE Billing', headerX, y);
     doc.setFontSize(10);
+    doc.setTextColor('#10230F');
     y += 6;
     if (invoice.sellerAddress) {
       const addressLines = doc.splitTextToSize(invoice.sellerAddress, 120);
@@ -1075,18 +1096,27 @@ function BillingPage() {
       y += 6;
     }
 
-    y = Math.max(y + 4, 50);
+    const invoiceInfoTop = 20;
+    doc.setDrawColor('#8AA057');
+    doc.setLineWidth(0.8);
+    doc.line(marginLeft, invoiceInfoTop + 30, 196, invoiceInfoTop + 30);
+
+    y = Math.max(y + 8, 54);
     doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
     doc.text('TAX INVOICE', marginLeft, y);
+    doc.setFont(undefined, 'normal');
     doc.setFontSize(10);
     y += 8;
     doc.text(`Invoice #: ${invoice.invoiceNumber}`, marginLeft, y);
-    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleString()}`, 120, y);
+    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString()}`, 120, y);
     y += 6;
-    doc.text(`Type: ${invoice.type}`, marginLeft, y);
-    doc.text(`Customer: ${invoice.partyName || invoice.customerName}`, 120, y);
+    doc.text(`Type: ${invoice.type.toUpperCase()}`, marginLeft, y);
+    doc.text(`Customer: ${invoice.partyName || invoice.customerName || '-'}`, 120, y);
     y += 6;
-    if (invoice.partyPhone) doc.text(`Phone: ${invoice.partyPhone}`, marginLeft, y);
+    if (invoice.partyPhone) {
+      doc.text(`Phone: ${invoice.partyPhone}`, marginLeft, y);
+    }
     if (invoice.partyGSTIN) {
       doc.text(`GSTIN: ${invoice.partyGSTIN}`, 120, y);
       y += 6;
@@ -1094,48 +1124,67 @@ function BillingPage() {
 
     y += 8;
     doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
     doc.text('Description', marginLeft, y);
-    doc.text('Qty', 90, y);
-    doc.text('Rate', 110, y);
-    doc.text('SGST', 138, y);
-    doc.text('CGST', 158, y);
-    doc.text('Total', 180, y);
+    doc.text('Qty', 88, y);
+    doc.text('Rate', 106, y);
+    doc.text('SGST', 132, y);
+    doc.text('CGST', 154, y);
+    doc.text('IGST', 176, y);
+    doc.text('Total', 196, y, { align: 'right' });
     y += 6;
-    doc.setLineWidth(0.5);
+    doc.setDrawColor('#D9E3C1');
+    doc.setLineWidth(0.6);
     doc.line(marginLeft, y, 196, y);
-    y += 4;
+    y += 6;
     doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
 
     invoice.items.forEach((item) => {
       if (y > 260) {
         doc.addPage();
         y = 20;
       }
-      const nameLines = doc.splitTextToSize(item.name || '-', 70);
+      const nameLines = doc.splitTextToSize(item.name || '-', 68);
       doc.text(nameLines, marginLeft, y);
-      doc.text(String(item.quantity || 1), 90, y);
-      doc.text(`₹${(item.price || 0).toFixed(2)}`, 110, y);
-      doc.text(`${item.sgstRate || 0}%`, 138, y);
-      doc.text(`${item.cgstRate || 0}%`, 158, y);
-      doc.text(`₹${(item.total || 0).toFixed(2)}`, 180, y);
+      doc.text(String(item.quantity || 1), 88, y);
+      doc.text(`₹${(item.price || 0).toFixed(2)}`, 106, y);
+      doc.text(item.sgstRate ? `${item.sgstRate}%` : '-', 132, y);
+      doc.text(item.cgstRate ? `${item.cgstRate}%` : '-', 154, y);
+      doc.text(item.igstRate ? `${item.igstRate}%` : '-', 176, y);
+      doc.text(`₹${(item.total || 0).toFixed(2)}`, 196, y, { align: 'right' });
       y += nameLines.length * 6;
     });
 
+    y += 12;
+    doc.setDrawColor('#D9E3C1');
+    doc.setFillColor('#F4F6E6');
+    doc.roundedRect(marginLeft, y, 180, 42, 4, 4, 'F');
+    doc.setDrawColor('#8AA057');
+    doc.setLineWidth(0.8);
+    doc.roundedRect(marginLeft, y, 180, 42, 4, 4);
     y += 8;
     doc.setFontSize(11);
-    doc.text(`Subtotal: ₹${(invoice.subtotal || 0).toFixed(2)}`, marginLeft, y);
+    doc.setFont(undefined, 'bold');
+    doc.text('Summary', marginLeft + 4, y);
+    y += 8;
+    doc.setFont(undefined, 'normal');
+    doc.text(`Subtotal: ₹${(invoice.subtotal || 0).toFixed(2)}`, marginLeft + 8, y);
     y += 6;
-    doc.text(`GST: ₹${(invoice.gstAmount || 0).toFixed(2)}`, marginLeft, y);
+    doc.text(`GST: ₹${(invoice.gstAmount || 0).toFixed(2)}`, marginLeft + 8, y);
     y += 6;
-    doc.text(`Grand total: ₹${(invoice.grandTotal || 0).toFixed(2)}`, marginLeft, y);
+    doc.text(`Grand total: ₹${(invoice.grandTotal || 0).toFixed(2)}`, marginLeft + 8, y);
     y += 6;
-    doc.text(`Paid: ₹${(invoice.paidAmount || 0).toFixed(2)}`, marginLeft, y);
+    doc.text(`Paid: ₹${(invoice.paidAmount || 0).toFixed(2)}`, marginLeft + 8, y);
     y += 6;
-    doc.text(`Balance: ₹${(invoice.balance || 0).toFixed(2)}`, marginLeft, y);
-    y += 10;
+    doc.text(`Balance: ₹${(invoice.balance || 0).toFixed(2)}`, marginLeft + 8, y);
+    y += 14;
+
     if (invoice.notes) {
       doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
       doc.text('Notes:', marginLeft, y);
+      doc.setFont(undefined, 'normal');
       const notesLines = doc.splitTextToSize(invoice.notes, 170);
       y += 6;
       doc.text(notesLines, marginLeft, y);
@@ -1163,8 +1212,8 @@ function BillingPage() {
               <option value="return">Return</option>
             </select>
             <select value={billingMode} onChange={(e) => setBillingMode(e.target.value)}>
-              <option value="auto">Item-based billing</option>
-              <option value="manual">Full setup billing</option>
+              <option value="normal">Normal billing</option>
+              <option value="single">Single price billing</option>
             </select>
             <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
             <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
@@ -1187,7 +1236,7 @@ function BillingPage() {
             </select>
             <textarea placeholder="Invoice notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-          {billingMode === 'auto' ? (
+          {billingMode === 'normal' ? (
             <div className="item-list">
               {items.length ? items.map((item) => (
                 <button key={item._id} className="item-chip" onClick={() => addItem(item)}>{item.name} — ₹{type === 'purchase' ? item.purchasePrice : item.salePrice}</button>
@@ -1195,55 +1244,94 @@ function BillingPage() {
             </div>
           ) : (
             <div className="form-grid">
-              <input placeholder="Full setup description" value={manualName} onChange={(e) => setManualName(e.target.value)} />
-              <input type="number" min="0" step="0.01" placeholder="Setup base price" value={manualBasePrice} onChange={(e) => setManualBasePrice(e.target.value)} />
-              <input type="number" min="0" step="0.01" placeholder="SGST %" value={manualSgstRate} onChange={(e) => setManualSgstRate(e.target.value)} />
-              <input type="number" min="0" step="0.01" placeholder="CGST %" value={manualCgstRate} onChange={(e) => setManualCgstRate(e.target.value)} />
-              <input type="number" min="0" step="0.01" placeholder="IGST %" value={manualIgstRate} onChange={(e) => setManualIgstRate(e.target.value)} />
-              <p className="muted">This invoice uses one total setup price for the full customer order.</p>
+              <input placeholder="Single price description" value={singleDescription} onChange={(e) => setSingleDescription(e.target.value)} />
+              <input type="number" min="0" step="0.01" placeholder="Total amount after GST" value={singleTotalAfterGst} onChange={(e) => setSingleTotalAfterGst(e.target.value)} />
+              <select value={singleGstType} onChange={(e) => setSingleGstType(e.target.value)}>
+                <option value="cgst-sgst">CGST + SGST</option>
+                <option value="igst">IGST</option>
+              </select>
+              {singleGstType === 'cgst-sgst' ? (
+                <>
+                  <input type="number" min="0" step="0.01" placeholder="CGST %" value={singleCgstRate} onChange={(e) => setSingleCgstRate(e.target.value)} />
+                  <input type="number" min="0" step="0.01" placeholder="SGST %" value={singleSgstRate} onChange={(e) => setSingleSgstRate(e.target.value)} />
+                </>
+              ) : (
+                <input type="number" min="0" step="0.01" placeholder="IGST %" value={singleIgstRate} onChange={(e) => setSingleIgstRate(e.target.value)} />
+              )}
+              <p className="muted">Enter the final amount including GST. The base price will be calculated automatically.</p>
             </div>
           )}
         </div>
 
         <div className="panel">
           <div className="billing-panel-header">
-            <h4>{billingMode === 'auto' ? 'Selected items' : 'Setup items & units'}</h4>
+            <h4>{billingMode === 'normal' ? 'Selected items' : 'Single price details'}</h4>
             <span className="badge">{selectedItems.length} item{selectedItems.length === 1 ? '' : 's'}</span>
           </div>
-          {selectedItems.length === 0 ? (
-            <p className="muted">No items added yet. Click an item to include it in the invoice.</p>
+          {billingMode === 'normal' ? (
+            selectedItems.length === 0 ? (
+              <p className="muted">No items added yet. Click an item to include it in the invoice.</p>
+            ) : (
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Qty</th>
+                      <th>Unit</th>
+                      <th>Price</th>
+                      <th>GST</th>
+                      <th>Total</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedItems.map((entry) => {
+                      const lineGst = ((entry.quantity * entry.price) * ((entry.sgstRate || 0) + (entry.cgstRate || 0) + (entry.igstRate || 0)) / 100).toFixed(2);
+                      return (
+                        <tr key={entry.item}>
+                          <td>{entry.name}</td>
+                          <td>{entry.quantity}</td>
+                          <td>{entry.unit}</td>
+                          <td>₹{entry.price.toFixed(2)}</td>
+                          <td>₹{lineGst}</td>
+                          <td>₹{(entry.quantity * entry.price + Number(lineGst)).toFixed(2)}</td>
+                          <td><button className="btn secondary" type="button" onClick={() => removeItem(entry.item)}>Remove</button></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
           ) : (
             <div className="table-responsive">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Unit</th>
-                    <th>{billingMode === 'auto' ? 'Rate' : 'Included'}</th>
-                    <th>Action</th>
+                    <th>Description</th>
+                    <th>Base price</th>
+                    <th>GST</th>
+                    <th>Total after GST</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedItems.map((entry) => (
-                    <tr key={entry.item}>
-                      <td>{entry.name}</td>
-                      <td>{entry.quantity}</td>
-                      <td>{entry.unit}</td>
-                      <td>{billingMode === 'auto' ? `₹${entry.price.toFixed(2)}` : 'Included'}</td>
-                      <td><button className="btn secondary" type="button" onClick={() => removeItem(entry.item)}>Remove</button></td>
-                    </tr>
-                  ))}
+                  <tr>
+                    <td>{singleDescription || 'Single price service'}</td>
+                    <td>₹{singleBaseAmount.toFixed(2)}</td>
+                    <td>₹{singleGstAmount.toFixed(2)} ({singleTaxRate.toFixed(2)}%)</td>
+                    <td>₹{singleTotal.toFixed(2)}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
           )}
           <div className="billing-summary">
-            <div className="summary-row"><span>Subtotal</span><strong>₹{billingMode === 'auto' ? subtotal.toFixed(2) : manualBase.toFixed(2)}</strong></div>
-            <div className="summary-row"><span>GST</span><strong>₹{billingMode === 'auto' ? gstAmount.toFixed(2) : manualGstAmount.toFixed(2)}</strong></div>
-            <div className="summary-row"><span>Total</span><strong>₹{billingMode === 'auto' ? total.toFixed(2) : manualTotal.toFixed(2)}</strong></div>
+            <div className="summary-row"><span>Subtotal</span><strong>₹{billingMode === 'normal' ? subtotal.toFixed(2) : singleBaseAmount.toFixed(2)}</strong></div>
+            <div className="summary-row"><span>GST</span><strong>₹{billingMode === 'normal' ? gstAmount.toFixed(2) : singleGstAmount.toFixed(2)}</strong></div>
+            <div className="summary-row"><span>Total</span><strong>₹{billingMode === 'normal' ? total.toFixed(2) : singleTotal.toFixed(2)}</strong></div>
             <div className="summary-row"><span>Paid</span><strong>₹{Number(paidAmount || 0).toFixed(2)}</strong></div>
-            <div className="summary-row"><span>Balance</span><strong>₹{((billingMode === 'auto' ? total : manualTotal) - Number(paidAmount || 0)).toFixed(2)}</strong></div>
+            <div className="summary-row"><span>Balance</span><strong>₹{billingMode === 'normal' ? (total - Number(paidAmount || 0)).toFixed(2) : singleBalance.toFixed(2)}</strong></div>
             <div className="summary-row"><span>Payment</span><strong>{paymentMethod}</strong></div>
           </div>
           <input type="number" min="0" step="0.01" placeholder="Paid amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
