@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom';
+import { Link, Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
