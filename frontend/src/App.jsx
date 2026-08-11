@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
@@ -131,15 +131,15 @@ function AuthenticatedApp({ user, logout, setUser }) {
       </nav>
       <div className="dashboard">
         <aside className="sidebar">
-          <Link to="/dashboard">Dashboard</Link>
-          <Link to="/items">Items</Link>
-          <Link to="/stock">Stock</Link>
-          <Link to="/billing">Billing</Link>
-          <Link to="/accounting">Accounting</Link>
-          <Link to="/contacts">Contacts</Link>
-          <Link to="/profile">Shop profile</Link>
-          <Link to="/reports">Reports</Link>
-          {user.role === 'admin' && <Link to="/users">Users</Link>}
+          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/dashboard">Dashboard</NavLink>
+          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/items">Items</NavLink>
+          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/stock">Stock</NavLink>
+          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/billing">Billing</NavLink>
+          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/accounting">Accounting</NavLink>
+          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/contacts">Contacts</NavLink>
+          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/profile">Shop profile</NavLink>
+          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/reports">Reports</NavLink>
+          {user.role === 'admin' && <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/users">Users</NavLink>}
         </aside>
         <main className="content">
           <Routes>
@@ -240,25 +240,46 @@ function Dashboard({ user }) {
     api.get('/items').then((res) => setItems(res.data));
   }, []);
 
+  const lowStockItems = items.filter((item) => Number(item.stock) < 5);
+
   return (
     <div>
-      <h3>Dashboard overview</h3>
+      <div className="page-header">
+        <div>
+          <p className="eyebrow">Dashboard</p>
+          <h3>Welcome back, {user.name || 'Manager'}</h3>
+          <p className="muted">A concise view of sales, inventory and follow-up activity for fast decisions.</p>
+        </div>
+      </div>
+
       <div className="stats-grid">
-        <div className="stat-card"><h4>Sales</h4><p>₹{summary.totalSales.toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Purchases</h4><p>₹{summary.totalPurchases.toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Returns</h4><p>₹{summary.totalReturns.toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Invoices</h4><p>{summary.invoiceCount}</p></div>
+        <div className="stat-card"><h4>Total sales</h4><p>₹{summary.totalSales.toLocaleString()}</p><p className="muted">Sales across all invoices</p></div>
+        <div className="stat-card"><h4>Total purchases</h4><p>₹{summary.totalPurchases.toLocaleString()}</p><p className="muted">Purchase spend tracked</p></div>
+        <div className="stat-card"><h4>Total returns</h4><p>₹{summary.totalReturns.toLocaleString()}</p><p className="muted">Returns and adjustments</p></div>
+        <div className="stat-card"><h4>Invoice count</h4><p>{summary.invoiceCount}</p><p className="muted">Invoices generated</p></div>
       </div>
+
       <div className="panel">
-        <h4>Low stock items</h4>
-        <ul>
-          {items.filter((item) => item.stock < 5).map((item) => (
-            <li key={item._id}>{item.name} — {item.stock} in stock</li>
-          ))}
-        </ul>
+        <h4>Stock highlights</h4>
+        {lowStockItems.length === 0 ? (
+          <p className="muted">No items are critically low in stock right now.</p>
+        ) : (
+          <ul className="highlight-list">
+            {lowStockItems.map((item) => (
+              <li key={item._id}>{item.name} — {item.stock} pcs left</li>
+            ))}
+          </ul>
+        )}
       </div>
+
       <div className="panel">
-        <p>Welcome {user.name}. Manage bills, stock, and reports from this elegant control center.</p>
+        <h4>Quick actions</h4>
+        <div className="action-grid">
+          <Link className="btn primary" to="/billing">Create new invoice</Link>
+          <Link className="btn secondary" to="/stock">Review inventory</Link>
+          <Link className="btn secondary" to="/contacts">Follow-up customers</Link>
+          <Link className="btn secondary" to="/reports">View reports</Link>
+        </div>
       </div>
     </div>
   );
@@ -852,16 +873,20 @@ function BillingPage() {
     setSelectedItems((prev) => {
       const existing = prev.find((x) => x.item === item._id);
       if (existing) {
-        return prev.map((x) => x.item === item._id ? { ...x, quantity: x.quantity + 1, total: (x.price * (x.quantity + 1)) } : x);
+        return prev.map((x) => x.item === item._id ? { ...x, quantity: x.quantity + 1 } : x);
       }
 
       const price = type === 'purchase' ? item.purchasePrice : item.salePrice;
-      return [...prev, { item: item._id, name: item.name, quantity: 1, price, sgstRate: item.sgstRate || 0, cgstRate: item.cgstRate || 0, igstRate: item.igstRate || 0, total: price }];
+      return [...prev, { item: item._id, name: item.name, description: item.description || item.name, quantity: 1, unit: item.unit || 'pcs', price, sgstRate: item.sgstRate || 0, cgstRate: item.cgstRate || 0, igstRate: item.igstRate || 0, total: price }];
     });
   };
 
   const updateQty = (id, delta) => {
-    setSelectedItems((prev) => prev.map((entry) => entry.item === id ? { ...entry, quantity: Math.max(1, entry.quantity + delta), total: (entry.price * Math.max(1, entry.quantity + delta)) } : entry));
+    setSelectedItems((prev) => prev.map((entry) => entry.item === id ? { ...entry, quantity: Math.max(1, entry.quantity + delta) } : entry));
+  };
+
+  const removeItem = (id) => {
+    setSelectedItems((prev) => prev.filter((entry) => entry.item !== id));
   };
 
   const saveInvoice = async () => {
@@ -882,17 +907,28 @@ function BillingPage() {
 
     try {
       const itemsPayload = billingMode === 'manual'
-        ? [{
-            itemId: undefined,
-            name: manualName || 'Full setup',
-            quantity: 1,
-            price: Number(manualBasePrice) || 0,
+        ? selectedItems.map((entry) => ({
+            itemId: entry.item,
+            name: entry.name,
+            quantity: entry.quantity,
+            unit: entry.unit,
+            price: 0,
             sgstRate: Number(manualSgstRate) || 0,
             cgstRate: Number(manualCgstRate) || 0,
             igstRate: Number(manualIgstRate) || 0,
-            total: Number(manualBasePrice) || 0
-          }]
-        : selectedItems.map((entry) => ({ ...entry, itemId: entry.item, total: entry.quantity * entry.price }));
+            total: 0
+          }))
+        : selectedItems.map((entry) => ({
+            itemId: entry.item,
+            name: entry.name,
+            quantity: entry.quantity,
+            unit: entry.unit,
+            price: entry.price,
+            sgstRate: entry.sgstRate,
+            cgstRate: entry.cgstRate,
+            igstRate: entry.igstRate,
+            total: entry.quantity * entry.price
+          }));
 
       const payload = {
         partyName: partyName || customerName,
@@ -903,6 +939,8 @@ function BillingPage() {
         type,
         items: itemsPayload,
         subtotal: billingMode === 'manual' ? Number(manualBasePrice) || 0 : undefined,
+        gstAmount: billingMode === 'manual' ? ((Number(manualBasePrice) || 0) * ((Number(manualSgstRate) || 0) + (Number(manualCgstRate) || 0) + (Number(manualIgstRate) || 0)) / 100) : undefined,
+        grandTotal: billingMode === 'manual' ? Number(manualBasePrice || 0) + ((Number(manualBasePrice) || 0) * ((Number(manualSgstRate) || 0) + (Number(manualCgstRate) || 0) + (Number(manualIgstRate) || 0)) / 100) : undefined,
         paidAmount: Number(paidAmount) || 0,
         accountId: paymentAccount || undefined,
         paymentMethod,
@@ -1070,7 +1108,7 @@ function BillingPage() {
           </select>
           <select value={billingMode} onChange={(e) => setBillingMode(e.target.value)}>
             <option value="auto">Item-based billing</option>
-            <option value="manual">Manual total billing</option>
+            <option value="manual">Full setup billing</option>
           </select>
           <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
           <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
@@ -1104,21 +1142,40 @@ function BillingPage() {
               <input type="number" min="0" step="0.01" placeholder="SGST %" value={manualSgstRate} onChange={(e) => setManualSgstRate(e.target.value)} />
               <input type="number" min="0" step="0.01" placeholder="CGST %" value={manualCgstRate} onChange={(e) => setManualCgstRate(e.target.value)} />
               <input type="number" min="0" step="0.01" placeholder="IGST %" value={manualIgstRate} onChange={(e) => setManualIgstRate(e.target.value)} />
-              <p className="muted">Enter a single full setup price and tax rates. Invoice will calculate CGST / SGST automatically.</p>
+              <p className="muted">This invoice uses one total setup price for the full customer order.</p>
             </div>
           )}
         </div>
         <div className="panel">
-          {billingMode === 'auto' ? selectedItems.map((entry) => (
-            <div className="list-row" key={entry.item}>
-              <div><strong>{entry.name}</strong></div>
-              <div className="row-actions">
-                <button onClick={() => updateQty(entry.item, -1)}>-</button>
-                <span>{entry.quantity}</span>
-                <button onClick={() => updateQty(entry.item, 1)}>+</button>
-              </div>
+          <h4>{billingMode === 'auto' ? 'Selected items' : 'Setup items & units'}</h4>
+          {selectedItems.length === 0 ? (
+            <p className="muted">No items added yet. Click an item to include it in the invoice.</p>
+          ) : (
+            <div className="table-responsive">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Unit</th>
+                    <th>{billingMode === 'auto' ? 'Rate' : 'Included'}</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedItems.map((entry) => (
+                    <tr key={entry.item}>
+                      <td>{entry.name}</td>
+                      <td>{entry.quantity}</td>
+                      <td>{entry.unit}</td>
+                      <td>{billingMode === 'auto' ? `₹${entry.price.toFixed(2)}` : 'Included'}</td>
+                      <td><button className="btn secondary" type="button" onClick={() => removeItem(entry.item)}>Remove</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )) : <p className="muted">Manual billing mode: totals will be used directly.</p>}
+          )}
           <div className="totals">
             <div>Subtotal: ₹{billingMode === 'auto' ? subtotal.toFixed(2) : manualBase.toFixed(2)}</div>
             <div>GST: ₹{billingMode === 'auto' ? gstAmount.toFixed(2) : manualGstAmount.toFixed(2)}</div>
@@ -1529,6 +1586,7 @@ function ReportsPage() {
 function ContactsPage() {
   const [contacts, setContacts] = useState([]);
   const [form, setForm] = useState({
+    callerName: '',
     name: '',
     contactNumber: '',
     consumerNumber: '',
@@ -1556,6 +1614,7 @@ function ContactsPage() {
 
   const resetForm = () => {
     setForm({
+      callerName: '',
       name: '',
       contactNumber: '',
       consumerNumber: '',
@@ -1600,6 +1659,7 @@ function ContactsPage() {
   const editContact = (contact) => {
     setEditingContactId(contact.id || contact._id);
     setForm({
+      callerName: contact.callerName || '',
       name: contact.name || '',
       contactNumber: contact.contactNumber || '',
       consumerNumber: contact.consumerNumber || '',
@@ -1649,7 +1709,8 @@ function ContactsPage() {
       <div className="panel">
         <h4>{editingContactId ? 'Edit contact' : 'Add contact'}</h4>
         <form className="form-grid" onSubmit={saveContact}>
-          <input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <input placeholder="Caller name" value={form.callerName} onChange={(e) => setForm({ ...form, callerName: e.target.value })} />
+          <input placeholder="Customer name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <input placeholder="Contact number" value={form.contactNumber} onChange={(e) => setForm({ ...form, contactNumber: e.target.value })} />
           <input placeholder="Consumer number" value={form.consumerNumber} onChange={(e) => setForm({ ...form, consumerNumber: e.target.value })} />
           <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
@@ -1683,7 +1744,7 @@ function ContactsPage() {
             <div className="list-row">
               <div>
                 <strong>{contact.name}</strong>
-                <div className="muted">{contact.contactNumber} • {contact.consumerNumber || 'No consumer number'}</div>
+                <div className="muted">Caller: {contact.callerName || 'Unknown'} • {contact.contactNumber} • {contact.consumerNumber || 'No consumer number'}</div>
                 <div className="muted">Status: {contact.status}</div>
               </div>
               <div className="inline-actions">

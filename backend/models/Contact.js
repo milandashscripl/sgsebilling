@@ -4,6 +4,7 @@ const contactSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   contactNumber: { type: String, required: true, trim: true },
   consumerNumber: { type: String, trim: true, default: '' },
+  callerName: { type: String, trim: true, default: '' },
   status: {
     type: String,
     enum: ['Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Not Interested', 'Following Up'],

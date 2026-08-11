@@ -40,9 +40,10 @@ router.get('/export', auth, async (req, res) => {
     }
 
     const contacts = await Contact.find(filter).lean();
-    const csv = ['name,contactNumber,consumerNumber,status,review,followUpStrategy,followUpCount,lastContacted,nextFollowUp,createdAt']
+    const csv = ['name,callerName,contactNumber,consumerNumber,status,review,followUpStrategy,followUpCount,lastContacted,nextFollowUp,createdAt']
       .concat(contacts.map((contact) => [
         sanitizeCsvValue(contact.name),
+        sanitizeCsvValue(contact.callerName),
         sanitizeCsvValue(contact.contactNumber),
         sanitizeCsvValue(contact.consumerNumber),
         sanitizeCsvValue(contact.status),
@@ -68,6 +69,7 @@ router.post('/', auth, async (req, res) => {
   try {
     const contact = await Contact.create({
       name: req.body.name,
+      callerName: req.body.callerName || '',
       contactNumber: req.body.contactNumber,
       consumerNumber: req.body.consumerNumber || '',
       status: req.body.status || 'Warm Lead',
@@ -90,6 +92,7 @@ router.put('/:contactId', auth, async (req, res) => {
       { _id: req.params.contactId, createdBy: req.user._id },
       {
         name: req.body.name,
+        callerName: req.body.callerName || '',
         contactNumber: req.body.contactNumber,
         consumerNumber: req.body.consumerNumber || '',
         status: req.body.status || 'Warm Lead',
