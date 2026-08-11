@@ -10,7 +10,7 @@ const router = express.Router();
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, shopName, shopAddress, shopGSTIN, shopLogoUrl, phone, address } = req.body;
     if (!name || !email || !password) return res.status(400).json({ message: 'All fields required' });
 
     const existing = mongoose.connection.readyState === 1
@@ -26,11 +26,17 @@ router.post('/register', async (req, res) => {
         name,
         email,
         password: hashed,
-        role: role === 'admin' ? 'admin' : 'user'
+        role: role === 'admin' ? 'admin' : 'user',
+        shopName: shopName || 'SGSE Billing',
+        shopAddress: shopAddress || '',
+        shopGSTIN: shopGSTIN || '',
+        shopLogoUrl: shopLogoUrl || '',
+        phone: phone || '',
+        address: address || ''
       });
       await user.save();
     } else {
-      user = await authStore.createUser({ name, email, password, role });
+      user = await authStore.createUser({ name, email, password, role, shopName, shopAddress, shopGSTIN, shopLogoUrl, phone, address });
     }
 
     const token = jwt.sign(
@@ -45,7 +51,13 @@ router.post('/register', async (req, res) => {
         id: mongoose.connection.readyState === 1 ? String(user._id) : user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        shopName: user.shopName,
+        shopAddress: user.shopAddress,
+        shopGSTIN: user.shopGSTIN,
+        shopLogoUrl: user.shopLogoUrl,
+        phone: user.phone,
+        address: user.address
       }
     });
   } catch (error) {
@@ -79,7 +91,13 @@ router.post('/login', async (req, res) => {
         id: mongoose.connection.readyState === 1 ? String(user._id) : user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        shopName: user.shopName,
+        shopAddress: user.shopAddress,
+        shopGSTIN: user.shopGSTIN,
+        shopLogoUrl: user.shopLogoUrl,
+        phone: user.phone,
+        address: user.address
       }
     });
   } catch (error) {
@@ -89,6 +107,48 @@ router.post('/login', async (req, res) => {
 
 router.get('/me', auth, async (req, res) => {
   res.json({ user: req.user });
+});
+
+router.put('/me', auth, async (req, res) => {
+  try {
+    const updates = {
+      name: req.body.name || req.user.name,
+      shopName: req.body.shopName || req.user.shopName,
+      shopAddress: req.body.shopAddress || req.user.shopAddress,
+      shopGSTIN: req.body.shopGSTIN || req.user.shopGSTIN,
+      shopLogoUrl: req.body.shopLogoUrl || req.user.shopLogoUrl,
+      phone: req.body.phone || req.user.phone,
+      address: req.body.address || req.user.address
+    };
+
+    let updatedUser;
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findById(req.user.id);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      Object.assign(user, updates);
+      await user.save();
+      updatedUser = user;
+    } else {
+      updatedUser = await authStore.updateUserById(req.user.id, updates);
+    }
+
+    res.json({
+      user: {
+        id: updatedUser.id ? String(updatedUser.id) : String(updatedUser._id),
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        shopName: updatedUser.shopName,
+        shopAddress: updatedUser.shopAddress,
+        shopGSTIN: updatedUser.shopGSTIN,
+        shopLogoUrl: updatedUser.shopLogoUrl,
+        phone: updatedUser.phone,
+        address: updatedUser.address
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 module.exports = router;

@@ -85,7 +85,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      {user ? <AuthenticatedApp user={user} logout={logout} /> : <PublicApp setUser={setUser} />}
+      {user ? <AuthenticatedApp user={user} logout={logout} setUser={setUser} /> : <PublicApp setUser={setUser} />}
     </div>
   );
 }
@@ -116,7 +116,7 @@ function PublicApp({ setUser }) {
   );
 }
 
-function AuthenticatedApp({ user, logout }) {
+function AuthenticatedApp({ user, logout, setUser }) {
   return (
     <div>
       <nav className="topbar">
@@ -137,6 +137,7 @@ function AuthenticatedApp({ user, logout }) {
           <Link to="/billing">Billing</Link>
           <Link to="/accounting">Accounting</Link>
           <Link to="/contacts">Contacts</Link>
+          <Link to="/profile">Shop profile</Link>
           <Link to="/reports">Reports</Link>
           {user.role === 'admin' && <Link to="/users">Users</Link>}
         </aside>
@@ -148,6 +149,7 @@ function AuthenticatedApp({ user, logout }) {
             <Route path="/stock" element={<StockPage />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/profile" element={<ProfilePage user={user} setUser={setUser} />} />
             <Route path="/reports" element={<ReportsPage />} />
             {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -258,6 +260,70 @@ function Dashboard({ user }) {
       <div className="panel">
         <p>Welcome {user.name}. Manage bills, stock, and reports from this elegant control center.</p>
       </div>
+    </div>
+  );
+}
+
+function ProfilePage({ user, setUser }) {
+  const [form, setForm] = useState({
+    shopName: user.shopName || '',
+    shopAddress: user.shopAddress || '',
+    shopGSTIN: user.shopGSTIN || '',
+    shopLogoUrl: user.shopLogoUrl || '',
+    phone: user.phone || '',
+    address: user.address || ''
+  });
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setForm({
+      shopName: user.shopName || '',
+      shopAddress: user.shopAddress || '',
+      shopGSTIN: user.shopGSTIN || '',
+      shopLogoUrl: user.shopLogoUrl || '',
+      phone: user.phone || '',
+      address: user.address || ''
+    });
+  }, [user]);
+
+  const saveProfile = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    try {
+      const res = await api.put('/auth/me', form);
+      const updatedUser = res.data.user;
+      setMessage('Profile saved successfully');
+      if (setUser) {
+        setUser(updatedUser);
+      }
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to save profile');
+    }
+  };
+
+  return (
+    <div>
+      <h3>Shop profile & invoice header</h3>
+      <form className="panel" onSubmit={saveProfile}>
+        <div className="form-grid">
+          <input placeholder="Shop name" value={form.shopName} onChange={(e) => setForm({ ...form, shopName: e.target.value })} />
+          <input placeholder="Shop address" value={form.shopAddress} onChange={(e) => setForm({ ...form, shopAddress: e.target.value })} />
+          <input placeholder="Shop GSTIN" value={form.shopGSTIN} onChange={(e) => setForm({ ...form, shopGSTIN: e.target.value })} />
+          <input placeholder="Shop logo URL" value={form.shopLogoUrl} onChange={(e) => setForm({ ...form, shopLogoUrl: e.target.value })} />
+          <input placeholder="Shop phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <input placeholder="Shop billing address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        </div>
+        {message && <p className="muted">{message}</p>}
+        <button className="btn primary" type="submit">Save profile</button>
+      </form>
+      {form.shopLogoUrl && (
+        <div className="panel">
+          <h4>Logo preview</h4>
+          <img src={form.shopLogoUrl} alt="Shop logo preview" style={{ maxWidth: '200px', maxHeight: '120px', display: 'block' }} />
+          <p className="muted">Use a public image URL or data URI. If the invoice PDF cannot render the logo, view the invoice header text instead.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -766,9 +832,11 @@ function BillingPage() {
   const [partyGSTIN, setPartyGSTIN] = useState('');
   const [type, setType] = useState('sale');
   const [billingMode, setBillingMode] = useState('auto');
-  const [manualSubtotal, setManualSubtotal] = useState('');
-  const [manualGst, setManualGst] = useState('');
-  const [manualTotal, setManualTotal] = useState('');
+  const [manualName, setManualName] = useState('Full setup');
+  const [manualBasePrice, setManualBasePrice] = useState('');
+  const [manualSgstRate, setManualSgstRate] = useState('0');
+  const [manualCgstRate, setManualCgstRate] = useState('0');
+  const [manualIgstRate, setManualIgstRate] = useState('0');
   const [paymentAccount, setPaymentAccount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paidAmount, setPaidAmount] = useState('');
@@ -802,19 +870,28 @@ function BillingPage() {
       return;
     }
 
-    if (billingMode === 'manual' && (!manualTotal || Number(manualTotal) <= 0)) {
-      setBillingMessage('Enter a manual total amount before creating a bill');
+    if (billingMode === 'manual' && (!manualBasePrice || Number(manualBasePrice) <= 0)) {
+      setBillingMessage('Enter a valid full setup price before creating a bill');
       return;
     }
 
-      if (Number(paidAmount) > 0 && !paymentAccount) {
-        setBillingMessage('Select an account for the payment');
-        return;
-      }
+    if (Number(paidAmount) > 0 && !paymentAccount) {
+      setBillingMessage('Select an account for the payment');
+      return;
+    }
 
     try {
       const itemsPayload = billingMode === 'manual'
-        ? [{ itemId: undefined, name: 'Manual billing', quantity: 1, price: Number(manualSubtotal) || 0, sgstRate: 0, cgstRate: 0, igstRate: 0, total: Number(manualTotal) || Number(manualSubtotal) || 0 }]
+        ? [{
+            itemId: undefined,
+            name: manualName || 'Full setup',
+            quantity: 1,
+            price: Number(manualBasePrice) || 0,
+            sgstRate: Number(manualSgstRate) || 0,
+            cgstRate: Number(manualCgstRate) || 0,
+            igstRate: Number(manualIgstRate) || 0,
+            total: Number(manualBasePrice) || 0
+          }]
         : selectedItems.map((entry) => ({ ...entry, itemId: entry.item, total: entry.quantity * entry.price }));
 
       const payload = {
@@ -825,9 +902,7 @@ function BillingPage() {
         customerPhone,
         type,
         items: itemsPayload,
-        subtotal: billingMode === 'manual' ? Number(manualSubtotal) || 0 : undefined,
-        gstAmount: billingMode === 'manual' ? Number(manualGst) || 0 : undefined,
-        grandTotal: billingMode === 'manual' ? Number(manualTotal) || 0 : undefined,
+        subtotal: billingMode === 'manual' ? Number(manualBasePrice) || 0 : undefined,
         paidAmount: Number(paidAmount) || 0,
         accountId: paymentAccount || undefined,
         paymentMethod,
@@ -842,9 +917,11 @@ function BillingPage() {
       setPartyGSTIN('');
       setCustomerName('');
       setCustomerPhone('');
-      setManualSubtotal('');
-      setManualGst('');
-      setManualTotal('');
+      setManualName('Full setup');
+      setManualBasePrice('');
+      setManualSgstRate('0');
+      setManualCgstRate('0');
+      setManualIgstRate('0');
       setPaidAmount('');
       setPaymentAccount('');
       setPaymentMethod('cash');
@@ -862,42 +939,121 @@ function BillingPage() {
   }, 0);
   const total = subtotal + gstAmount;
 
-  const downloadInvoicePdf = (invoice) => {
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text('SGSE Billing Invoice', 14, 20);
-    doc.setFontSize(11);
-    doc.text(`Invoice #: ${invoice.invoiceNumber}`, 14, 32);
-    doc.text(`Type: ${invoice.type}`, 14, 38);
-    doc.text(`Party: ${invoice.partyName || invoice.customerName}`, 14, 44);
-    doc.text(`Phone: ${invoice.partyPhone || invoice.customerPhone}`, 14, 50);
-    if (invoice.partyGSTIN) doc.text(`GSTIN: ${invoice.partyGSTIN}`, 14, 56);
-    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleString()}`, 14, 62);
+  const manualBase = Number(manualBasePrice) || 0;
+  const manualSgstAmount = manualBase * (Number(manualSgstRate) || 0) / 100;
+  const manualCgstAmount = manualBase * (Number(manualCgstRate) || 0) / 100;
+  const manualIgstAmount = manualBase * (Number(manualIgstRate) || 0) / 100;
+  const manualGstAmount = manualSgstAmount + manualCgstAmount + manualIgstAmount;
+  const manualTotal = manualBase + manualGstAmount;
 
-    let y = 74;
-    doc.setFontSize(12);
-    doc.text('Items', 14, y);
-    y += 8;
+  const loadImageAsDataUrl = async (url) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  const downloadInvoicePdf = async (invoice) => {
+    const doc = new jsPDF();
+    const marginLeft = 14;
+    let y = 20;
+
+    if (invoice.sellerLogoUrl) {
+      const logoData = await loadImageAsDataUrl(invoice.sellerLogoUrl);
+      if (logoData) {
+        try {
+          doc.addImage(logoData, 'PNG', marginLeft, 10, 32, 32);
+        } catch (err) {
+          // Ignore logo render errors
+        }
+      }
+    }
+
+    const headerX = invoice.sellerLogoUrl ? 52 : marginLeft;
+    doc.setFontSize(14);
+    doc.text(invoice.sellerName || 'SGSE Billing', headerX, y);
     doc.setFontSize(10);
-    invoice.items.forEach((item) => {
-      doc.text(`${item.name} x${item.quantity} @ ₹${item.price.toFixed(2)} = ₹${item.total.toFixed(2)}`, 14, y);
+    y += 6;
+    if (invoice.sellerAddress) {
+      const addressLines = doc.splitTextToSize(invoice.sellerAddress, 120);
+      doc.text(addressLines, headerX, y);
+      y += addressLines.length * 6;
+    }
+    if (invoice.sellerGSTIN) {
+      doc.text(`GSTIN: ${invoice.sellerGSTIN}`, headerX, y);
       y += 6;
+    }
+    if (invoice.sellerPhone) {
+      doc.text(`Phone: ${invoice.sellerPhone}`, headerX, y);
+      y += 6;
+    }
+
+    y = Math.max(y + 4, 50);
+    doc.setFontSize(12);
+    doc.text('TAX INVOICE', marginLeft, y);
+    doc.setFontSize(10);
+    y += 8;
+    doc.text(`Invoice #: ${invoice.invoiceNumber}`, marginLeft, y);
+    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleString()}`, 120, y);
+    y += 6;
+    doc.text(`Type: ${invoice.type}`, marginLeft, y);
+    doc.text(`Customer: ${invoice.partyName || invoice.customerName}`, 120, y);
+    y += 6;
+    if (invoice.partyPhone) doc.text(`Phone: ${invoice.partyPhone}`, marginLeft, y);
+    if (invoice.partyGSTIN) {
+      doc.text(`GSTIN: ${invoice.partyGSTIN}`, 120, y);
+      y += 6;
+    }
+
+    y += 8;
+    doc.setFontSize(11);
+    doc.text('Description', marginLeft, y);
+    doc.text('Qty', 90, y);
+    doc.text('Rate', 110, y);
+    doc.text('SGST', 138, y);
+    doc.text('CGST', 158, y);
+    doc.text('Total', 180, y);
+    y += 6;
+    doc.setLineWidth(0.5);
+    doc.line(marginLeft, y, 196, y);
+    y += 4;
+    doc.setFontSize(10);
+
+    invoice.items.forEach((item) => {
       if (y > 260) {
         doc.addPage();
         y = 20;
       }
+      const nameLines = doc.splitTextToSize(item.name || '-', 70);
+      doc.text(nameLines, marginLeft, y);
+      doc.text(String(item.quantity || 1), 90, y);
+      doc.text(`₹${(item.price || 0).toFixed(2)}`, 110, y);
+      doc.text(`${item.sgstRate || 0}%`, 138, y);
+      doc.text(`${item.cgstRate || 0}%`, 158, y);
+      doc.text(`₹${(item.total || 0).toFixed(2)}`, 180, y);
+      y += nameLines.length * 6;
     });
 
     y += 8;
-    doc.text(`Subtotal: ₹${invoice.subtotal.toFixed(2)}`, 14, y);
+    doc.setFontSize(11);
+    doc.text(`Subtotal: ₹${(invoice.subtotal || 0).toFixed(2)}`, marginLeft, y);
     y += 6;
-    doc.text(`GST: ₹${invoice.gstAmount.toFixed(2)}`, 14, y);
+    doc.text(`GST: ₹${(invoice.gstAmount || 0).toFixed(2)}`, marginLeft, y);
     y += 6;
-    doc.text(`Total: ₹${invoice.grandTotal.toFixed(2)}`, 14, y);
+    doc.text(`Grand total: ₹${(invoice.grandTotal || 0).toFixed(2)}`, marginLeft, y);
     y += 6;
-    doc.text(`Paid: ₹${invoice.paidAmount?.toFixed(2) || 0}`, 14, y);
+    doc.text(`Paid: ₹${(invoice.paidAmount || 0).toFixed(2)}`, marginLeft, y);
     y += 6;
-    doc.text(`Balance: ₹${invoice.balance?.toFixed(2) || 0}`, 14, y);
+    doc.text(`Balance: ₹${(invoice.balance || 0).toFixed(2)}`, marginLeft, y);
 
     doc.save(`${invoice.invoiceNumber}.pdf`);
   };
@@ -943,10 +1099,12 @@ function BillingPage() {
             </div>
           ) : (
             <div className="form-grid">
-              <input type="number" min="0" step="0.01" placeholder="Subtotal amount" value={manualSubtotal} onChange={(e) => setManualSubtotal(e.target.value)} />
-              <input type="number" min="0" step="0.01" placeholder="GST amount" value={manualGst} onChange={(e) => setManualGst(e.target.value)} />
-              <input type="number" min="0" step="0.01" placeholder="Grand total" value={manualTotal} onChange={(e) => setManualTotal(e.target.value)} />
-              <p className="muted">Enter total billing and GST amounts manually. The invoice will be created from these values.</p>
+              <input placeholder="Full setup description" value={manualName} onChange={(e) => setManualName(e.target.value)} />
+              <input type="number" min="0" step="0.01" placeholder="Setup base price" value={manualBasePrice} onChange={(e) => setManualBasePrice(e.target.value)} />
+              <input type="number" min="0" step="0.01" placeholder="SGST %" value={manualSgstRate} onChange={(e) => setManualSgstRate(e.target.value)} />
+              <input type="number" min="0" step="0.01" placeholder="CGST %" value={manualCgstRate} onChange={(e) => setManualCgstRate(e.target.value)} />
+              <input type="number" min="0" step="0.01" placeholder="IGST %" value={manualIgstRate} onChange={(e) => setManualIgstRate(e.target.value)} />
+              <p className="muted">Enter a single full setup price and tax rates. Invoice will calculate CGST / SGST automatically.</p>
             </div>
           )}
         </div>
@@ -962,9 +1120,9 @@ function BillingPage() {
             </div>
           )) : <p className="muted">Manual billing mode: totals will be used directly.</p>}
           <div className="totals">
-            <div>Subtotal: ₹{billingMode === 'auto' ? subtotal.toFixed(2) : (Number(manualSubtotal) || 0).toFixed(2)}</div>
-            <div>GST: ₹{billingMode === 'auto' ? gstAmount.toFixed(2) : (Number(manualGst) || 0).toFixed(2)}</div>
-            <div><strong>Total: ₹{billingMode === 'auto' ? total.toFixed(2) : (Number(manualTotal) || 0).toFixed(2)}</strong></div>
+            <div>Subtotal: ₹{billingMode === 'auto' ? subtotal.toFixed(2) : manualBase.toFixed(2)}</div>
+            <div>GST: ₹{billingMode === 'auto' ? gstAmount.toFixed(2) : manualGstAmount.toFixed(2)}</div>
+            <div><strong>Total: ₹{billingMode === 'auto' ? total.toFixed(2) : manualTotal.toFixed(2)}</strong></div>
             <input type="number" min="0" step="0.01" placeholder="Paid amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
           </div>
           {billingMessage && <p className="muted">{billingMessage}</p>}
@@ -1167,30 +1325,32 @@ function ReportsPage() {
   const [invoices, setInvoices] = useState([]);
   const [stockSearch, setStockSearch] = useState('');
   const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [reportFromDate, setReportFromDate] = useState('');
+  const [reportToDate, setReportToDate] = useState('');
 
   useEffect(() => {
-    api.get('/reports/summary').then((res) => setSummary(res.data));
-  }, []);
+    api.get('/reports/summary', { params: { fromDate: reportFromDate, toDate: reportToDate } }).then((res) => setSummary(res.data));
+  }, [reportFromDate, reportToDate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      api.get('/reports/stock', { params: { search: stockSearch } })
+      api.get('/reports/stock', { params: { search: stockSearch, fromDate: reportFromDate, toDate: reportToDate } })
         .then((res) => setStock(res.data))
         .catch(() => setStock([]));
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [stockSearch]);
+  }, [stockSearch, reportFromDate, reportToDate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      api.get('/reports/invoices', { params: { search: invoiceSearch } })
+      api.get('/reports/invoices', { params: { search: invoiceSearch, fromDate: reportFromDate, toDate: reportToDate } })
         .then((res) => setInvoices(res.data))
         .catch(() => setInvoices([]));
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [invoiceSearch]);
+  }, [invoiceSearch, reportFromDate, reportToDate]);
 
   const downloadReport = async (path, filename, params = {}) => {
     try {
@@ -1211,10 +1371,14 @@ function ReportsPage() {
   const downloadPdfReport = async () => {
     const doc = new jsPDF();
     let y = 20;
+    const dateRange = reportFromDate || reportToDate ? `Date range: ${reportFromDate || 'Any'} - ${reportToDate || 'Any'}` : 'Date range: All time';
 
     doc.setFontSize(16);
     doc.text('SGSE Billing Report', 14, y);
-    y += 10;
+    y += 8;
+    doc.setFontSize(10);
+    doc.text(dateRange, 14, y);
+    y += 12;
 
     doc.setFontSize(11);
     doc.text(`Sales: ₹${summary.totalSales.toLocaleString()}`, 14, y);
@@ -1241,6 +1405,25 @@ function ReportsPage() {
       y += 6;
     });
 
+    if (invoices.length) {
+      doc.addPage();
+      y = 20;
+      doc.setFontSize(13);
+      doc.text('Invoice report', 14, y);
+      y += 8;
+      doc.setFontSize(10);
+
+      invoices.forEach((invoice) => {
+        const line = `${invoice.invoiceNumber} | ${invoice.partyName || invoice.customerName || '-'} | ₹${(invoice.grandTotal || 0).toFixed(2)} | ${invoice.paymentStatus || '-'} | ${invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : '-'}`;
+        if (y > 280) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, 14, y);
+        y += 6;
+      });
+    }
+
     doc.save('sgse-report.pdf');
   };
 
@@ -1263,6 +1446,8 @@ function ReportsPage() {
             value={stockSearch}
             onChange={(e) => setStockSearch(e.target.value)}
           />
+          <input type="date" value={reportFromDate} onChange={(e) => setReportFromDate(e.target.value)} />
+          <input type="date" value={reportToDate} onChange={(e) => setReportToDate(e.target.value)} />
         </div>
         <table className="table">
           <thead>
@@ -1289,7 +1474,8 @@ function ReportsPage() {
           </tbody>
         </table>
         <div className="inline-actions">
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/stock/export', 'stock.csv', { search: stockSearch })}>Download stock CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/stock/export', 'stock.csv', { search: stockSearch, fromDate: reportFromDate, toDate: reportToDate })}>Download stock CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadPdfReport()}>Download filtered PDF report</button>
         </div>
       </div>
 
@@ -1328,11 +1514,11 @@ function ReportsPage() {
           </tbody>
         </table>
         <div className="inline-actions">
-          <button className="btn primary" type="button" onClick={() => downloadReport('/reports/invoices/export', 'invoices.csv', { search: invoiceSearch })}>Download invoices CSV</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/sales/export', 'sales.csv', { search: invoiceSearch })}>Download sales CSV</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/purchases/export', 'purchases.csv', { search: invoiceSearch })}>Download purchases CSV</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/returns/export', 'returns.csv', { search: invoiceSearch })}>Download returns CSV</button>
-          <button className="btn secondary" type="button" onClick={downloadPdfReport}>Download PDF report</button>
+          <button className="btn primary" type="button" onClick={() => downloadReport('/reports/invoices/export', 'invoices.csv', { search: invoiceSearch, fromDate: reportFromDate, toDate: reportToDate })}>Download invoices CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/sales/export', 'sales.csv', { search: invoiceSearch, fromDate: reportFromDate, toDate: reportToDate })}>Download sales CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/purchases/export', 'purchases.csv', { search: invoiceSearch, fromDate: reportFromDate, toDate: reportToDate })}>Download purchases CSV</button>
+          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/returns/export', 'returns.csv', { search: invoiceSearch, fromDate: reportFromDate, toDate: reportToDate })}>Download returns CSV</button>
+          <button className="btn secondary" type="button" onClick={downloadPdfReport}>Download filtered PDF report</button>
           <button className="btn secondary" type="button" onClick={() => window.print()}>Print report</button>
         </div>
       </div>
@@ -1354,17 +1540,19 @@ function ContactsPage() {
   });
   const [editingContactId, setEditingContactId] = useState(null);
   const [message, setMessage] = useState('');
+  const [contactFromDate, setContactFromDate] = useState('');
+  const [contactToDate, setContactToDate] = useState('');
 
   const loadContacts = async () => {
     try {
-      const res = await api.get('/contacts');
+      const res = await api.get('/contacts', { params: { fromDate: contactFromDate, toDate: contactToDate } });
       setContacts(res.data);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Unable to load contacts');
     }
   };
 
-  useEffect(() => { loadContacts(); }, []);
+  useEffect(() => { loadContacts(); }, [contactFromDate, contactToDate]);
 
   const resetForm = () => {
     setForm({
@@ -1435,6 +1623,25 @@ function ContactsPage() {
     }
   };
 
+  const downloadContactsCsv = async () => {
+    try {
+      const res = await api.get('/contacts/export', {
+        responseType: 'blob',
+        params: { fromDate: contactFromDate, toDate: contactToDate }
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'contacts.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to download contacts');
+    }
+  };
+
   return (
     <div>
       <h3>Calling & Customer follow-up</h3>
@@ -1466,6 +1673,11 @@ function ContactsPage() {
 
       <div className="panel">
         <h4>Contact list</h4>
+        <div className="form-row">
+          <input type="date" value={contactFromDate} onChange={(e) => setContactFromDate(e.target.value)} />
+          <input type="date" value={contactToDate} onChange={(e) => setContactToDate(e.target.value)} />
+          <button className="btn secondary" type="button" onClick={downloadContactsCsv}>Download contacts CSV</button>
+        </div>
         {contacts.length === 0 ? <p className="muted">No contacts yet. Add one to start following up.</p> : contacts.map((contact) => (
           <div key={contact.id || contact._id} className="panel" style={{ padding: '12px' }}>
             <div className="list-row">

@@ -14,16 +14,29 @@ function createAuthStore() {
       name: 'Admin',
       email: 'admin@example.com',
       password: hashed,
-      role: 'admin'
+      role: 'admin',
+      shopName: 'SGSE Billing',
+      shopAddress: '',
+      shopGSTIN: '',
+      shopLogoUrl: '',
+      phone: '',
+      address: ''
     };
     users.push(admin);
     return admin;
   };
 
   const findUserByEmail = (email) => users.find((user) => user.email === email);
-  const findUserById = (id) => users.find((user) => user.id === id);
+  const findUserById = (id) => users.find((user) => String(user.id) === String(id));
 
-  const createUser = async ({ name, email, password, role }) => {
+  const updateUserById = async (id, updates) => {
+    const user = findUserById(id);
+    if (!user) return null;
+    Object.assign(user, updates);
+    return user;
+  };
+
+  const createUser = async ({ name, email, password, role, shopName = 'SGSE Billing', shopAddress = '', shopGSTIN = '', shopLogoUrl = '', phone = '', address = '' }) => {
     const existing = findUserByEmail(email);
     if (existing) return null;
 
@@ -33,7 +46,13 @@ function createAuthStore() {
       name,
       email,
       password: hashed,
-      role: role === 'admin' ? 'admin' : 'user'
+      role: role === 'admin' ? 'admin' : 'user',
+      shopName,
+      shopAddress,
+      shopGSTIN,
+      shopLogoUrl,
+      phone,
+      address
     };
     users.push(user);
     return user;

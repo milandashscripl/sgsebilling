@@ -6,12 +6,63 @@ const router = express.Router();
 
 router.get('/', auth, async (req, res) => {
   try {
-    const contacts = await Contact.find({ createdBy: req.user._id }).sort({ updatedAt: -1 }).lean();
+    const filter = { createdBy: req.user._id };
+    const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : null;
+    const toDate = req.query.toDate ? new Date(req.query.toDate) : null;
+
+    if (fromDate && !Number.isNaN(fromDate.getTime())) {
+      filter.createdAt = { ...filter.createdAt, $gte: fromDate };
+    }
+    if (toDate && !Number.isNaN(toDate.getTime())) {
+      toDate.setHours(23, 59, 59, 999);
+      filter.createdAt = { ...filter.createdAt, $lte: toDate };
+    }
+
+    const contacts = await Contact.find(filter).sort({ updatedAt: -1 }).lean();
     res.json(contacts.map((item) => ({ ...item, id: String(item._id) })));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
+
+router.get('/export', auth, async (req, res) => {
+  try {
+    const filter = { createdBy: req.user._id };
+    const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : null;
+    const toDate = req.query.toDate ? new Date(req.query.toDate) : null;
+
+    if (fromDate && !Number.isNaN(fromDate.getTime())) {
+      filter.createdAt = { ...filter.createdAt, $gte: fromDate };
+    }
+    if (toDate && !Number.isNaN(toDate.getTime())) {
+      toDate.setHours(23, 59, 59, 999);
+      filter.createdAt = { ...filter.createdAt, $lte: toDate };
+    }
+
+    const contacts = await Contact.find(filter).lean();
+    const csv = ['name,contactNumber,consumerNumber,status,review,followUpStrategy,followUpCount,lastContacted,nextFollowUp,createdAt']
+      .concat(contacts.map((contact) => [
+        sanitizeCsvValue(contact.name),
+        sanitizeCsvValue(contact.contactNumber),
+        sanitizeCsvValue(contact.consumerNumber),
+        sanitizeCsvValue(contact.status),
+        sanitizeCsvValue(contact.review),
+        sanitizeCsvValue(contact.followUpStrategy),
+        contact.followUpCount || 0,
+        contact.lastContacted ? contact.lastContacted.toISOString() : '',
+        contact.nextFollowUp ? contact.nextFollowUp.toISOString() : '',
+        contact.createdAt ? contact.createdAt.toISOString() : ''
+      ].join(','))).join('\n');
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment('contacts.csv');
+    res.send(csv);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+const sanitizeCsvValue = (value) => String(value || '').replace(/,/g, ' ').replace(/\r|\n/g, ' ');
 
 router.post('/', auth, async (req, res) => {
   try {

@@ -6,6 +6,9 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: { type: String, enum: ['admin', 'user'], default: 'user' },
   shopName: { type: String, default: 'SGSE Billing' },
+  shopAddress: { type: String, default: '' },
+  shopGSTIN: { type: String, default: '' },
+  shopLogoUrl: { type: String, default: '' },
   phone: { type: String, default: '' },
   address: { type: String, default: '' }
 }, { timestamps: true });

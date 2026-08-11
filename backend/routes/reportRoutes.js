@@ -7,14 +7,26 @@ const router = express.Router();
 
 router.get('/summary', auth, async (req, res) => {
   try {
+    const dateFilter = {};
+    applyDateRange(req, dateFilter, 'createdAt');
+
     const [salesCount, purchasesCount, returnsCount, invoiceCount, totalSales, totalPurchases, totalReturns] = await Promise.all([
-      Invoice.countDocuments({ type: 'sale' }),
-      Invoice.countDocuments({ type: 'purchase' }),
-      Invoice.countDocuments({ type: 'return' }),
-      Invoice.countDocuments(),
-      Invoice.aggregate([{ $match: { type: 'sale' } }, { $group: { _id: null, total: { $sum: '$grandTotal' } } }]),
-      Invoice.aggregate([{ $match: { type: 'purchase' } }, { $group: { _id: null, total: { $sum: '$grandTotal' } } }]),
-      Invoice.aggregate([{ $match: { type: 'return' } }, { $group: { _id: null, total: { $sum: '$grandTotal' } } }])
+      Invoice.countDocuments({ type: 'sale', ...dateFilter }),
+      Invoice.countDocuments({ type: 'purchase', ...dateFilter }),
+      Invoice.countDocuments({ type: 'return', ...dateFilter }),
+      Invoice.countDocuments({ ...dateFilter }),
+      Invoice.aggregate([
+        { $match: { type: 'sale', ...dateFilter } },
+        { $group: { _id: null, total: { $sum: '$grandTotal' } } }
+      ]),
+      Invoice.aggregate([
+        { $match: { type: 'purchase', ...dateFilter } },
+        { $group: { _id: null, total: { $sum: '$grandTotal' } } }
+      ]),
+      Invoice.aggregate([
+        { $match: { type: 'return', ...dateFilter } },
+        { $group: { _id: null, total: { $sum: '$grandTotal' } } }
+      ])
     ]);
 
     res.json({
@@ -40,6 +52,7 @@ router.get('/stock', auth, async (req, res) => {
       filter.name = { $regex: search, $options: 'i' };
     }
 
+    applyDateRange(req, filter, 'updatedAt');
     const items = await Item.find(filter).sort({ stock: 1, name: 1 }).lean();
     res.json(items.map((item) => ({ ...item, id: String(item._id) })));
   } catch (error) {
@@ -48,6 +61,23 @@ router.get('/stock', auth, async (req, res) => {
 });
 
 const sanitizeCsvValue = (value) => String(value || '').replace(/,/g, ' ').replace(/\r|\n/g, ' ');
+
+const applyDateRange = (req, filter, field) => {
+  const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : null;
+  const toDate = req.query.toDate ? new Date(req.query.toDate) : null;
+  const range = {};
+
+  if (fromDate && !Number.isNaN(fromDate.getTime())) {
+    range.$gte = fromDate;
+  }
+  if (toDate && !Number.isNaN(toDate.getTime())) {
+    toDate.setHours(23, 59, 59, 999);
+    range.$lte = toDate;
+  }
+  if (Object.keys(range).length) {
+    filter[field] = range;
+  }
+};
 
 router.get('/invoices', auth, async (req, res) => {
   try {
@@ -61,6 +91,7 @@ router.get('/invoices', auth, async (req, res) => {
       ];
     }
 
+    applyDateRange(req, filter, 'createdAt');
     const invoices = await Invoice.find(filter).sort({ createdAt: -1 }).lean();
     res.json(invoices.map((invoice) => ({ ...invoice, id: String(invoice._id) })));
   } catch (error) {
@@ -80,9 +111,10 @@ router.get('/invoices/export', auth, async (req, res) => {
       ];
     }
 
+    applyDateRange(req, filter, 'createdAt');
     const invoices = await Invoice.find(filter).lean();
-    const csv = ['invoiceNumber,type,partyName,partyPhone,partyGSTIN,subtotal,gstAmount,grandTotal,paymentStatus']
-      .concat(invoices.map((inv) => `${sanitizeCsvValue(inv.invoiceNumber)},${sanitizeCsvValue(inv.type)},${sanitizeCsvValue(inv.partyName)},${sanitizeCsvValue(inv.partyPhone)},${sanitizeCsvValue(inv.partyGSTIN)},${inv.subtotal || 0},${inv.gstAmount || 0},${inv.grandTotal || 0},${sanitizeCsvValue(inv.paymentStatus)}`))
+    const csv = ['invoiceNumber,type,partyName,partyPhone,partyGSTIN,subtotal,gstAmount,grandTotal,paymentStatus,createdAt']
+      .concat(invoices.map((inv) => `${sanitizeCsvValue(inv.invoiceNumber)},${sanitizeCsvValue(inv.type)},${sanitizeCsvValue(inv.partyName)},${sanitizeCsvValue(inv.partyPhone)},${sanitizeCsvValue(inv.partyGSTIN)},${inv.subtotal || 0},${inv.gstAmount || 0},${inv.grandTotal || 0},${sanitizeCsvValue(inv.paymentStatus)},${inv.createdAt ? inv.createdAt.toISOString() : ''}`))
       .join('\n');
 
     res.header('Content-Type', 'text/csv');
@@ -102,9 +134,10 @@ router.get('/stock/export', auth, async (req, res) => {
       filter.name = { $regex: search, $options: 'i' };
     }
 
+    applyDateRange(req, filter, 'updatedAt');
     const items = await Item.find(filter).lean();
-    const csv = ['name,itemType,category,specification,unit,stock,purchasePrice,salePrice,sgstRate,cgstRate,igstRate']
-      .concat(items.map((item) => `${sanitizeCsvValue(item.name)},${sanitizeCsvValue(item.itemType)},${sanitizeCsvValue(item.category)},${sanitizeCsvValue(item.specification)},${sanitizeCsvValue(item.unit)},${item.stock || 0},${item.purchasePrice || 0},${item.salePrice || 0},${item.sgstRate || 0},${item.cgstRate || 0},${item.igstRate || 0}`))
+    const csv = ['name,itemType,category,specification,unit,stock,purchasePrice,salePrice,sgstRate,cgstRate,igstRate,updatedAt']
+      .concat(items.map((item) => `${sanitizeCsvValue(item.name)},${sanitizeCsvValue(item.itemType)},${sanitizeCsvValue(item.category)},${sanitizeCsvValue(item.specification)},${sanitizeCsvValue(item.unit)},${item.stock || 0},${item.purchasePrice || 0},${item.salePrice || 0},${item.sgstRate || 0},${item.cgstRate || 0},${item.igstRate || 0},${item.updatedAt ? item.updatedAt.toISOString() : ''}`))
       .join('\n');
 
     res.header('Content-Type', 'text/csv');
@@ -115,16 +148,18 @@ router.get('/stock/export', auth, async (req, res) => {
   }
 });
 
-const buildInvoiceExport = async (type) => {
-  const invoices = await Invoice.find({ type }).lean();
-  return ['invoiceNumber,partyName,partyPhone,partyGSTIN,subtotal,gstAmount,grandTotal,paymentStatus']
-    .concat(invoices.map((inv) => `${sanitizeCsvValue(inv.invoiceNumber)},${sanitizeCsvValue(inv.partyName)},${sanitizeCsvValue(inv.partyPhone)},${sanitizeCsvValue(inv.partyGSTIN)},${inv.subtotal || 0},${inv.gstAmount || 0},${inv.grandTotal || 0},${sanitizeCsvValue(inv.paymentStatus)}`))
+const buildInvoiceExport = async (type, req) => {
+  const filter = { type };
+  applyDateRange(req, filter, 'createdAt');
+  const invoices = await Invoice.find(filter).lean();
+  return ['invoiceNumber,partyName,partyPhone,partyGSTIN,subtotal,gstAmount,grandTotal,paymentStatus,createdAt']
+    .concat(invoices.map((inv) => `${sanitizeCsvValue(inv.invoiceNumber)},${sanitizeCsvValue(inv.partyName)},${sanitizeCsvValue(inv.partyPhone)},${sanitizeCsvValue(inv.partyGSTIN)},${inv.subtotal || 0},${inv.gstAmount || 0},${inv.grandTotal || 0},${sanitizeCsvValue(inv.paymentStatus)},${inv.createdAt ? inv.createdAt.toISOString() : ''}`))
     .join('\n');
 };
 
 router.get('/sales/export', auth, async (req, res) => {
   try {
-    const csv = await buildInvoiceExport('sale');
+    const csv = await buildInvoiceExport('sale', req);
     res.header('Content-Type', 'text/csv');
     res.attachment('sales.csv');
     res.send(csv);
@@ -135,7 +170,7 @@ router.get('/sales/export', auth, async (req, res) => {
 
 router.get('/purchases/export', auth, async (req, res) => {
   try {
-    const csv = await buildInvoiceExport('purchase');
+    const csv = await buildInvoiceExport('purchase', req);
     res.header('Content-Type', 'text/csv');
     res.attachment('purchases.csv');
     res.send(csv);
@@ -146,7 +181,7 @@ router.get('/purchases/export', auth, async (req, res) => {
 
 router.get('/returns/export', auth, async (req, res) => {
   try {
-    const csv = await buildInvoiceExport('return');
+    const csv = await buildInvoiceExport('return', req);
     res.header('Content-Type', 'text/csv');
     res.attachment('returns.csv');
     res.send(csv);

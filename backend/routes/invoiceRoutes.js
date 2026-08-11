@@ -83,6 +83,11 @@ router.post('/', auth, async (req, res) => {
       paidAmount: paid,
       balance,
       paymentStatus,
+      sellerName: req.user.shopName || req.user.name || 'SGSE Billing',
+      sellerAddress: req.user.shopAddress || req.user.address || '',
+      sellerGSTIN: req.user.shopGSTIN || '',
+      sellerLogoUrl: req.user.shopLogoUrl || '',
+      sellerPhone: req.user.phone || '',
       notes: notes || '',
       createdBy: req.user._id
     });

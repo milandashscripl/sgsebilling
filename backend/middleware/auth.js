@@ -12,7 +12,7 @@ const auth = async (req, res, next) => {
     let user = null;
 
     if (mongoose.connection.readyState === 1) {
-      user = await User.findById(decoded.id).select('name email role');
+      user = await User.findById(decoded.id).select('-password');
     }
 
     if (!user) {
@@ -27,7 +27,13 @@ const auth = async (req, res, next) => {
       _id: user._id ? String(user._id) : String(user.id),
       name: user.name,
       email: user.email,
-      role: user.role
+      role: user.role,
+      shopName: user.shopName || '',
+      shopAddress: user.shopAddress || '',
+      shopGSTIN: user.shopGSTIN || '',
+      shopLogoUrl: user.shopLogoUrl || '',
+      phone: user.phone || '',
+      address: user.address || ''
     };
     next();
   } catch (error) {

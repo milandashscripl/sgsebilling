@@ -26,6 +26,11 @@ const invoiceSchema = new mongoose.Schema({
   paidAmount: Number,
   balance: Number,
   paymentStatus: { type: String, enum: ['paid', 'partial', 'unpaid'], default: 'paid' },
+  sellerName: { type: String, default: '' },
+  sellerAddress: { type: String, default: '' },
+  sellerGSTIN: { type: String, default: '' },
+  sellerLogoUrl: { type: String, default: '' },
+  sellerPhone: { type: String, default: '' },
   notes: String,
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
