@@ -8,6 +8,8 @@ const invoiceSchema = new mongoose.Schema({
   customerName: { type: String, default: 'Walk-in Customer' },
   customerPhone: { type: String, default: '' },
   type: { type: String, enum: ['sale', 'purchase', 'return'], default: 'sale' },
+  accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', default: null },
+  paymentMethod: { type: String, default: 'cash' },
   items: [{
     item: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
     name: String,

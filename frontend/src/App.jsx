@@ -829,6 +829,11 @@ function BillingPage() {
         paidAmount: Number(paidAmount) || 0,
         accountId: paymentAccount || undefined,
         paymentMethod,
+      };
+
+      const res = await api.post('/invoices', payload);
+      const invoice = res.data;
+      setBillingMessage('Invoice created successfully');
       setSelectedItems([]);
       setPartyName('');
       setPartyPhone('');

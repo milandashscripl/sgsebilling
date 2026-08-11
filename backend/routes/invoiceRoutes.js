@@ -74,6 +74,8 @@ router.post('/', auth, async (req, res) => {
       customerName: customerName || partyName || 'Walk-in Customer',
       customerPhone: customerPhone || partyPhone || '',
       type: type || 'sale',
+      accountId: req.body.accountId || null,
+      paymentMethod: req.body.paymentMethod || 'cash',
       items: invoiceItems,
       subtotal,
       gstAmount,
@@ -86,10 +88,11 @@ router.post('/', auth, async (req, res) => {
     });
 
     if (paid > 0 && req.body.accountId) {
+      const transactionType = type === 'sale' ? 'income' : 'expense';
       await Transaction.create({
         date: new Date().toISOString().slice(0, 10),
         accountId: req.body.accountId,
-        type: 'income',
+        type: transactionType,
         amount: paid,
         paymentMethod: req.body.paymentMethod || 'cash',
         reference: `Invoice ${invoiceNumber}`,
