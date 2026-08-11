@@ -2,9 +2,36 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { authStore } = require('../utils/authStore');
+
+const upload = multer();
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const uploadToCloudinary = (fileBuffer) => new Promise((resolve, reject) => {
+  const uploadStream = cloudinary.uploader.upload_stream(
+    {
+      folder: 'sgse-logos',
+      resource_type: 'image',
+      format: 'png',
+      transformation: [{ width: 500, height: 500, crop: 'limit' }]
+    },
+    (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    }
+  );
+  streamifier.createReadStream(fileBuffer).pipe(uploadStream);
+});
 
 const router = express.Router();
 
@@ -130,6 +157,45 @@ router.put('/me', auth, async (req, res) => {
       updatedUser = user;
     } else {
       updatedUser = await authStore.updateUserById(req.user.id, updates);
+    }
+
+    res.json({
+      user: {
+        id: updatedUser.id ? String(updatedUser.id) : String(updatedUser._id),
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        shopName: updatedUser.shopName,
+        shopAddress: updatedUser.shopAddress,
+        shopGSTIN: updatedUser.shopGSTIN,
+        shopLogoUrl: updatedUser.shopLogoUrl,
+        phone: updatedUser.phone,
+        address: updatedUser.address
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post('/me/logo', auth, upload.single('logo'), async (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ message: 'Logo file is required' });
+    }
+
+    const uploadResult = await uploadToCloudinary(req.file.buffer);
+    const logoUrl = uploadResult.secure_url;
+
+    let updatedUser;
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findById(req.user.id);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      user.shopLogoUrl = logoUrl;
+      await user.save();
+      updatedUser = user;
+    } else {
+      updatedUser = await authStore.updateUserById(req.user.id, { shopLogoUrl: logoUrl });
     }
 
     res.json({

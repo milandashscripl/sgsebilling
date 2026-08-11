@@ -295,6 +295,8 @@ function ProfilePage({ user, setUser }) {
     address: user.address || ''
   });
   const [message, setMessage] = useState('');
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState('');
 
   useEffect(() => {
     setForm({
@@ -323,6 +325,31 @@ function ProfilePage({ user, setUser }) {
     }
   };
 
+  const uploadLogoFile = async (file) => {
+    if (!file) return;
+    setLogoUploadError('');
+    setLogoUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      const res = await api.post('/auth/me/logo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      const updatedUser = res.data.user;
+      setForm((prev) => ({ ...prev, shopLogoUrl: updatedUser.shopLogoUrl }));
+      if (setUser) setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setMessage('Logo uploaded successfully');
+    } catch (error) {
+      setLogoUploadError(error.response?.data?.message || 'Unable to upload logo');
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
   return (
     <div>
       <h3>Shop profile & invoice header</h3>
@@ -332,6 +359,16 @@ function ProfilePage({ user, setUser }) {
           <input placeholder="Shop address" value={form.shopAddress} onChange={(e) => setForm({ ...form, shopAddress: e.target.value })} />
           <input placeholder="Shop GSTIN" value={form.shopGSTIN} onChange={(e) => setForm({ ...form, shopGSTIN: e.target.value })} />
           <input placeholder="Shop logo URL" value={form.shopLogoUrl} onChange={(e) => setForm({ ...form, shopLogoUrl: e.target.value })} />
+          <div>
+            <label className="file-label">Upload logo image</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => uploadLogoFile(e.target.files?.[0])}
+            />
+            {logoUploading && <p className="muted">Uploading logo...</p>}
+            {logoUploadError && <p className="error">{logoUploadError}</p>}
+          </div>
           <input placeholder="Shop phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <input placeholder="Shop billing address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
         </div>
@@ -861,6 +898,7 @@ function BillingPage() {
   const [paymentAccount, setPaymentAccount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paidAmount, setPaidAmount] = useState('');
+  const [notes, setNotes] = useState('');
   const [accounts, setAccounts] = useState([]);
   const [billingMessage, setBillingMessage] = useState('');
 
@@ -944,6 +982,7 @@ function BillingPage() {
         paidAmount: Number(paidAmount) || 0,
         accountId: paymentAccount || undefined,
         paymentMethod,
+        notes: notes || ''
       };
 
       const res = await api.post('/invoices', payload);
@@ -961,6 +1000,7 @@ function BillingPage() {
       setManualCgstRate('0');
       setManualIgstRate('0');
       setPaidAmount('');
+      setNotes('');
       setPaymentAccount('');
       setPaymentMethod('cash');
       setBillingMode('auto');
@@ -1092,43 +1132,61 @@ function BillingPage() {
     doc.text(`Paid: ₹${(invoice.paidAmount || 0).toFixed(2)}`, marginLeft, y);
     y += 6;
     doc.text(`Balance: ₹${(invoice.balance || 0).toFixed(2)}`, marginLeft, y);
+    y += 10;
+    if (invoice.notes) {
+      doc.setFontSize(10);
+      doc.text('Notes:', marginLeft, y);
+      const notesLines = doc.splitTextToSize(invoice.notes, 170);
+      y += 6;
+      doc.text(notesLines, marginLeft, y);
+      y += notesLines.length * 6;
+    }
 
     doc.save(`${invoice.invoiceNumber}.pdf`);
   };
 
   return (
     <div>
-      <h3>Single-price billing</h3>
+      <div className="page-header">
+        <p className="eyebrow">Billing</p>
+        <h3>Invoice creation</h3>
+        <p className="muted">Add items, choose payment details, and generate a polished PDF invoice instantly.</p>
+      </div>
+
       <div className="billing-grid">
         <div className="panel">
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            <option value="sale">Sale</option>
-            <option value="purchase">Purchase</option>
-            <option value="return">Return</option>
-          </select>
-          <select value={billingMode} onChange={(e) => setBillingMode(e.target.value)}>
-            <option value="auto">Item-based billing</option>
-            <option value="manual">Full setup billing</option>
-          </select>
-          <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
-          <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
-          <input placeholder="Party GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
-          <input placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-          <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
-          <select value={paymentAccount} onChange={(e) => setPaymentAccount(e.target.value)}>
-            <option value="">Select payment account</option>
-            {accounts.map((account) => (
-              <option key={account._id || account.id} value={account._id || account.id}>{account.name} ({account.type})</option>
-            ))}
-          </select>
-          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-            <option value="cash">Cash</option>
-            <option value="phonepe">PhonePe</option>
-            <option value="gpay">GPay</option>
-            <option value="neft">NEFT</option>
-            <option value="rtgs">RTGS</option>
-            <option value="withdrawal">Withdrawal</option>
-          </select>
+          <h4>Invoice details</h4>
+          <div className="form-grid">
+            <select value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="sale">Sale</option>
+              <option value="purchase">Purchase</option>
+              <option value="return">Return</option>
+            </select>
+            <select value={billingMode} onChange={(e) => setBillingMode(e.target.value)}>
+              <option value="auto">Item-based billing</option>
+              <option value="manual">Full setup billing</option>
+            </select>
+            <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
+            <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
+            <input placeholder="Party GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
+            <input placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+            <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+            <select value={paymentAccount} onChange={(e) => setPaymentAccount(e.target.value)}>
+              <option value="">Select payment account</option>
+              {accounts.map((account) => (
+                <option key={account._id || account.id} value={account._id || account.id}>{account.name} ({account.type})</option>
+              ))}
+            </select>
+            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+              <option value="cash">Cash</option>
+              <option value="phonepe">PhonePe</option>
+              <option value="gpay">GPay</option>
+              <option value="neft">NEFT</option>
+              <option value="rtgs">RTGS</option>
+              <option value="withdrawal">Withdrawal</option>
+            </select>
+            <textarea placeholder="Invoice notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
           {billingMode === 'auto' ? (
             <div className="item-list">
               {items.length ? items.map((item) => (
@@ -1146,8 +1204,12 @@ function BillingPage() {
             </div>
           )}
         </div>
+
         <div className="panel">
-          <h4>{billingMode === 'auto' ? 'Selected items' : 'Setup items & units'}</h4>
+          <div className="billing-panel-header">
+            <h4>{billingMode === 'auto' ? 'Selected items' : 'Setup items & units'}</h4>
+            <span className="badge">{selectedItems.length} item{selectedItems.length === 1 ? '' : 's'}</span>
+          </div>
           {selectedItems.length === 0 ? (
             <p className="muted">No items added yet. Click an item to include it in the invoice.</p>
           ) : (
@@ -1176,14 +1238,17 @@ function BillingPage() {
               </table>
             </div>
           )}
-          <div className="totals">
-            <div>Subtotal: ₹{billingMode === 'auto' ? subtotal.toFixed(2) : manualBase.toFixed(2)}</div>
-            <div>GST: ₹{billingMode === 'auto' ? gstAmount.toFixed(2) : manualGstAmount.toFixed(2)}</div>
-            <div><strong>Total: ₹{billingMode === 'auto' ? total.toFixed(2) : manualTotal.toFixed(2)}</strong></div>
-            <input type="number" min="0" step="0.01" placeholder="Paid amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
+          <div className="billing-summary">
+            <div className="summary-row"><span>Subtotal</span><strong>₹{billingMode === 'auto' ? subtotal.toFixed(2) : manualBase.toFixed(2)}</strong></div>
+            <div className="summary-row"><span>GST</span><strong>₹{billingMode === 'auto' ? gstAmount.toFixed(2) : manualGstAmount.toFixed(2)}</strong></div>
+            <div className="summary-row"><span>Total</span><strong>₹{billingMode === 'auto' ? total.toFixed(2) : manualTotal.toFixed(2)}</strong></div>
+            <div className="summary-row"><span>Paid</span><strong>₹{Number(paidAmount || 0).toFixed(2)}</strong></div>
+            <div className="summary-row"><span>Balance</span><strong>₹{((billingMode === 'auto' ? total : manualTotal) - Number(paidAmount || 0)).toFixed(2)}</strong></div>
+            <div className="summary-row"><span>Payment</span><strong>{paymentMethod}</strong></div>
           </div>
-          {billingMessage && <p className="muted">{billingMessage}</p>}
-          <button className="btn primary" onClick={saveInvoice}>Create bill</button>
+          <input type="number" min="0" step="0.01" placeholder="Paid amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
+          {billingMessage && <p className="message">{billingMessage}</p>}
+          <button className="btn primary" onClick={saveInvoice}>Create invoice</button>
         </div>
       </div>
     </div>
