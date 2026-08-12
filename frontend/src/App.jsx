@@ -1063,136 +1063,321 @@ function BillingPage() {
   };
 
   const downloadInvoicePdf = async (invoice) => {
-    const doc = new jsPDF();
-    const marginLeft = 14;
-    let y = 20;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginLeft = 12;
+    const marginRight = 12;
+    const contentWidth = pageWidth - marginLeft - marginRight;
+    let y = 10;
 
-    if (invoice.sellerLogoUrl) {
-      const logoData = await loadImageAsDataUrl(invoice.sellerLogoUrl);
-      if (logoData) {
-        try {
-          doc.addImage(logoData, 'PNG', marginLeft, 10, 32, 32);
-        } catch (err) {
-          // Ignore logo render errors
-        }
-      }
-    }
-
-    const headerX = invoice.sellerLogoUrl ? 52 : marginLeft;
-    doc.setFontSize(18);
-    doc.setTextColor('#1F3A13');
-    doc.text(invoice.sellerName || 'SGSE Billing', headerX, y);
-    doc.setFontSize(10);
-    doc.setTextColor('#10230F');
-    y += 6;
+    // Header Section - Company Details
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor('#186FAF');
+    doc.text(invoice.sellerName || 'GST INVOICE', marginLeft, y);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor('#333333');
+    y += 8;
+    
     if (invoice.sellerAddress) {
-      const addressLines = doc.splitTextToSize(invoice.sellerAddress, 120);
-      doc.text(addressLines, headerX, y);
-      y += addressLines.length * 6;
+      const addressLines = doc.splitTextToSize(invoice.sellerAddress, contentWidth);
+      doc.text(addressLines, marginLeft, y);
+      y += addressLines.length * 3.5 + 2;
     }
-    if (invoice.sellerGSTIN) {
-      doc.text(`GSTIN: ${invoice.sellerGSTIN}`, headerX, y);
-      y += 6;
-    }
-    if (invoice.sellerPhone) {
-      doc.text(`Phone: ${invoice.sellerPhone}`, headerX, y);
-      y += 6;
+    
+    if (invoice.sellerGSTIN || invoice.sellerPhone || invoice.sellerEmail) {
+      doc.setFontSize(8);
+      if (invoice.sellerGSTIN) doc.text(`GSTIN: ${invoice.sellerGSTIN}`, marginLeft, y);
+      y += 3;
+      if (invoice.sellerPhone) doc.text(`Phone: ${invoice.sellerPhone}`, marginLeft, y);
+      y += 3;
+      if (invoice.sellerEmail) doc.text(`Email: ${invoice.sellerEmail}`, marginLeft, y);
+      y += 3;
     }
 
-    const invoiceInfoTop = 20;
-    doc.setDrawColor('#8AA057');
-    doc.setLineWidth(0.8);
-    doc.line(marginLeft, invoiceInfoTop + 30, 196, invoiceInfoTop + 30);
+    y += 3;
+    doc.setDrawColor('#186FAF');
+    doc.setLineWidth(0.5);
+    doc.line(marginLeft, y, pageWidth - marginRight, y);
+    y += 4;
 
-    y = Math.max(y + 8, 54);
-    doc.setFontSize(12);
+    // Invoice Header Info
+    doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
-    doc.text('TAX INVOICE', marginLeft, y);
+    doc.setTextColor('#186FAF');
+    doc.text('GST INVOICE', marginLeft, y);
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(10);
-    y += 8;
-    doc.text(`Invoice #: ${invoice.invoiceNumber}`, marginLeft, y);
-    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString()}`, 120, y);
-    y += 6;
-    doc.text(`Type: ${invoice.type.toUpperCase()}`, marginLeft, y);
-    doc.text(`Customer: ${invoice.partyName || invoice.customerName || '-'}`, 120, y);
-    y += 6;
-    if (invoice.partyPhone) {
-      doc.text(`Phone: ${invoice.partyPhone}`, marginLeft, y);
-    }
-    if (invoice.partyGSTIN) {
-      doc.text(`GSTIN: ${invoice.partyGSTIN}`, 120, y);
-      y += 6;
-    }
+    doc.setFontSize(9);
+    doc.setTextColor('#333333');
+    
+    // Right side invoice details
+    doc.text(`Invoice No: ${invoice.invoiceNumber}`, pageWidth - marginRight - 60, y);
+    y += 5;
+    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString('en-IN')}`, pageWidth - marginRight - 60, y);
+    y += 5;
+    doc.text(`Type: ${(invoice.type || 'SALE').toUpperCase()}`, marginLeft, y);
+    y += 5;
 
-    y += 8;
-    doc.setFontSize(11);
+    // Buyer Section
     doc.setFont(undefined, 'bold');
-    doc.text('Description', marginLeft, y);
-    doc.text('Qty', 88, y);
-    doc.text('Rate', 106, y);
-    doc.text('SGST', 132, y);
-    doc.text('CGST', 154, y);
-    doc.text('IGST', 176, y);
-    doc.text('Total', 196, y, { align: 'right' });
+    doc.text('Buyer (Bill To)', marginLeft, y);
+    doc.setFont(undefined, 'normal');
+    y += 4;
+    doc.text(invoice.partyName || invoice.customerName || '-', marginLeft, y);
+    y += 3;
+    if (invoice.partyAddress) doc.text(invoice.partyAddress, marginLeft, y);
+    y += 3;
+    if (invoice.partyPhone) doc.text(`Phone: ${invoice.partyPhone}`, marginLeft, y);
+    y += 3;
+    if (invoice.partyGSTIN) doc.text(`GSTIN/UIN: ${invoice.partyGSTIN}`, marginLeft, y);
+    else doc.text('GSTIN/UIN: N/A', marginLeft, y);
+    y += 3;
+    doc.text(`State: ${invoice.state || 'N/A'}`, marginLeft, y);
     y += 6;
-    doc.setDrawColor('#D9E3C1');
-    doc.setLineWidth(0.6);
-    doc.line(marginLeft, y, 196, y);
-    y += 6;
+
+    // Description of Goods Section
+    doc.setFont(undefined, 'bold');
     doc.setFontSize(10);
+    doc.text('Description of Goods', marginLeft, y);
+    y += 5;
+
+    // Items Table Header
+    doc.setFontSize(9);
+    doc.setTextColor('#FFFFFF');
+    doc.setFillColor('#186FAF');
+    const colWidth = {
+      desc: 72,
+      hsn: 22,
+      qty: 18,
+      rate: 25,
+      sgst: 20,
+      cgst: 20,
+      igst: 20,
+      amount: 28
+    };
+    
+    let xPos = marginLeft;
+    doc.text('Description', xPos, y);
+    xPos += colWidth.desc;
+    doc.text('HSN/SAC', xPos, y);
+    xPos += colWidth.hsn;
+    doc.text('QTY', xPos, y);
+    xPos += colWidth.qty;
+    doc.text('Rate', xPos, y);
+    xPos += colWidth.rate;
+    doc.text('SGST', xPos, y);
+    xPos += colWidth.sgst;
+    doc.text('CGST', xPos, y);
+    xPos += colWidth.cgst;
+    doc.text('IGST', xPos, y);
+    xPos += colWidth.igst;
+    doc.text('Amount', xPos, y, { align: 'right' });
+    
+    y += 5;
+    doc.setDrawColor('#186FAF');
+    doc.setLineWidth(0.4);
+    doc.line(marginLeft, y, pageWidth - marginRight, y);
+    y += 3;
+
+    // Items
+    doc.setTextColor('#333333');
+    doc.setFontSize(8);
     doc.setFont(undefined, 'normal');
 
-    invoice.items.forEach((item) => {
-      if (y > 260) {
+    invoice.items.forEach((item, idx) => {
+      if (y > 250) {
         doc.addPage();
-        y = 20;
+        y = 15;
       }
-      const nameLines = doc.splitTextToSize(item.name || '-', 68);
-      doc.text(nameLines, marginLeft, y);
-      doc.text(String(item.quantity || 1), 88, y);
-      doc.text(`₹${(item.price || 0).toFixed(2)}`, 106, y);
-      doc.text(item.sgstRate ? `${item.sgstRate}%` : '-', 132, y);
-      doc.text(item.cgstRate ? `${item.cgstRate}%` : '-', 154, y);
-      doc.text(item.igstRate ? `${item.igstRate}%` : '-', 176, y);
-      doc.text(`₹${(item.total || 0).toFixed(2)}`, 196, y, { align: 'right' });
-      y += nameLines.length * 6;
+
+      xPos = marginLeft;
+      const descLines = doc.splitTextToSize(item.name || '-', colWidth.desc - 2);
+      doc.text(descLines, xPos, y);
+      const descHeight = descLines.length * 3;
+
+      xPos = marginLeft + colWidth.desc;
+      doc.text(item.hsn || '85414300', xPos, y);
+
+      xPos += colWidth.hsn;
+      doc.text(String(item.quantity || 1), xPos, y);
+
+      xPos += colWidth.qty;
+      doc.text(`₹${(item.price || 0).toFixed(2)}`, xPos, y);
+
+      xPos += colWidth.rate;
+      doc.text(item.sgstRate ? `${item.sgstRate}%` : '-', xPos, y);
+
+      xPos += colWidth.sgst;
+      doc.text(item.cgstRate ? `${item.cgstRate}%` : '-', xPos, y);
+
+      xPos += colWidth.cgst;
+      doc.text(item.igstRate ? `${item.igstRate}%` : '-', xPos, y);
+
+      xPos += colWidth.igst;
+      doc.text(`₹${(item.total || 0).toFixed(2)}`, xPos, y, { align: 'right' });
+
+      y += Math.max(descHeight, 4);
     });
 
-    y += 12;
-    doc.setDrawColor('#D9E3C1');
-    doc.setFillColor('#F4F6E6');
-    doc.roundedRect(marginLeft, y, 180, 42, 4, 4, 'F');
-    doc.setDrawColor('#8AA057');
-    doc.setLineWidth(0.8);
-    doc.roundedRect(marginLeft, y, 180, 42, 4, 4);
-    y += 8;
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.text('Summary', marginLeft + 4, y);
-    y += 8;
-    doc.setFont(undefined, 'normal');
-    doc.text(`Subtotal: ₹${(invoice.subtotal || 0).toFixed(2)}`, marginLeft + 8, y);
-    y += 6;
-    doc.text(`GST: ₹${(invoice.gstAmount || 0).toFixed(2)}`, marginLeft + 8, y);
-    y += 6;
-    doc.text(`Grand total: ₹${(invoice.grandTotal || 0).toFixed(2)}`, marginLeft + 8, y);
-    y += 6;
-    doc.text(`Paid: ₹${(invoice.paidAmount || 0).toFixed(2)}`, marginLeft + 8, y);
-    y += 6;
-    doc.text(`Balance: ₹${(invoice.balance || 0).toFixed(2)}`, marginLeft + 8, y);
-    y += 14;
+    y += 2;
+    doc.setDrawColor('#186FAF');
+    doc.setLineWidth(0.4);
+    doc.line(marginLeft, y, pageWidth - marginRight, y);
+    y += 4;
 
+    // Tax Summary Section
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    const subtotal = invoice.subtotal || 0;
+    const gstAmount = invoice.gstAmount || 0;
+    const total = invoice.grandTotal || 0;
+    const paid = invoice.paidAmount || 0;
+    const balance = invoice.balance || total - paid;
+
+    xPos = marginLeft + colWidth.desc + colWidth.hsn + colWidth.qty;
+    doc.text('Taxable Value', xPos, y);
+    xPos = pageWidth - marginRight - 30;
+    doc.text(`₹${subtotal.toFixed(2)}`, xPos, y, { align: 'right' });
+
+    y += 5;
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8);
+    
+    // Tax calculation for each rate
+    const taxRates = {};
+    invoice.items.forEach(item => {
+      const itemRate = `${item.sgstRate || 0}-${item.cgstRate || 0}-${item.igstRate || 0}`;
+      if (!taxRates[itemRate]) {
+        taxRates[itemRate] = { sgst: 0, cgst: 0, igst: 0 };
+      }
+      const itemBase = item.total / (1 + ((item.sgstRate || 0) + (item.cgstRate || 0) + (item.igstRate || 0)) / 100);
+      taxRates[itemRate].sgst += itemBase * (item.sgstRate || 0) / 100;
+      taxRates[itemRate].cgst += itemBase * (item.cgstRate || 0) / 100;
+      taxRates[itemRate].igst += itemBase * (item.igstRate || 0) / 100;
+    });
+
+    Object.entries(taxRates).forEach(([rates, taxes]) => {
+      const [sgstRate, cgstRate, igstRate] = rates.split('-').map(Number);
+      if (sgstRate > 0) {
+        xPos = marginLeft + colWidth.desc + colWidth.hsn + colWidth.qty;
+        doc.text(`SGST (${sgstRate}%)`, xPos, y);
+        xPos = pageWidth - marginRight - 30;
+        doc.text(`₹${taxes.sgst.toFixed(2)}`, xPos, y, { align: 'right' });
+        y += 4;
+      }
+      if (cgstRate > 0) {
+        xPos = marginLeft + colWidth.desc + colWidth.hsn + colWidth.qty;
+        doc.text(`CGST (${cgstRate}%)`, xPos, y);
+        xPos = pageWidth - marginRight - 30;
+        doc.text(`₹${taxes.cgst.toFixed(2)}`, xPos, y, { align: 'right' });
+        y += 4;
+      }
+      if (igstRate > 0) {
+        xPos = marginLeft + colWidth.desc + colWidth.hsn + colWidth.qty;
+        doc.text(`IGST (${igstRate}%)`, xPos, y);
+        xPos = pageWidth - marginRight - 30;
+        doc.text(`₹${taxes.igst.toFixed(2)}`, xPos, y, { align: 'right' });
+        y += 4;
+      }
+    });
+
+    y += 2;
+    doc.setDrawColor('#186FAF');
+    doc.setLineWidth(0.5);
+    doc.line(marginLeft, y, pageWidth - marginRight, y);
+    y += 5;
+
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(10);
+    xPos = marginLeft + colWidth.desc + colWidth.hsn + colWidth.qty;
+    doc.text('TOTAL', xPos, y);
+    xPos = pageWidth - marginRight - 30;
+    doc.text(`₹${total.toFixed(2)}`, xPos, y, { align: 'right' });
+
+    y += 8;
+
+    // Amount in words
+    const amountInWords = (num) => {
+      const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+      const n = Math.floor(num);
+      if (n === 0) return 'Zero';
+      if (n < 10) return ones[n];
+      if (n < 100) return (n % 10 === 0 ? tens[Math.floor(n / 10)] : tens[Math.floor(n / 10)] + ' ' + ones[n % 10]);
+      if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred ' + (n % 100 === 0 ? '' : amountInWords(n % 100));
+      if (n < 100000) return amountInWords(Math.floor(n / 1000)) + ' Thousand ' + (n % 1000 === 0 ? '' : amountInWords(n % 1000));
+      if (n < 10000000) return amountInWords(Math.floor(n / 100000)) + ' Lakh ' + (n % 100000 === 0 ? '' : amountInWords(n % 100000));
+      return amountInWords(Math.floor(n / 10000000)) + ' Crore ' + (n % 10000000 === 0 ? '' : amountInWords(n % 10000000));
+    };
+
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    doc.text('Amount in Words:', marginLeft, y);
+    doc.setFont(undefined, 'normal');
+    const amountText = amountInWords(Math.floor(total)) + ' Rupees Only';
+    const amountLines = doc.splitTextToSize(amountText.toUpperCase(), contentWidth);
+    y += 4;
+    doc.text(amountLines, marginLeft, y);
+    y += amountLines.length * 4 + 3;
+
+    // Payment Details
+    if (paid > 0) {
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'bold');
+      doc.text('Payment Details:', marginLeft, y);
+      y += 4;
+      doc.setFont(undefined, 'normal');
+      doc.text(`Paid: ₹${paid.toFixed(2)} | Balance: ₹${balance.toFixed(2)} | Method: ${invoice.paymentMethod || 'N/A'}`, marginLeft, y);
+      y += 5;
+    }
+
+    // Bank Details
+    if (invoice.bankName || invoice.bankAccount || invoice.ifscCode) {
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'bold');
+      doc.text('OUR BANK:', marginLeft, y);
+      doc.setFont(undefined, 'normal');
+      y += 3;
+      if (invoice.bankName) doc.text(`Bank: ${invoice.bankName}`, marginLeft + 2, y);
+      y += 3;
+      if (invoice.bankAccount) doc.text(`Account: ${invoice.bankAccount}`, marginLeft + 2, y);
+      y += 3;
+      if (invoice.ifscCode) doc.text(`IFSC: ${invoice.ifscCode}`, marginLeft + 2, y);
+      y += 4;
+    }
+
+    // Terms and Notes
     if (invoice.notes) {
-      doc.setFontSize(10);
+      y += 2;
+      doc.setFontSize(8);
       doc.setFont(undefined, 'bold');
       doc.text('Notes:', marginLeft, y);
       doc.setFont(undefined, 'normal');
-      const notesLines = doc.splitTextToSize(invoice.notes, 170);
-      y += 6;
-      doc.text(notesLines, marginLeft, y);
-      y += notesLines.length * 6;
+      y += 3;
+      const notesLines = doc.splitTextToSize(invoice.notes, contentWidth - 4);
+      doc.text(notesLines, marginLeft + 2, y);
+      y += notesLines.length * 3;
     }
+
+    // Declaration
+    y += 3;
+    doc.setFontSize(7);
+    doc.setFont(undefined, 'normal');
+    const declaration = 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
+    const declarationLines = doc.splitTextToSize(declaration, contentWidth);
+    doc.text(declarationLines, marginLeft, y);
+    y += declarationLines.length * 3 + 4;
+
+    // Signature
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    doc.text(`FOR ${invoice.sellerName || 'SGSE'}`, pageWidth - marginRight - 40, y);
+    y += 15;
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.text('Authorized Signatory', pageWidth - marginRight - 40, y, { align: 'center' });
 
     doc.save(`${invoice.invoiceNumber}.pdf`);
   };
@@ -1209,36 +1394,75 @@ function BillingPage() {
         <div className="panel">
           <h4>Invoice details</h4>
           <div className="form-grid">
-            <select value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="sale">Sale</option>
-              <option value="purchase">Purchase</option>
-              <option value="return">Return</option>
-            </select>
-            <select value={billingMode} onChange={(e) => setBillingMode(e.target.value)}>
-              <option value="normal">Normal billing</option>
-              <option value="single">Single price billing</option>
-            </select>
-            <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
-            <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
-            <input placeholder="Party GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
-            <input placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-            <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
-            <select value={paymentAccount} onChange={(e) => setPaymentAccount(e.target.value)}>
-              <option value="">Select payment account</option>
-              {accounts.map((account) => (
-                <option key={account._id || account.id} value={account._id || account.id}>{account.name} ({account.type})</option>
-              ))}
-            </select>
-            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-              <option value="cash">Cash</option>
-              <option value="phonepe">PhonePe</option>
-              <option value="gpay">GPay</option>
-              <option value="neft">NEFT</option>
-              <option value="rtgs">RTGS</option>
-              <option value="withdrawal">Withdrawal</option>
-            </select>
-            <textarea placeholder="Invoice notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#333', display: 'block', marginBottom: '4px' }}>📋 Invoice Type *</label>
+              <select value={type} onChange={(e) => setType(e.target.value)} style={{ width: '100%' }}>
+                <option value="sale">Sale (Selling to customer)</option>
+                <option value="purchase">Purchase (Buying from supplier)</option>
+                <option value="return">Return (Return goods)</option>
+              </select>
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Choose whether this is a sale, purchase, or return</p>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#333', display: 'block', marginBottom: '4px' }}>⚙️ Billing Mode *</label>
+              <select value={billingMode} onChange={(e) => setBillingMode(e.target.value)} style={{ width: '100%' }}>
+                <option value="normal">Normal Billing (Select items from list)</option>
+                <option value="single">Single Price Billing (One line item with fixed total)</option>
+              </select>
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Normal for multiple items, Single for complete setup billing</p>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#333', display: 'block', marginBottom: '4px' }}>🏢 Party/Buyer Name *</label>
+              <input placeholder="Enter customer or party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Name of the person/company buying from you</p>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#333', display: 'block', marginBottom: '4px' }}>📱 Party Phone</label>
+              <input placeholder="Enter phone number" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Contact number for billing</p>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#333', display: 'block', marginBottom: '4px' }}>🔢 Party GSTIN</label>
+              <input placeholder="15-digit GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>GST registration number if available</p>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#333', display: 'block', marginBottom: '4px' }}>👤 Customer Name (Delivery)</label>
+              <input placeholder="Person name for delivery" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Name of person receiving delivery</p>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#333', display: 'block', marginBottom: '4px' }}>📞 Delivery Phone</label>
+              <input placeholder="Delivery contact phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Contact for delivery confirmation</p>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#333', display: 'block', marginBottom: '4px' }}>💳 Payment Account *</label>
+              <select value={paymentAccount} onChange={(e) => setPaymentAccount(e.target.value)} style={{ width: '100%' }}>
+                <option value="">Select account for payment</option>
+                {accounts.map((account) => (
+                  <option key={account._id || account.id} value={account._id || account.id}>{account.name} ({account.type})</option>
+                ))}
+              </select>
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Account where payment will be recorded</p>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#333', display: 'block', marginBottom: '4px' }}>💰 Payment Method *</label>
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%' }}>
+                <option value="cash">💵 Cash</option>
+                <option value="phonepe">📱 PhonePe</option>
+                <option value="gpay">📱 Google Pay</option>
+                <option value="neft">🏦 NEFT</option>
+                <option value="rtgs">🏦 RTGS</option>
+                <option value="withdrawal">💸 Withdrawal</option>
+              </select>
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>How payment was received or will be made</p>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#333', display: 'block', marginBottom: '4px' }}>📝 Invoice Notes</label>
+              <textarea placeholder="Any special terms, warranty info, or notes for this invoice" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ minHeight: '70px' }} />
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Warranty, terms, conditions, or any special notes</p>
+            </div>\n          </div>
           {billingMode === 'normal' ? (
             <div className="item-list">
               {items.length ? items.map((item) => (
@@ -1840,6 +2064,38 @@ function ReportsPage() {
 function ContactsPage() {
   const [contacts, setContacts] = useState([]);
   const getNowLocalDateTime = () => new Date().toISOString().slice(0, 16);
+  
+  // Time formatting functions for beautiful display
+  const getTimeAgo = (date) => {
+    if (!date) return 'Never';
+    const now = new Date();
+    const diff = Math.floor((now - new Date(date)) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return 'Older';
+  };
+  
+  const isRecentContact = (date) => {
+    if (!date) return false;
+    const now = new Date();
+    const diff = (now - new Date(date)) / 1000;
+    return diff < 86400; // Last 24 hours
+  };
+  
+  const getStatusColor = (status) => {
+    const colors = {
+      'Hot Lead': '#d32f2f',
+      'Warm Lead': '#ff6f00',
+      'Cool Lead': '#1976d2',
+      'May Convert': '#388e3c',
+      'Not Interested': '#757575',
+      'Following Up': '#0288d1'
+    };
+    return colors[status] || '#186FAF';
+  };
+  
   const [form, setForm] = useState({
     callerName: '',
     name: '',
@@ -2102,26 +2358,49 @@ function ContactsPage() {
               <div className="date-slot-header">{groupedContacts[slotKey].label}</div>
               <div className="date-slot-list">
                 {groupedContacts[slotKey].items.map((contact) => (
-                  <div key={contact.id || contact._id} className="panel contact-card">
+                  <div key={contact.id || contact._id} className="panel contact-card" style={{ borderLeft: `4px solid ${getStatusColor(contact.status)}` }}>
                     <div className="list-row">
-                      <div>
-                        <strong>{contact.name}</strong>
-                        <div className="muted">Caller: {contact.callerName || 'Unknown'} • {contact.contactNumber} • {contact.consumerNumber || 'No consumer number'}</div>
-                        <span className={`badge status-badge status-${String(contact.status || 'Warm Lead').replace(/\s+/g, '-').toLowerCase()}`}>{contact.status}</span>
+                      <div className="contact-header">
+                        <strong style={{ fontSize: '16px' }}>{contact.name}</strong>
+                        <div className="muted" style={{ marginTop: '4px', fontSize: '13px' }}>👤 {contact.callerName || 'Unknown'} • 📱 {contact.contactNumber} • 🆔 {contact.consumerNumber || 'No consumer number'}</div>
+                        <div style={{ marginTop: '8px' }}>
+                          <span className={`badge status-badge status-${String(contact.status || 'Warm Lead').replace(/\s+/g, '-').toLowerCase()}`} style={{ backgroundColor: getStatusColor(contact.status), color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>{contact.status}</span>
+                          {isRecentContact(contact.lastContacted) && <span className="badge-recent" style={{ marginLeft: '8px', backgroundColor: '#4CAF50', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', animation: 'pulse 1.5s infinite' }}>🟢 RECENT</span>}
+                        </div>
                       </div>
                       <div className="inline-actions">
-                        <button className="btn secondary" type="button" onClick={() => editContact(contact)}>Edit</button>
-                        <button className="btn secondary" type="button" onClick={() => deleteContact(contact.id || contact._id)}>Delete</button>
+                        <button className="btn secondary" type="button" onClick={() => editContact(contact)}>✏️ Edit</button>
+                        <button className="btn secondary" type="button" onClick={() => deleteContact(contact.id || contact._id)}>🗑️ Delete</button>
                       </div>
                     </div>
-                    <div className="contact-meta">
-                      <p className="muted"><strong>Review:</strong> {contact.review || 'No review yet'}</p>
-                      <p className="muted"><strong>Plan:</strong> {contact.followUpStrategy || 'No strategy defined'}</p>
-                      <p className="muted"><strong>Calls:</strong> {contact.followUpCount || 0}</p>
+                    <div className="contact-meta" style={{ marginTop: '12px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                          <p className="muted" style={{ marginBottom: '4px' }}><strong>⭐ Review:</strong></p>
+                          <p style={{ marginLeft: '20px', fontSize: '13px' }}>{contact.review || 'No review yet'}</p>
+                        </div>
+                        <div>
+                          <p className="muted" style={{ marginBottom: '4px' }}><strong>📋 Plan:</strong></p>
+                          <p style={{ marginLeft: '20px', fontSize: '13px' }}>{contact.followUpStrategy || 'No strategy defined'}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="contact-meta">
-                      <p className="muted"><strong>Last contacted:</strong> {contact.lastContacted ? new Date(contact.lastContacted).toLocaleString() : 'Never'}</p>
-                      <p className="muted"><strong>Next follow-up:</strong> {contact.nextFollowUp ? new Date(contact.nextFollowUp).toLocaleDateString() : 'Not scheduled'}</p>
+                    <div className="contact-meta" style={{ marginTop: '12px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                        <div>
+                          <p className="muted" style={{ marginBottom: '4px' }}><strong>📞 Calls:</strong></p>
+                          <p style={{ marginLeft: '20px', fontSize: '13px' }}>{contact.followUpCount || 0}</p>
+                        </div>
+                        <div>
+                          <p className="muted" style={{ marginBottom: '4px' }}><strong>📅 Last Contacted:</strong></p>
+                          <p style={{ marginLeft: '20px', fontSize: '13px' }}>{contact.lastContacted ? new Date(contact.lastContacted).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'}</p>
+                          <p style={{ marginLeft: '20px', fontSize: '12px', color: '#666' }}>({getTimeAgo(contact.lastContacted)})</p>
+                        </div>
+                        <div>
+                          <p className="muted" style={{ marginBottom: '4px' }}><strong>⏭️ Next Follow-up:</strong></p>
+                          <p style={{ marginLeft: '20px', fontSize: '13px' }}>{contact.nextFollowUp ? new Date(contact.nextFollowUp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not scheduled'}</p>
+                        </div>
+                      </div>
                     </div>
                     <div className="form-row call-log-row">
                       <select value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)}>
