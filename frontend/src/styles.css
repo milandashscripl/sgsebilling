@@ -239,19 +239,34 @@ h5 { color: #1B2A3B; font-weight: 700; }
 
 /* Extra small phones */
 @media (max-width: 400px) {
-  .app-shell { padding: 6px; }
-  .topbar { padding: 10px 12px; gap: 6px; }
-  .topbar h2 { font-size: 1rem; }
+  .app-shell { padding: 6px; min-height: 100vh; }
+  .topbar { padding: 10px 12px; gap: 6px; flex-wrap: wrap; }
+  .topbar h2 { font-size: 1rem; margin-bottom: 4px; }
   .topbar p { font-size: 0.7rem; }
-  .sidebar-link { font-size: 0.75rem; padding: 8px 6px; flex: 0 1 calc(50% - 4px); }
-  .sidebar { padding: 6px; gap: 6px; }
-  .panel, .contacts-panel { padding: 12px; }
-  .btn { padding: 9px 12px; font-size: 0.85rem; }
-  input, select, textarea { padding: 10px 10px; font-size: 15px; }
-  h3 { font-size: 1.1rem; }
-  .stat-card { padding: 12px; }
-  .contact-card { padding: 10px; }
+  .topbar-actions { flex-basis: 100%; justify-content: flex-start; }
+  .sidebar-link { font-size: 0.75rem; padding: 8px 6px; flex: 0 1 calc(50% - 4px); border-radius: 10px; }
+  .sidebar { padding: 6px; gap: 6px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .panel, .contacts-panel { padding: 12px; margin-bottom: 10px; border-radius: 12px; }
+  .btn { padding: 9px 12px; font-size: 0.85rem; border-radius: 8px; }
+  input, select, textarea { padding: 10px 10px; font-size: 15px; border-radius: 10px; }
+  h3 { font-size: 1.1rem; margin-bottom: 8px; }
+  h4 { font-size: 0.95rem; }
+  .stat-card { padding: 12px; border-radius: 12px; }
+  .contact-card { padding: 10px; border-radius: 12px; margin-bottom: 8px; }
   .table th, .table td { padding: 6px 4px; font-size: 0.75rem; }
+  .page-header { padding: 8px 0; }
+  .calling-list-item { margin-bottom: 8px; padding: 12px; }
+  .calling-item-name { font-size: 0.95rem; }
+  .calling-item-time { font-size: 0.75rem; padding: 4px 8px; margin-right: 4px; }
+  .calling-item-time-relative { font-size: 0.7rem; }
+  .calling-item-detail { font-size: 0.75rem; }
+  .calling-item-actions .btn { font-size: 0.8rem; padding: 8px 10px; }
+  .status-badge { font-size: 0.75rem; padding: 4px 8px; }
+  .badge-recent { font-size: 0.65rem; padding: 3px 6px; }
+  .calling-stats { gap: 8px; }
+  .calling-stat-card { padding: 10px; }
+  .calling-stat-number { font-size: 1.4rem; }
+  .calling-stat-label { font-size: 0.65rem; }
 }
 
 .hero-header { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }

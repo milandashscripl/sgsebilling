@@ -1,0 +1,187 @@
+/* ===== MAGICAL ANIMATIONS & ENHANCEMENTS ===== */
+
+/* Keyframe animations */
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+@keyframes rotate { to { transform: rotate(360deg); } }
+
+/* Apply animations to elements */
+.calling-list-item { animation: slideInUp 0.4s ease-out; }
+.panel { animation: fadeIn 0.3s ease-out; }
+.stat-card { animation: slideInUp 0.4s ease-out; }
+
+/* Badge for recent calls (within last 2 hours) */
+.badge-recent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(102, 187, 106, 0.2));
+  color: #2E6E42;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.badge-recent::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4CAF50;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* Enhanced calling item time display */
+.calling-item-time {
+  font-size: 0.85rem;
+  color: #FFFFFF;
+  font-weight: 700;
+  background: linear-gradient(135deg, #186FAF, #3F9AE8);
+  padding: 6px 12px;
+  border-radius: 10px;
+  display: inline-block;
+  margin-right: 8px;
+  box-shadow: 0 2px 8px rgba(63, 154, 232, 0.2);
+}
+
+.calling-item-time-relative {
+  font-size: 0.8rem;
+  color: #5E6F83;
+  font-weight: 500;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Call metrics dashboard */
+.calling-stats { 
+  display: grid; 
+  grid-template-columns: repeat(4, minmax(0, 1fr)); 
+  gap: 12px; 
+  margin-bottom: 18px; 
+}
+
+.calling-stat-card { 
+  background: linear-gradient(135deg, rgba(63, 154, 232, 0.08), rgba(255, 255, 255, 0.8)); 
+  border: 1px solid rgba(63, 154, 232, 0.12); 
+  border-radius: 14px; 
+  padding: 14px; 
+  text-align: center; 
+  animation: slideInUp 0.4s ease-out; 
+  transition: transform 0.2s ease, box-shadow 0.2s ease; 
+}
+
+.calling-stat-card:hover { 
+  transform: translateY(-2px); 
+  box-shadow: 0 4px 12px rgba(63, 154, 232, 0.15); 
+}
+
+.calling-stat-number { 
+  font-size: 1.6rem; 
+  font-weight: 700; 
+  color: #186FAF; 
+}
+
+.calling-stat-label { 
+  font-size: 0.75rem; 
+  color: #5E6F83; 
+  text-transform: uppercase; 
+  letter-spacing: 0.05em; 
+  margin-top: 6px; 
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #FFFFFF;
+  border: 1px solid rgba(31, 58, 85, 0.12);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 24px rgba(31, 58, 85, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideInUp 0.3s ease-out;
+  z-index: 1000;
+  max-width: 400px;
+  font-weight: 500;
+}
+
+.toast.success { 
+  border-left: 4px solid #4CAF50; 
+  color: #2E6E42; 
+}
+
+.toast.error { 
+  border-left: 4px solid #C23C3C; 
+  color: #C23C3C; 
+}
+
+/* Spinner loading indicator */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(63, 154, 232, 0.3);
+  border-top-color: #3F9AE8;
+  border-radius: 50%;
+  animation: rotate 0.6s linear infinite;
+}
+
+/* Smooth scrolling */
+html { scroll-behavior: smooth; }
+
+/* Responsive stat cards */
+@media (max-width: 1200px) {
+  .calling-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .calling-stats { grid-template-columns: 1fr; gap: 10px; }
+  .calling-list-item { padding: 12px; }
+  .toast { bottom: 16px; right: 16px; max-width: calc(100% - 32px); }
+  .calling-item-time { font-size: 0.8rem; padding: 5px 10px; }
+}
+
+/* Page transition effects */
+.page-transition { animation: fadeIn 0.3s ease-out; }
+
+/* Improve all clickable elements */
+button, a, [role="button"] { transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* Better responsive design for all screens */
+@media (max-width: 640px) {
+  .calling-item-time { margin-right: 6px; }
+}
+
+/* Smooth transitions on interactive elements */
+input, select, textarea { transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease; }
+
+/* Enhance visibility in dark/light modes */
+@media (prefers-color-scheme: dark) {
+  .badge-recent { background: linear-gradient(135deg, rgba(76, 175, 80, 0.3), rgba(102, 187, 106, 0.3)); }
+  .calling-stat-card { background: linear-gradient(135deg, rgba(63, 154, 232, 0.12), rgba(63, 154, 232, 0.08)); }
+}

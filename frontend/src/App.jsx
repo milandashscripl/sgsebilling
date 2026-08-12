@@ -3,6 +3,7 @@ import { Link, Routes, Route, Navigate, NavLink, useNavigate } from 'react-route
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
+import './animations.css';
 
 const API = API_BASE_URL;
 
@@ -2180,18 +2181,27 @@ function CallingPage() {
   const [contacts, setContacts] = useState([]);
   const [calls, setCalls] = useState([]);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState(''); // 'success' or 'error'
   const [sortBy, setSortBy] = useState('latest');
   const [filterStatus, setFilterStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCallId, setEditingCallId] = useState(null);
   const [editingNote, setEditingNote] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadCalls();
   }, []);
 
+  const showMessage = (msg, type = 'success') => {
+    setMessage(msg);
+    setMessageType(type);
+    setTimeout(() => setMessage(''), 3000);
+  };
+
   const loadCalls = async () => {
     try {
+      setLoading(true);
       const res = await api.get('/contacts');
       setContacts(res.data);
       
@@ -2217,7 +2227,9 @@ function CallingPage() {
       
       setCalls(allCalls);
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Unable to load calls');
+      showMessage(error.response?.data?.message || 'Unable to load calls', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2259,11 +2271,11 @@ function CallingPage() {
       };
       
       await api.put(`/contacts/${contactId}`, updatedContact);
-      setMessage('Call note updated successfully');
+      showMessage('Call note updated successfully', 'success');
       setEditingCallId(null);
       await loadCalls();
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Unable to update call note');
+      showMessage(error.response?.data?.message || 'Unable to update call note', 'error');
     }
   };
 
@@ -2283,10 +2295,10 @@ function CallingPage() {
       };
       
       await api.put(`/contacts/${contactId}`, updatedContact);
-      setMessage('Call record deleted successfully');
+      showMessage('Call record deleted successfully', 'success');
       await loadCalls();
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Unable to delete call record');
+      showMessage(error.response?.data?.message || 'Unable to delete call record', 'error');
     }
   };
 
@@ -2303,8 +2315,41 @@ function CallingPage() {
     return statusMap[status] || '#5E6F83';
   };
 
+  const getTimeAgo = (date) => {
+    const now = new Date();
+    const diff = Math.floor((now - new Date(date)) / 1000);
+    
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return 'Older';
+  };
+
+  const isRecentCall = (date) => {
+    const now = new Date();
+    const diff = (now - new Date(date)) / 1000;
+    return diff < 7200; // Last 2 hours
+  };
+
+  const getCallStats = () => {
+    const stats = {
+      total: calls.length,
+      today: calls.filter(c => {
+        const callDate = new Date(c.timestamp);
+        const today = new Date();
+        return callDate.toDateString() === today.toDateString();
+      }).length,
+      hotLeads: calls.filter(c => c.status === 'Hot Lead').length,
+      followed: calls.filter(c => c.outcome === 'Contacted').length
+    };
+    return stats;
+  };
+
+  const stats = getCallStats();
+
   return (
-    <div>
+    <div className="page-transition">
       <div className="page-header">
         <div>
           <p className="eyebrow">Call Management</p>
@@ -2313,22 +2358,43 @@ function CallingPage() {
         </div>
       </div>
 
+      {/* Call Statistics Dashboard */}
+      <div className="calling-stats">
+        <div className="calling-stat-card">
+          <div className="calling-stat-number">{stats.total}</div>
+          <div className="calling-stat-label">Total Calls</div>
+        </div>
+        <div className="calling-stat-card">
+          <div className="calling-stat-number">{stats.today}</div>
+          <div className="calling-stat-label">Today</div>
+        </div>
+        <div className="calling-stat-card">
+          <div className="calling-stat-number">{stats.hotLeads}</div>
+          <div className="calling-stat-label">Hot Leads</div>
+        </div>
+        <div className="calling-stat-card">
+          <div className="calling-stat-number">{stats.followed}</div>
+          <div className="calling-stat-label">Followed Up</div>
+        </div>
+      </div>
+
+      {/* Search and Filter */}
       <div className="panel">
         <div className="form-grid">
           <input 
-            placeholder="Search by name, phone, or note..." 
+            placeholder="🔍 Search by name, phone, or note..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
             <option value="">All statuses</option>
-            <option value="Hot Lead">Hot Lead</option>
-            <option value="Warm Lead">Warm Lead</option>
-            <option value="Cool Lead">Cool Lead</option>
-            <option value="May Convert">May Convert</option>
-            <option value="Not Interested">Not Interested</option>
-            <option value="Following Up">Following Up</option>
-            <option value="Contacted">Contacted</option>
+            <option value="Hot Lead">🔥 Hot Lead</option>
+            <option value="Warm Lead">☀️ Warm Lead</option>
+            <option value="Cool Lead">❄️ Cool Lead</option>
+            <option value="May Convert">✅ May Convert</option>
+            <option value="Not Interested">❌ Not Interested</option>
+            <option value="Following Up">📞 Following Up</option>
+            <option value="Contacted">✓ Contacted</option>
           </select>
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
             <option value="latest">Latest first</option>
@@ -2337,30 +2403,43 @@ function CallingPage() {
             <option value="status">By status</option>
           </select>
         </div>
-        {message && <p className="muted" style={{ marginTop: '12px', color: message.includes('successfully') ? '#2E6E42' : '#C23C3C' }}>{message}</p>}
       </div>
 
+      {/* Toast Notification */}
+      {message && (
+        <div className={`toast ${messageType}`}>
+          <span>{message}</span>
+        </div>
+      )}
+
+      {/* Call List */}
       <div className="panel">
         {filteredCalls.length === 0 ? (
           <div className="empty-state">
-            <p className="muted">No calls found. {calls.length === 0 ? 'Start by adding contacts and logging calls.' : 'Try adjusting your filters.'}</p>
+            <p className="muted">📞 No calls found. {calls.length === 0 ? 'Start by adding contacts and logging calls.' : 'Try adjusting your filters.'}</p>
           </div>
         ) : (
           <div>
-            <p className="muted" style={{ marginBottom: '16px' }}>Showing {filteredCalls.length} call{filteredCalls.length !== 1 ? 's' : ''}</p>
+            <p className="muted" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Showing {filteredCalls.length} call{filteredCalls.length !== 1 ? 's' : ''}</span>
+              <span>💬 {loading ? <span className="spinner"></span> : 'Ready'}</span>
+            </p>
             {filteredCalls.map((call) => (
               <div key={call.id} className="calling-list-item">
                 <div className="calling-item-header">
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div className="calling-item-name">{call.contactName}</div>
-                    <div className="calling-item-date">
-                      {new Date(call.timestamp).toLocaleString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
+                      <span className="calling-item-time">
+                        📅 {new Date(call.timestamp).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                      <span className="calling-item-time-relative">({getTimeAgo(call.timestamp)})</span>
+                      {isRecentCall(call.timestamp) && <span className="badge-recent">Recent</span>}
                     </div>
                   </div>
                   <div className="calling-item-status">
@@ -2372,37 +2451,37 @@ function CallingPage() {
 
                 <div className="calling-item-details">
                   <div className="calling-item-detail">
-                    <span className="calling-item-detail-label">Mobile:</span> {call.contactNumber}
+                    <span className="calling-item-detail-label">📱 Mobile:</span> {call.contactNumber}
                   </div>
                   <div className="calling-item-detail">
-                    <span className="calling-item-detail-label">Consumer #:</span> {call.consumerNumber || 'N/A'}
+                    <span className="calling-item-detail-label">🆔 Consumer #:</span> {call.consumerNumber || 'N/A'}
                   </div>
                   <div className="calling-item-detail">
-                    <span className="calling-item-detail-label">Outcome:</span> {call.outcome || 'Contacted'}
+                    <span className="calling-item-detail-label">📞 Outcome:</span> {call.outcome || 'Contacted'}
                   </div>
                   {call.callerName && (
                     <div className="calling-item-detail">
-                      <span className="calling-item-detail-label">Caller:</span> {call.callerName}
+                      <span className="calling-item-detail-label">👤 Caller:</span> {call.callerName}
                     </div>
                   )}
                 </div>
 
                 {call.review && (
                   <div className="calling-item-review">
-                    <strong>Customer Review:</strong> {call.review}
+                    <strong>⭐ Customer Review:</strong> {call.review}
                   </div>
                 )}
 
                 {editingCallId === call.id ? (
                   <div className="form-row" style={{ marginTop: '10px' }}>
                     <textarea
-                      placeholder="Call note"
+                      placeholder="📝 Add or edit call note..."
                       value={editingNote}
                       onChange={(e) => setEditingNote(e.target.value)}
                       style={{ flex: '1 1 100%', minHeight: '80px' }}
                     />
                     <div className="inline-actions" style={{ flex: '1 1 100%' }}>
-                      <button className="btn primary" onClick={() => updateCallNote(call.contactId, call.timestamp, editingNote)}>Save</button>
+                      <button className="btn primary" onClick={() => updateCallNote(call.contactId, call.timestamp, editingNote)}>Save Note</button>
                       <button className="btn secondary" onClick={() => setEditingCallId(null)}>Cancel</button>
                     </div>
                   </div>
@@ -2410,7 +2489,7 @@ function CallingPage() {
                   <>
                     {call.note && (
                       <div className="calling-item-review" style={{ marginTop: '10px', borderLeftColor: '#3F9AE8' }}>
-                        <strong>Note:</strong> {call.note}
+                        <strong>📝 Note:</strong> {call.note}
                       </div>
                     )}
                   </>
@@ -2421,10 +2500,10 @@ function CallingPage() {
                     setEditingCallId(call.id);
                     setEditingNote(call.note || '');
                   }}>
-                    {editingCallId === call.id ? 'Cancel' : 'Edit Note'}
+                    {editingCallId === call.id ? '✕ Cancel' : '✏️ Edit Note'}
                   </button>
                   <button className="btn secondary" onClick={() => deleteCall(call.contactId, call.timestamp)}>
-                    Delete
+                    🗑️ Delete
                   </button>
                 </div>
               </div>
