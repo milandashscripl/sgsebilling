@@ -137,5 +137,18 @@
 
     </div>
   </div>
+  <script>
+    // Use uploaded shop logo (from localStorage 'user') if available
+    try {
+      const userJson = localStorage.getItem('user');
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        if (user.shopLogoUrl) {
+          const img = document.querySelector('.invoice-sheet img');
+          if (img) img.src = user.shopLogoUrl;
+        }
+      }
+    } catch (e) { /* ignore */ }
+  </script>
 </body>
 </html>

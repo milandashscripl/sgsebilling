@@ -1103,29 +1103,56 @@ function BillingPage() {
     const contentWidth = pageWidth - marginLeft - marginRight;
     let y = 10;
 
-    // Header Section - Company Details
+    // Header Section - Company Details (embed shop logo if available)
+    // Try invoice.sellerLogo, else try localStorage user.shopLogoUrl
+    let sellerLogo = invoice.sellerLogo || null;
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (!sellerLogo && storedUser) {
+        const su = JSON.parse(storedUser);
+        if (su?.shopLogoUrl) sellerLogo = su.shopLogoUrl;
+      }
+    } catch (e) {
+      // ignore
+    }
+
     doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
     doc.setTextColor('#186FAF');
-    doc.text(invoice.sellerName || 'GST INVOICE', marginLeft, y);
+
+    if (sellerLogo) {
+      const imgData = await loadImageAsDataUrl(sellerLogo).catch(() => null);
+      if (imgData) {
+        // place logo top-left and reduce left margin accordingly
+        try {
+          doc.addImage(imgData, 'PNG', marginLeft, y - 2, 30, 30);
+        } catch (e) {
+          // image type could be jpeg
+          try { doc.addImage(imgData, 'JPEG', marginLeft, y - 2, 30, 30); } catch { }
+        }
+      }
+    }
+
+    const titleX = sellerLogo ? marginLeft + 36 : marginLeft;
+    doc.text(invoice.sellerName || 'GST INVOICE', titleX, y + 6);
     doc.setFont(undefined, 'normal');
     doc.setFontSize(9);
     doc.setTextColor('#333333');
-    y += 8;
-    
+    y += 14;
+
     if (invoice.sellerAddress) {
-      const addressLines = doc.splitTextToSize(invoice.sellerAddress, contentWidth);
-      doc.text(addressLines, marginLeft, y);
+      const addressLines = doc.splitTextToSize(invoice.sellerAddress, contentWidth - (sellerLogo ? 36 : 0));
+      doc.text(addressLines, titleX, y);
       y += addressLines.length * 3.5 + 2;
     }
-    
+
     if (invoice.sellerGSTIN || invoice.sellerPhone || invoice.sellerEmail) {
       doc.setFontSize(8);
-      if (invoice.sellerGSTIN) doc.text(`GSTIN: ${invoice.sellerGSTIN}`, marginLeft, y);
+      if (invoice.sellerGSTIN) doc.text(`GSTIN: ${invoice.sellerGSTIN}`, titleX, y);
       y += 3;
-      if (invoice.sellerPhone) doc.text(`Phone: ${invoice.sellerPhone}`, marginLeft, y);
+      if (invoice.sellerPhone) doc.text(`Phone: ${invoice.sellerPhone}`, titleX, y);
       y += 3;
-      if (invoice.sellerEmail) doc.text(`Email: ${invoice.sellerEmail}`, marginLeft, y);
+      if (invoice.sellerEmail) doc.text(`Email: ${invoice.sellerEmail}`, titleX, y);
       y += 3;
     }
 
