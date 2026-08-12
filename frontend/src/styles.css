@@ -61,6 +61,9 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .panel-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .filter-bar { gap: 10px; flex-wrap: wrap; }
 .contact-card { background: #FFFFFF; border: 1px solid rgba(31,58,85,0.08); box-shadow: 0 14px 30px rgba(31,58,85,0.06); padding: 18px; margin-bottom: 18px; }
+.date-slot { margin-bottom: 24px; }
+.date-slot-header { margin-bottom: 14px; padding: 14px 18px; border-radius: 18px; background: rgba(31,58,85,0.08); color: #1B2A3B; font-weight: 700; }
+.date-slot-list { display: grid; gap: 14px; }
 .contact-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; }
 .call-log-row { gap: 10px; flex-wrap: wrap; margin-top: 10px; }
 .call-history { padding: 14px; background: rgba(63,154,232,0.06); border-radius: 16px; margin-top: 12px; }

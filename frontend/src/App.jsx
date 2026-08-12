@@ -1836,6 +1836,7 @@ function ReportsPage() {
 
 function ContactsPage() {
   const [contacts, setContacts] = useState([]);
+  const getNowLocalDateTime = () => new Date().toISOString().slice(0, 16);
   const [form, setForm] = useState({
     callerName: '',
     name: '',
@@ -1846,7 +1847,7 @@ function ContactsPage() {
     followUpStrategy: '',
     followUpCount: '0',
     nextFollowUp: '',
-    lastContacted: ''
+    lastContacted: getNowLocalDateTime()
   });
   const [editingContactId, setEditingContactId] = useState(null);
   const [message, setMessage] = useState('');
@@ -1857,7 +1858,7 @@ function ContactsPage() {
   const [lastContactedTo, setLastContactedTo] = useState('');
   const [callOutcome, setCallOutcome] = useState('Contacted');
   const [callNote, setCallNote] = useState('');
-  const [callTimestamp, setCallTimestamp] = useState('');
+  const [callTimestamp, setCallTimestamp] = useState(getNowLocalDateTime());
 
   const loadContacts = async () => {
     try {
@@ -1888,7 +1889,7 @@ function ContactsPage() {
       followUpStrategy: '',
       followUpCount: '0',
       nextFollowUp: '',
-      lastContacted: ''
+      lastContacted: getNowLocalDateTime()
     });
     setEditingContactId(null);
     setMessage('');
@@ -1935,7 +1936,7 @@ function ContactsPage() {
       followUpStrategy: contact.followUpStrategy || '',
       followUpCount: String(contact.followUpCount || 0),
       nextFollowUp: contact.nextFollowUp ? contact.nextFollowUp.slice(0, 10) : '',
-      lastContacted: contact.lastContacted ? contact.lastContacted.slice(0, 16) : ''
+      lastContacted: contact.lastContacted ? contact.lastContacted.slice(0, 16) : getNowLocalDateTime()
     });
     setMessage('Editing contact');
   };
@@ -1971,6 +1972,30 @@ function ContactsPage() {
       return true;
     }
   };
+
+  const getDateSlotLabel = (contact) => {
+    if (!contact.lastContacted) return 'No call date';
+    return new Date(contact.lastContacted).toLocaleDateString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const filteredContacts = contacts.filter((c) => applyLastContactFilter(c));
+  const groupedContacts = filteredContacts.reduce((acc, contact) => {
+    const key = contact.lastContacted ? new Date(contact.lastContacted).toISOString().slice(0, 10) : 'no-date';
+    if (!acc[key]) {
+      acc[key] = {
+        label: getDateSlotLabel(contact),
+        items: []
+      };
+    }
+    acc[key].items.push(contact);
+    return acc;
+  }, {});
+  const groupedDateKeys = Object.keys(groupedContacts).sort();
 
   const deleteContact = async (id) => {
     if (!window.confirm('Delete this contact?')) return;
@@ -2063,58 +2088,67 @@ function ContactsPage() {
             <h4>No contacts yet</h4>
             <p className="muted">There are no saved lead records yet. Add a contact above to start tracking calls and follow-ups.</p>
           </div>
-        ) : contacts.filter((c) => applyLastContactFilter(c)).length === 0 ? (
+        ) : filteredContacts.length === 0 ? (
           <div className="empty-state">
             <h4>No contacts match filters</h4>
             <p className="muted">Try clearing the filter values or adjusting the date range.</p>
           </div>
-        ) : contacts.filter((c) => applyLastContactFilter(c)).map((contact) => (
-          <div key={contact.id || contact._id} className="panel contact-card">
-            <div className="list-row">
-              <div>
-                <strong>{contact.name}</strong>
-                <div className="muted">Caller: {contact.callerName || 'Unknown'} • {contact.contactNumber} • {contact.consumerNumber || 'No consumer number'}</div>
-                <span className={`badge status-badge status-${String(contact.status || 'Warm Lead').replace(/\s+/g, '-').toLowerCase()}`}>{contact.status}</span>
-              </div>
-              <div className="inline-actions">
-                <button className="btn secondary" type="button" onClick={() => editContact(contact)}>Edit</button>
-                <button className="btn secondary" type="button" onClick={() => deleteContact(contact.id || contact._id)}>Delete</button>
-              </div>
-            </div>
-            <div className="contact-meta">
-              <p className="muted"><strong>Review:</strong> {contact.review || 'No review yet'}</p>
-              <p className="muted"><strong>Plan:</strong> {contact.followUpStrategy || 'No strategy defined'}</p>
-              <p className="muted"><strong>Calls:</strong> {contact.followUpCount || 0}</p>
-            </div>
-            <div className="contact-meta">
-              <p className="muted"><strong>Last contacted:</strong> {contact.lastContacted ? new Date(contact.lastContacted).toLocaleString() : 'Never'}</p>
-              <p className="muted"><strong>Next follow-up:</strong> {contact.nextFollowUp ? new Date(contact.nextFollowUp).toLocaleDateString() : 'Not scheduled'}</p>
-            </div>
-            <div className="form-row call-log-row">
-              <select value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)}>
-                <option value="Contacted">Contacted</option>
-                <option value="Hot Lead">Hot Lead</option>
-                <option value="Warm Lead">Warm Lead</option>
-                <option value="May Convert">May Convert</option>
-                <option value="Not Interested">Not Interested</option>
-              </select>
-              <input type="datetime-local" value={callTimestamp} onChange={(e) => setCallTimestamp(e.target.value)} />
-              <input placeholder="Call note" value={callNote} onChange={(e) => setCallNote(e.target.value)} />
-              <button className="btn primary" type="button" onClick={() => logContactCall(contact)}>Log call</button>
-            </div>
-            {contact.callHistory && contact.callHistory.length > 0 && (
-              <div className="call-history">
-                <strong>Recent call history</strong>
-                {contact.callHistory.slice(-3).reverse().map((entry, index) => (
-                  <div key={`${contact.id || contact._id}-call-${index}`} className="call-history-entry">
-                    <div><strong>{new Date(entry.timestamp).toLocaleString()}</strong> — {entry.status || entry.outcome}</div>
-                    <div className="muted">{entry.note || 'No note recorded'}</div>
+        ) : (
+          groupedDateKeys.map((slotKey) => (
+            <div key={slotKey} className="date-slot">
+              <div className="date-slot-header">{groupedContacts[slotKey].label}</div>
+              <div className="date-slot-list">
+                {groupedContacts[slotKey].items.map((contact) => (
+                  <div key={contact.id || contact._id} className="panel contact-card">
+                    <div className="list-row">
+                      <div>
+                        <strong>{contact.name}</strong>
+                        <div className="muted">Caller: {contact.callerName || 'Unknown'} • {contact.contactNumber} • {contact.consumerNumber || 'No consumer number'}</div>
+                        <span className={`badge status-badge status-${String(contact.status || 'Warm Lead').replace(/\s+/g, '-').toLowerCase()}`}>{contact.status}</span>
+                      </div>
+                      <div className="inline-actions">
+                        <button className="btn secondary" type="button" onClick={() => editContact(contact)}>Edit</button>
+                        <button className="btn secondary" type="button" onClick={() => deleteContact(contact.id || contact._id)}>Delete</button>
+                      </div>
+                    </div>
+                    <div className="contact-meta">
+                      <p className="muted"><strong>Review:</strong> {contact.review || 'No review yet'}</p>
+                      <p className="muted"><strong>Plan:</strong> {contact.followUpStrategy || 'No strategy defined'}</p>
+                      <p className="muted"><strong>Calls:</strong> {contact.followUpCount || 0}</p>
+                    </div>
+                    <div className="contact-meta">
+                      <p className="muted"><strong>Last contacted:</strong> {contact.lastContacted ? new Date(contact.lastContacted).toLocaleString() : 'Never'}</p>
+                      <p className="muted"><strong>Next follow-up:</strong> {contact.nextFollowUp ? new Date(contact.nextFollowUp).toLocaleDateString() : 'Not scheduled'}</p>
+                    </div>
+                    <div className="form-row call-log-row">
+                      <select value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)}>
+                        <option value="Contacted">Contacted</option>
+                        <option value="Hot Lead">Hot Lead</option>
+                        <option value="Warm Lead">Warm Lead</option>
+                        <option value="May Convert">May Convert</option>
+                        <option value="Not Interested">Not Interested</option>
+                      </select>
+                      <input type="datetime-local" value={callTimestamp} onChange={(e) => setCallTimestamp(e.target.value)} />
+                      <input placeholder="Call note" value={callNote} onChange={(e) => setCallNote(e.target.value)} />
+                      <button className="btn primary" type="button" onClick={() => logContactCall(contact)}>Log call</button>
+                    </div>
+                    {contact.callHistory && contact.callHistory.length > 0 && (
+                      <div className="call-history">
+                        <strong>Recent call history</strong>
+                        {contact.callHistory.slice(-3).reverse().map((entry, index) => (
+                          <div key={`${contact.id || contact._id}-call-${index}`} className="call-history-entry">
+                            <div><strong>{new Date(entry.timestamp).toLocaleString()}</strong> — {entry.status || entry.outcome}</div>
+                            <div className="muted">{entry.note || 'No note recorded'}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
