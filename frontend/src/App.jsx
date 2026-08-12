@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { jsPDF } from 'jspdf';
-import { API_BASE_URL } from './config';
+import { downloadInvoicePdf } from './utils/invoicePdf';
+import api from './api';
 // Time helpers (module-level) used across pages
 const getNowLocalDateTime = () => new Date().toISOString().slice(0, 16);
 
@@ -37,9 +37,7 @@ const isRecentContact = (date, seconds = 86400) => {
 };
 import './animations.css';
 
-const API = API_BASE_URL;
-
-const api = axios.create({ baseURL: API });
+// api instance imported from ./api
 
 const emptyItemForm = {
   name: '',
@@ -266,6 +264,8 @@ function Register({ setUser }) {
   );
 }
 
+import AnalyticsDashboard from './components/AnalyticsDashboard';
+
 function Dashboard({ user }) {
   const [summary, setSummary] = useState({ totalSales: 0, totalPurchases: 0, totalReturns: 0, invoiceCount: 0 });
   const [items, setItems] = useState([]);
@@ -293,6 +293,8 @@ function Dashboard({ user }) {
         <div className="stat-card"><h4>Total returns</h4><p>₹{summary.totalReturns.toLocaleString()}</p><p className="muted">Returns and adjustments</p></div>
         <div className="stat-card"><h4>Invoice count</h4><p>{summary.invoiceCount}</p><p className="muted">Invoices generated</p></div>
       </div>
+
+      <AnalyticsDashboard />
 
       <div className="panel">
         <h4>Stock highlights</h4>
@@ -1063,6 +1065,90 @@ function BillingPage() {
     }
   };
 
+  const previewInvoice = async () => {
+    if (billingMode === 'normal' && !selectedItems.length) {
+      setBillingMessage('Please add at least one item before previewing');
+      return;
+    }
+    if (billingMode === 'single' && (!singleTotalAfterGst || Number(singleTotalAfterGst) <= 0)) {
+      setBillingMessage('Enter a valid total amount after GST before previewing');
+      return;
+    }
+
+    const singleTaxRate = singleGstType === 'igst'
+      ? Number(singleIgstRate) || 0
+      : (Number(singleCgstRate) || 0) + (Number(singleSgstRate) || 0);
+    const totalAfter = Number(singleTotalAfterGst) || 0;
+    const baseAmount = singleTaxRate > 0 ? totalAfter / (1 + singleTaxRate / 100) : totalAfter;
+    const gstAmountSingle = totalAfter - baseAmount;
+
+    const itemsPayload = billingMode === 'single'
+      ? (selectedItems.length ? selectedItems.map((entry) => ({
+          itemId: entry.item,
+          name: entry.name,
+          quantity: entry.quantity,
+          unit: entry.unit,
+          price: entry.price,
+          sgstRate: entry.sgstRate,
+          cgstRate: entry.cgstRate,
+          igstRate: entry.igstRate,
+          total: entry.quantity * entry.price
+        })) : [{
+          name: singleDescription || 'Single price service',
+          quantity: 1,
+          unit: 'pcs',
+          price: Number(baseAmount.toFixed(2)),
+          sgstRate: singleGstType === 'cgst-sgst' ? Number(singleSgstRate) || 0 : 0,
+          cgstRate: singleGstType === 'cgst-sgst' ? Number(singleCgstRate) || 0 : 0,
+          igstRate: singleGstType === 'igst' ? Number(singleIgstRate) || 0 : 0,
+          total: Number(baseAmount.toFixed(2))
+        }])
+      : selectedItems.map((entry) => ({
+          itemId: entry.item,
+          name: entry.name,
+          quantity: entry.quantity,
+          unit: entry.unit,
+          price: entry.price,
+          sgstRate: entry.sgstRate,
+          cgstRate: entry.cgstRate,
+          igstRate: entry.igstRate,
+          total: entry.quantity * entry.price
+        }));
+
+    const subtotalPreview = itemsPayload.reduce((s, it) => s + (it.price || 0) * (it.quantity || 1), 0);
+    const gstPreview = itemsPayload.reduce((s, it) => {
+      const base = (it.price || 0) * (it.quantity || 1);
+      return s + (base * (it.sgstRate || 0) / 100) + (base * (it.cgstRate || 0) / 100) + (base * (it.igstRate || 0) / 100);
+    }, 0);
+    const grandTotalPreview = billingMode === 'single' ? Number(totalAfter || 0) : subtotalPreview + gstPreview;
+
+    const invoicePreview = {
+      invoiceNumber: `PREVIEW-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      partyName: partyName || customerName,
+      partyPhone: partyPhone || customerPhone,
+      partyGSTIN,
+      customerName,
+      customerPhone,
+      type,
+      items: itemsPayload,
+      subtotal: Number(subtotalPreview.toFixed(2)),
+      gstAmount: Number(gstPreview.toFixed(2)),
+      grandTotal: Number(grandTotalPreview.toFixed(2)),
+      paidAmount: Number(paidAmount) || 0,
+      accountId: paymentAccount || undefined,
+      paymentMethod,
+      notes: notes || ''
+    };
+
+    try {
+      sessionStorage.setItem('invoicePreview', JSON.stringify(invoicePreview));
+      window.open('/invoice-preview.html', '_blank');
+    } catch (e) {
+      setBillingMessage('Unable to open preview');
+    }
+  };
+
   const subtotal = selectedItems.reduce((sum, entry) => sum + entry.quantity * entry.price, 0);
   const gstAmount = selectedItems.reduce((sum, entry) => {
     const base = entry.quantity * entry.price;
@@ -1094,352 +1180,7 @@ function BillingPage() {
     }
   };
 
-  const downloadInvoicePdf = async (invoice) => {
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const marginLeft = 12;
-    const marginRight = 12;
-    const contentWidth = pageWidth - marginLeft - marginRight;
-    let y = 10;
-
-    // Header Section - Company Details (embed shop logo if available)
-    // Try invoice.sellerLogo, else try localStorage user.shopLogoUrl
-    let sellerLogo = invoice.sellerLogo || null;
-    try {
-      const storedUser = localStorage.getItem('user');
-      if (!sellerLogo && storedUser) {
-        const su = JSON.parse(storedUser);
-        if (su?.shopLogoUrl) sellerLogo = su.shopLogoUrl;
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    doc.setFontSize(20);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor('#186FAF');
-
-    if (sellerLogo) {
-      const imgData = await loadImageAsDataUrl(sellerLogo).catch(() => null);
-      if (imgData) {
-        // place logo top-left and reduce left margin accordingly
-        try {
-          doc.addImage(imgData, 'PNG', marginLeft, y - 2, 30, 30);
-        } catch (e) {
-          // image type could be jpeg
-          try { doc.addImage(imgData, 'JPEG', marginLeft, y - 2, 30, 30); } catch { }
-        }
-      }
-    }
-
-    const titleX = sellerLogo ? marginLeft + 36 : marginLeft;
-    doc.text(invoice.sellerName || 'GST INVOICE', titleX, y + 6);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor('#333333');
-    y += 14;
-
-    if (invoice.sellerAddress) {
-      const addressLines = doc.splitTextToSize(invoice.sellerAddress, contentWidth - (sellerLogo ? 36 : 0));
-      doc.text(addressLines, titleX, y);
-      y += addressLines.length * 3.5 + 2;
-    }
-
-    if (invoice.sellerGSTIN || invoice.sellerPhone || invoice.sellerEmail) {
-      doc.setFontSize(8);
-      if (invoice.sellerGSTIN) doc.text(`GSTIN: ${invoice.sellerGSTIN}`, titleX, y);
-      y += 3;
-      if (invoice.sellerPhone) doc.text(`Phone: ${invoice.sellerPhone}`, titleX, y);
-      y += 3;
-      if (invoice.sellerEmail) doc.text(`Email: ${invoice.sellerEmail}`, titleX, y);
-      y += 3;
-    }
-
-    y += 3;
-    doc.setDrawColor('#186FAF');
-    doc.setLineWidth(0.5);
-    doc.line(marginLeft, y, pageWidth - marginRight, y);
-    y += 4;
-
-    // Invoice Header Info
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor('#186FAF');
-    doc.text('GST INVOICE', marginLeft, y);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor('#333333');
-    
-    // Right side invoice details
-    doc.text(`Invoice No: ${invoice.invoiceNumber}`, pageWidth - marginRight - 60, y);
-    y += 5;
-    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString('en-IN')}`, pageWidth - marginRight - 60, y);
-    y += 5;
-    doc.text(`Type: ${(invoice.type || 'SALE').toUpperCase()}`, marginLeft, y);
-    y += 5;
-
-    // Buyer Section
-    doc.setFont(undefined, 'bold');
-    doc.text('Buyer (Bill To)', marginLeft, y);
-    doc.setFont(undefined, 'normal');
-    y += 4;
-    doc.text(invoice.partyName || invoice.customerName || '-', marginLeft, y);
-    y += 3;
-    if (invoice.partyAddress) doc.text(invoice.partyAddress, marginLeft, y);
-    y += 3;
-    if (invoice.partyPhone) doc.text(`Phone: ${invoice.partyPhone}`, marginLeft, y);
-    y += 3;
-    if (invoice.partyGSTIN) doc.text(`GSTIN/UIN: ${invoice.partyGSTIN}`, marginLeft, y);
-    else doc.text('GSTIN/UIN: N/A', marginLeft, y);
-    y += 3;
-    doc.text(`State: ${invoice.state || 'N/A'}`, marginLeft, y);
-    y += 6;
-
-    // Description of Goods Section
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(10);
-    doc.text('Description of Goods', marginLeft, y);
-    y += 5;
-
-    // Items Table Header
-    doc.setFontSize(9);
-    doc.setTextColor('#FFFFFF');
-    doc.setFillColor('#186FAF');
-    const colWidth = {
-      desc: 72,
-      hsn: 22,
-      qty: 18,
-      rate: 25,
-      sgst: 20,
-      cgst: 20,
-      igst: 20,
-      amount: 28
-    };
-    
-    let xPos = marginLeft;
-    doc.text('Description', xPos, y);
-    xPos += colWidth.desc;
-    doc.text('HSN/SAC', xPos, y);
-    xPos += colWidth.hsn;
-    doc.text('QTY', xPos, y);
-    xPos += colWidth.qty;
-    doc.text('Rate', xPos, y);
-    xPos += colWidth.rate;
-    doc.text('SGST', xPos, y);
-    xPos += colWidth.sgst;
-    doc.text('CGST', xPos, y);
-    xPos += colWidth.cgst;
-    doc.text('IGST', xPos, y);
-    xPos += colWidth.igst;
-    doc.text('Amount', xPos, y, { align: 'right' });
-    
-    y += 5;
-    doc.setDrawColor('#186FAF');
-    doc.setLineWidth(0.4);
-    doc.line(marginLeft, y, pageWidth - marginRight, y);
-    y += 3;
-
-    // Items
-    doc.setTextColor('#333333');
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-
-    invoice.items.forEach((item, idx) => {
-      if (y > 250) {
-        doc.addPage();
-        y = 15;
-      }
-
-      xPos = marginLeft;
-      const descLines = doc.splitTextToSize(item.name || '-', colWidth.desc - 2);
-      doc.text(descLines, xPos, y);
-      const descHeight = descLines.length * 3;
-
-      xPos = marginLeft + colWidth.desc;
-      doc.text(item.hsn || '85414300', xPos, y);
-
-      xPos += colWidth.hsn;
-      doc.text(String(item.quantity || 1), xPos, y);
-
-      xPos += colWidth.qty;
-      doc.text(`₹${(item.price || 0).toFixed(2)}`, xPos, y);
-
-      xPos += colWidth.rate;
-      doc.text(item.sgstRate ? `${item.sgstRate}%` : '-', xPos, y);
-
-      xPos += colWidth.sgst;
-      doc.text(item.cgstRate ? `${item.cgstRate}%` : '-', xPos, y);
-
-      xPos += colWidth.cgst;
-      doc.text(item.igstRate ? `${item.igstRate}%` : '-', xPos, y);
-
-      xPos += colWidth.igst;
-      doc.text(`₹${(item.total || 0).toFixed(2)}`, xPos, y, { align: 'right' });
-
-      y += Math.max(descHeight, 4);
-    });
-
-    y += 2;
-    doc.setDrawColor('#186FAF');
-    doc.setLineWidth(0.4);
-    doc.line(marginLeft, y, pageWidth - marginRight, y);
-    y += 4;
-
-    // Tax Summary Section
-    doc.setFontSize(9);
-    doc.setFont(undefined, 'bold');
-    const subtotal = invoice.subtotal || 0;
-    const gstAmount = invoice.gstAmount || 0;
-    const total = invoice.grandTotal || 0;
-    const paid = invoice.paidAmount || 0;
-    const balance = invoice.balance || total - paid;
-
-    xPos = marginLeft + colWidth.desc + colWidth.hsn + colWidth.qty;
-    doc.text('Taxable Value', xPos, y);
-    xPos = pageWidth - marginRight - 30;
-    doc.text(`₹${subtotal.toFixed(2)}`, xPos, y, { align: 'right' });
-
-    y += 5;
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(8);
-    
-    // Tax calculation for each rate
-    const taxRates = {};
-    invoice.items.forEach(item => {
-      const itemRate = `${item.sgstRate || 0}-${item.cgstRate || 0}-${item.igstRate || 0}`;
-      if (!taxRates[itemRate]) {
-        taxRates[itemRate] = { sgst: 0, cgst: 0, igst: 0 };
-      }
-      const itemBase = item.total / (1 + ((item.sgstRate || 0) + (item.cgstRate || 0) + (item.igstRate || 0)) / 100);
-      taxRates[itemRate].sgst += itemBase * (item.sgstRate || 0) / 100;
-      taxRates[itemRate].cgst += itemBase * (item.cgstRate || 0) / 100;
-      taxRates[itemRate].igst += itemBase * (item.igstRate || 0) / 100;
-    });
-
-    Object.entries(taxRates).forEach(([rates, taxes]) => {
-      const [sgstRate, cgstRate, igstRate] = rates.split('-').map(Number);
-      if (sgstRate > 0) {
-        xPos = marginLeft + colWidth.desc + colWidth.hsn + colWidth.qty;
-        doc.text(`SGST (${sgstRate}%)`, xPos, y);
-        xPos = pageWidth - marginRight - 30;
-        doc.text(`₹${taxes.sgst.toFixed(2)}`, xPos, y, { align: 'right' });
-        y += 4;
-      }
-      if (cgstRate > 0) {
-        xPos = marginLeft + colWidth.desc + colWidth.hsn + colWidth.qty;
-        doc.text(`CGST (${cgstRate}%)`, xPos, y);
-        xPos = pageWidth - marginRight - 30;
-        doc.text(`₹${taxes.cgst.toFixed(2)}`, xPos, y, { align: 'right' });
-        y += 4;
-      }
-      if (igstRate > 0) {
-        xPos = marginLeft + colWidth.desc + colWidth.hsn + colWidth.qty;
-        doc.text(`IGST (${igstRate}%)`, xPos, y);
-        xPos = pageWidth - marginRight - 30;
-        doc.text(`₹${taxes.igst.toFixed(2)}`, xPos, y, { align: 'right' });
-        y += 4;
-      }
-    });
-
-    y += 2;
-    doc.setDrawColor('#186FAF');
-    doc.setLineWidth(0.5);
-    doc.line(marginLeft, y, pageWidth - marginRight, y);
-    y += 5;
-
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(10);
-    xPos = marginLeft + colWidth.desc + colWidth.hsn + colWidth.qty;
-    doc.text('TOTAL', xPos, y);
-    xPos = pageWidth - marginRight - 30;
-    doc.text(`₹${total.toFixed(2)}`, xPos, y, { align: 'right' });
-
-    y += 8;
-
-    // Amount in words
-    const amountInWords = (num) => {
-      const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-      const n = Math.floor(num);
-      if (n === 0) return 'Zero';
-      if (n < 10) return ones[n];
-      if (n < 100) return (n % 10 === 0 ? tens[Math.floor(n / 10)] : tens[Math.floor(n / 10)] + ' ' + ones[n % 10]);
-      if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred ' + (n % 100 === 0 ? '' : amountInWords(n % 100));
-      if (n < 100000) return amountInWords(Math.floor(n / 1000)) + ' Thousand ' + (n % 1000 === 0 ? '' : amountInWords(n % 1000));
-      if (n < 10000000) return amountInWords(Math.floor(n / 100000)) + ' Lakh ' + (n % 100000 === 0 ? '' : amountInWords(n % 100000));
-      return amountInWords(Math.floor(n / 10000000)) + ' Crore ' + (n % 10000000 === 0 ? '' : amountInWords(n % 10000000));
-    };
-
-    doc.setFontSize(9);
-    doc.setFont(undefined, 'bold');
-    doc.text('Amount in Words:', marginLeft, y);
-    doc.setFont(undefined, 'normal');
-    const amountText = amountInWords(Math.floor(total)) + ' Rupees Only';
-    const amountLines = doc.splitTextToSize(amountText.toUpperCase(), contentWidth);
-    y += 4;
-    doc.text(amountLines, marginLeft, y);
-    y += amountLines.length * 4 + 3;
-
-    // Payment Details
-    if (paid > 0) {
-      doc.setFontSize(8);
-      doc.setFont(undefined, 'bold');
-      doc.text('Payment Details:', marginLeft, y);
-      y += 4;
-      doc.setFont(undefined, 'normal');
-      doc.text(`Paid: ₹${paid.toFixed(2)} | Balance: ₹${balance.toFixed(2)} | Method: ${invoice.paymentMethod || 'N/A'}`, marginLeft, y);
-      y += 5;
-    }
-
-    // Bank Details
-    if (invoice.bankName || invoice.bankAccount || invoice.ifscCode) {
-      doc.setFontSize(8);
-      doc.setFont(undefined, 'bold');
-      doc.text('OUR BANK:', marginLeft, y);
-      doc.setFont(undefined, 'normal');
-      y += 3;
-      if (invoice.bankName) doc.text(`Bank: ${invoice.bankName}`, marginLeft + 2, y);
-      y += 3;
-      if (invoice.bankAccount) doc.text(`Account: ${invoice.bankAccount}`, marginLeft + 2, y);
-      y += 3;
-      if (invoice.ifscCode) doc.text(`IFSC: ${invoice.ifscCode}`, marginLeft + 2, y);
-      y += 4;
-    }
-
-    // Terms and Notes
-    if (invoice.notes) {
-      y += 2;
-      doc.setFontSize(8);
-      doc.setFont(undefined, 'bold');
-      doc.text('Notes:', marginLeft, y);
-      doc.setFont(undefined, 'normal');
-      y += 3;
-      const notesLines = doc.splitTextToSize(invoice.notes, contentWidth - 4);
-      doc.text(notesLines, marginLeft + 2, y);
-      y += notesLines.length * 3;
-    }
-
-    // Declaration
-    y += 3;
-    doc.setFontSize(7);
-    doc.setFont(undefined, 'normal');
-    const declaration = 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
-    const declarationLines = doc.splitTextToSize(declaration, contentWidth);
-    doc.text(declarationLines, marginLeft, y);
-    y += declarationLines.length * 3 + 4;
-
-    // Signature
-    doc.setFontSize(9);
-    doc.setFont(undefined, 'bold');
-    doc.text(`FOR ${invoice.sellerName || 'SGSE'}`, pageWidth - marginRight - 40, y);
-    y += 15;
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-    doc.text('Authorized Signatory', pageWidth - marginRight - 40, y, { align: 'center' });
-
-    doc.save(`${invoice.invoiceNumber}.pdf`);
-  };
+  
 
   return (
     <div>
@@ -1622,7 +1363,10 @@ function BillingPage() {
           </div>
           <input type="number" min="0" step="0.01" placeholder="Paid amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
           {billingMessage && <p className="message">{billingMessage}</p>}
-          <button className="btn primary" onClick={saveInvoice}>Create invoice</button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn outline" type="button" onClick={previewInvoice}>Preview</button>
+            <button className="btn primary" onClick={saveInvoice}>Create invoice</button>
+          </div>
         </div>
       </div>
     </div>
