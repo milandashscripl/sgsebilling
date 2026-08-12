@@ -3,6 +3,38 @@ import { Link, Routes, Route, Navigate, NavLink, useNavigate } from 'react-route
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
+// Time helpers (module-level) used across pages
+const getNowLocalDateTime = () => new Date().toISOString().slice(0, 16);
+
+const formatAbsoluteDate = (date) => {
+  if (!date) return 'Never';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'Invalid date';
+  return d.toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+const getTimeAgo = (date) => {
+  if (!date) return 'Never';
+  const then = new Date(date);
+  if (isNaN(then.getTime())) return 'Invalid date';
+  const now = Date.now();
+  const diff = Math.floor((now - then.getTime()) / 1000);
+  if (diff < 0) return 'In future';
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return formatAbsoluteDate(date);
+};
+
+const isRecentContact = (date, seconds = 86400) => {
+  if (!date) return false;
+  const then = new Date(date);
+  if (isNaN(then.getTime())) return false;
+  const now = Date.now();
+  const diff = Math.floor((now - then.getTime()) / 1000);
+  return diff >= 0 && diff < seconds;
+};
 import './animations.css';
 
 const API = API_BASE_URL;
@@ -2063,26 +2095,7 @@ function ReportsPage() {
 
 function ContactsPage() {
   const [contacts, setContacts] = useState([]);
-  const getNowLocalDateTime = () => new Date().toISOString().slice(0, 16);
-  
-  // Time formatting functions for beautiful display
-  const getTimeAgo = (date) => {
-    if (!date) return 'Never';
-    const now = new Date();
-    const diff = Math.floor((now - new Date(date)) / 1000);
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return 'Older';
-  };
-  
-  const isRecentContact = (date) => {
-    if (!date) return false;
-    const now = new Date();
-    const diff = (now - new Date(date)) / 1000;
-    return diff < 86400; // Last 24 hours
-  };
+  // Use module-level time helpers: `getNowLocalDateTime`, `getTimeAgo`, `isRecentContact`
   
   const getStatusColor = (status) => {
     const colors = {
@@ -2393,7 +2406,7 @@ function ContactsPage() {
                         </div>
                         <div>
                           <p className="muted" style={{ marginBottom: '4px' }}><strong>📅 Last Contacted:</strong></p>
-                          <p style={{ marginLeft: '20px', fontSize: '13px' }}>{contact.lastContacted ? new Date(contact.lastContacted).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'}</p>
+                          <p style={{ marginLeft: '20px', fontSize: '13px' }}>{contact.lastContacted ? formatAbsoluteDate(contact.lastContacted) : 'Never'}</p>
                           <p style={{ marginLeft: '20px', fontSize: '12px', color: '#666' }}>({getTimeAgo(contact.lastContacted)})</p>
                         </div>
                         <div>
@@ -2594,22 +2607,10 @@ function CallingPage() {
     return statusMap[status] || '#5E6F83';
   };
 
-  const getTimeAgo = (date) => {
-    const now = new Date();
-    const diff = Math.floor((now - new Date(date)) / 1000);
-    
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return 'Older';
-  };
+  // Use shared time helper
+  // `getTimeAgo` is defined at module level
 
-  const isRecentCall = (date) => {
-    const now = new Date();
-    const diff = (now - new Date(date)) / 1000;
-    return diff < 7200; // Last 2 hours
-  };
+  const isRecentCall = (date) => isRecentContact(date, 7200); // last 2 hours
 
   const getCallStats = () => {
     const stats = {
@@ -2709,14 +2710,7 @@ function CallingPage() {
                   <div style={{ flex: 1 }}>
                     <div className="calling-item-name">{call.contactName}</div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
-                      <span className="calling-item-time">
-                        📅 {new Date(call.timestamp).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
+                      <span className="calling-item-time">📅 {formatAbsoluteDate(call.timestamp)}</span>
                       <span className="calling-item-time-relative">({getTimeAgo(call.timestamp)})</span>
                       {isRecentCall(call.timestamp) && <span className="badge-recent">Recent</span>}
                     </div>
