@@ -15,6 +15,12 @@ const contactSchema = new mongoose.Schema({
   followUpCount: { type: Number, default: 0 },
   lastContacted: { type: Date, default: null },
   nextFollowUp: { type: Date, default: null },
+  callHistory: [{
+    timestamp: { type: Date, default: Date.now },
+    note: { type: String, trim: true, default: '' },
+    outcome: { type: String, trim: true, default: 'Contacted' },
+    status: { type: String, trim: true, default: 'Warm Lead' }
+  }],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 

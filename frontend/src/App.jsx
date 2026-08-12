@@ -1613,11 +1613,11 @@ function AccountingPage() {
 
       <div className="panel">
         <h4>Recent ledger entries</h4>
-        {transactions.map((entry) => (
-          <div className="list-row" key={entry._id}>
+        {filteredTransactions.map((entry) => (
+          <div className="list-row" key={entry._id || entry.id}>
             <div>
               <strong>{entry.reference || entry.note || 'Ledger entry'}</strong>
-              <div className="muted">{entry.date} • {entry.paymentMethod}</div>
+              <div className="muted">{entry.date || '-'} • {entry.paymentMethod || 'Unknown'}</div>
             </div>
             <div>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</div>
           </div>
@@ -1845,21 +1845,19 @@ function ContactsPage() {
     review: '',
     followUpStrategy: '',
     followUpCount: '0',
-    nextFollowUp: ''
+    nextFollowUp: '',
+    lastContacted: ''
   });
   const [editingContactId, setEditingContactId] = useState(null);
   const [message, setMessage] = useState('');
   const [contactFromDate, setContactFromDate] = useState('');
   const [contactToDate, setContactToDate] = useState('');
-
-  const loadContacts = async () => {
-    try {
-      const res = await api.get('/contacts', { params: { fromDate: contactFromDate, toDate: contactToDate } });
-      setContacts(res.data);
-    } catch (error) {
-      setMessage(error.response?.data?.message || 'Unable to load contacts');
-    }
-  };
+  const [statusFilter, setStatusFilter] = useState('');
+  const [lastContactedFrom, setLastContactedFrom] = useState('');
+  const [lastContactedTo, setLastContactedTo] = useState('');
+  const [callOutcome, setCallOutcome] = useState('Contacted');
+  const [callNote, setCallNote] = useState('');
+  const [callTimestamp, setCallTimestamp] = useState('');
 
   useEffect(() => { loadContacts(); }, [contactFromDate, contactToDate]);
 
@@ -1873,7 +1871,8 @@ function ContactsPage() {
       review: '',
       followUpStrategy: '',
       followUpCount: '0',
-      nextFollowUp: ''
+      nextFollowUp: '',
+      lastContacted: ''
     });
     setEditingContactId(null);
     setMessage('');
@@ -1890,7 +1889,8 @@ function ContactsPage() {
       const payload = {
         ...form,
         followUpCount: Number(form.followUpCount || 0),
-        nextFollowUp: form.nextFollowUp || null
+        nextFollowUp: form.nextFollowUp || null,
+        lastContacted: form.lastContacted || null
       };
 
       if (editingContactId) {
@@ -1918,9 +1918,42 @@ function ContactsPage() {
       review: contact.review || '',
       followUpStrategy: contact.followUpStrategy || '',
       followUpCount: String(contact.followUpCount || 0),
-      nextFollowUp: contact.nextFollowUp ? contact.nextFollowUp.slice(0, 10) : ''
+      nextFollowUp: contact.nextFollowUp ? contact.nextFollowUp.slice(0, 10) : '',
+      lastContacted: contact.lastContacted ? contact.lastContacted.slice(0, 16) : ''
     });
     setMessage('Editing contact');
+  };
+
+  const logContactCall = async (contact) => {
+    try {
+      const payload = {
+        timestamp: callTimestamp || new Date().toISOString(),
+        note: callNote,
+        outcome: callOutcome || 'Contacted',
+        statusOnCall: callOutcome === 'Not Interested' ? 'Not Interested' : contact.status || 'Warm Lead'
+      };
+      await api.post(`/contacts/${contact.id || contact._id}/calls`, payload);
+      setMessage('Call logged successfully');
+      setCallNote('');
+      setCallTimestamp('');
+      await loadContacts();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Unable to log call');
+    }
+  };
+
+  const applyLastContactFilter = (contact) => {
+    try {
+      const lc = contact.lastContacted ? new Date(contact.lastContacted) : null;
+      const from = lastContactedFrom ? new Date(lastContactedFrom) : null;
+      const to = lastContactedTo ? new Date(lastContactedTo) : null;
+      if (from && lc && lc < from) return false;
+      if (to && lc && lc > to) return false;
+      if (statusFilter && contact.status !== statusFilter) return false;
+      return true;
+    } catch (e) {
+      return true;
+    }
   };
 
   const deleteContact = async (id) => {
@@ -1973,6 +2006,7 @@ function ContactsPage() {
             <option value="Following Up">Following Up</option>
           </select>
           <input placeholder="Next follow-up date" type="date" value={form.nextFollowUp} onChange={(e) => setForm({ ...form, nextFollowUp: e.target.value })} />
+          <input placeholder="Last contacted" type="datetime-local" value={form.lastContacted} onChange={(e) => setForm({ ...form, lastContacted: e.target.value })} />
           <input placeholder="Follow-up count" type="number" min="0" value={form.followUpCount} onChange={(e) => setForm({ ...form, followUpCount: e.target.value })} />
           <input placeholder="Review by caller" value={form.review} onChange={(e) => setForm({ ...form, review: e.target.value })} />
           <input placeholder="Follow-up strategy" value={form.followUpStrategy} onChange={(e) => setForm({ ...form, followUpStrategy: e.target.value })} />
@@ -1988,9 +2022,22 @@ function ContactsPage() {
         <div className="form-row">
           <input type="date" value={contactFromDate} onChange={(e) => setContactFromDate(e.target.value)} />
           <input type="date" value={contactToDate} onChange={(e) => setContactToDate(e.target.value)} />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="Hot Lead">Hot Lead</option>
+            <option value="Warm Lead">Warm Lead</option>
+            <option value="Cool Lead">Cool Lead</option>
+            <option value="May Convert">May Convert</option>
+            <option value="Not Interested">Not Interested</option>
+            <option value="Following Up">Following Up</option>
+          </select>
+          <input type="datetime-local" value={lastContactedFrom} onChange={(e) => setLastContactedFrom(e.target.value)} />
+          <input type="datetime-local" value={lastContactedTo} onChange={(e) => setLastContactedTo(e.target.value)} />
           <button className="btn secondary" type="button" onClick={downloadContactsCsv}>Download contacts CSV</button>
+          <button className="btn secondary" type="button" onClick={() => { setContactFromDate(''); setContactToDate(''); setStatusFilter(''); setLastContactedFrom(''); setLastContactedTo(''); }}>Clear</button>
         </div>
-        {contacts.length === 0 ? <p className="muted">No contacts yet. Add one to start following up.</p> : contacts.map((contact) => (
+
+        {contacts.filter((c) => applyLastContactFilter(c)).length === 0 ? <p className="muted">No contacts match filters.</p> : contacts.filter((c) => applyLastContactFilter(c)).map((contact) => (
           <div key={contact.id || contact._id} className="panel" style={{ padding: '12px' }}>
             <div className="list-row">
               <div>
@@ -2006,8 +2053,31 @@ function ContactsPage() {
             <div className="muted">Review: {contact.review || 'No review yet'}</div>
             <div className="muted">Follow-up: {contact.followUpStrategy || 'No strategy defined'}</div>
             <div className="muted">Follow-ups completed: {contact.followUpCount || 0}</div>
-            <div className="muted">Last contacted: {contact.lastContacted ? new Date(contact.lastContacted).toLocaleDateString() : 'Never'}</div>
+            <div className="muted">Last contacted: {contact.lastContacted ? new Date(contact.lastContacted).toLocaleString() : 'Never'}</div>
             <div className="muted">Next follow-up: {contact.nextFollowUp ? new Date(contact.nextFollowUp).toLocaleDateString() : 'Not scheduled'}</div>
+            <div className="form-row" style={{ marginTop: '12px' }}>
+              <select value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)}>
+                <option value="Contacted">Contacted</option>
+                <option value="Hot Lead">Hot Lead</option>
+                <option value="Warm Lead">Warm Lead</option>
+                <option value="May Convert">May Convert</option>
+                <option value="Not Interested">Not Interested</option>
+              </select>
+              <input type="datetime-local" value={callTimestamp} onChange={(e) => setCallTimestamp(e.target.value)} />
+              <input placeholder="Call note" value={callNote} onChange={(e) => setCallNote(e.target.value)} />
+              <button className="btn primary" type="button" onClick={() => logContactCall(contact)}>Log call</button>
+            </div>
+            {contact.callHistory && contact.callHistory.length > 0 && (
+              <div style={{ marginTop: '12px' }}>
+                <strong>Recent call history</strong>
+                {contact.callHistory.slice(-3).reverse().map((entry, index) => (
+                  <div key={`${contact.id || contact._id}-call-${index}`} className="muted" style={{ marginTop: '6px' }}>
+                    <div>{new Date(entry.timestamp).toLocaleString()} — {entry.status || entry.outcome}</div>
+                    <div>{entry.note || 'No note recorded'}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

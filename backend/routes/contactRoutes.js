@@ -86,6 +86,33 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+router.post('/:contactId/calls', auth, async (req, res) => {
+  try {
+    const contact = await Contact.findOne({ _id: req.params.contactId, createdBy: req.user._id });
+    if (!contact) return res.status(404).json({ message: 'Contact not found' });
+
+    const timestamp = req.body.timestamp ? new Date(req.body.timestamp) : new Date();
+    const outcome = req.body.outcome || 'Contacted';
+    const status = req.body.statusOnCall || contact.status || 'Warm Lead';
+
+    contact.callHistory = contact.callHistory || [];
+    contact.callHistory.push({
+      timestamp,
+      note: req.body.note || '',
+      outcome,
+      status
+    });
+    contact.lastContacted = timestamp;
+    contact.status = status;
+    contact.followUpCount = Number(contact.followUpCount || 0) + 1;
+
+    await contact.save();
+    res.json({ ...contact.toObject(), id: String(contact._id) });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.put('/:contactId', auth, async (req, res) => {
   try {
     const contact = await Contact.findOneAndUpdate(
