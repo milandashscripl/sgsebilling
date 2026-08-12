@@ -1352,6 +1352,11 @@ function AccountingPage() {
   const [transactionForm, setTransactionForm] = useState({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
   const [expenseForm, setExpenseForm] = useState({ category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
   const [message, setMessage] = useState('');
+  const [filterFromDate, setFilterFromDate] = useState('');
+  const [filterToDate, setFilterToDate] = useState('');
+  const [expenseSearchText, setExpenseSearchText] = useState('');
+  const [expensePaymentFilter, setExpensePaymentFilter] = useState('');
+  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState('');
 
   const load = async () => {
     try {
@@ -1371,6 +1376,43 @@ function AccountingPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const applyDateFilter = (dateStr) => {
+    if (!dateStr) return null;
+    return new Date(dateStr);
+  };
+
+  const filteredExpenses = expenses.filter((exp) => {
+    try {
+      const expDate = exp.date ? new Date(exp.date) : null;
+      const from = applyDateFilter(filterFromDate);
+      const to = applyDateFilter(filterToDate);
+      if (from && expDate && expDate < from) return false;
+      if (to && expDate && expDate > to) return false;
+      if (expenseSearchText) {
+        const txt = expenseSearchText.toLowerCase();
+        if (!((exp.category || '').toLowerCase().includes(txt) || (exp.note || '').toLowerCase().includes(txt))) return false;
+      }
+      if (expensePaymentFilter && expensePaymentFilter !== (exp.paymentMethod || '')) return false;
+      if (expenseCategoryFilter && expenseCategoryFilter !== (exp.category || '')) return false;
+      return true;
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const filteredTransactions = transactions.filter((tx) => {
+    try {
+      const txDate = tx.date ? new Date(tx.date) : null;
+      const from = applyDateFilter(filterFromDate);
+      const to = applyDateFilter(filterToDate);
+      if (from && txDate && txDate < from) return false;
+      if (to && txDate && txDate > to) return false;
+      return true;
+    } catch (e) {
+      return true;
+    }
+  });
 
   const addAccount = async (e) => {
     e.preventDefault();
@@ -1520,8 +1562,25 @@ function AccountingPage() {
 
       <div className="panel">
         <h4>Expenses list</h4>
-        {expenses.length === 0 ? (
-          <p className="muted">No expenses recorded yet.</p>
+        <div className="form-row">
+          <input type="date" value={filterFromDate} onChange={(e) => setFilterFromDate(e.target.value)} />
+          <input type="date" value={filterToDate} onChange={(e) => setFilterToDate(e.target.value)} />
+          <input placeholder="Search category or note" value={expenseSearchText} onChange={(e) => setExpenseSearchText(e.target.value)} />
+          <select value={expensePaymentFilter} onChange={(e) => setExpensePaymentFilter(e.target.value)}>
+            <option value="">All payments</option>
+            <option value="cash">Cash</option>
+            <option value="phonepe">PhonePe</option>
+            <option value="gpay">GPay</option>
+            <option value="neft">NEFT</option>
+            <option value="rtgs">RTGS</option>
+            <option value="withdrawal">Withdrawal</option>
+          </select>
+          <input placeholder="Category filter" value={expenseCategoryFilter} onChange={(e) => setExpenseCategoryFilter(e.target.value)} />
+          <button className="btn secondary" type="button" onClick={() => { setFilterFromDate(''); setFilterToDate(''); setExpenseSearchText(''); setExpensePaymentFilter(''); setExpenseCategoryFilter(''); }}>Clear</button>
+        </div>
+
+        {filteredExpenses.length === 0 ? (
+          <p className="muted">No expenses match the selected filters.</p>
         ) : (
           <div className="table-responsive">
             <table className="table">
@@ -1536,7 +1595,7 @@ function AccountingPage() {
                 </tr>
               </thead>
               <tbody>
-                {expenses.map((expense) => (
+                {filteredExpenses.map((expense) => (
                   <tr key={expense._id || expense.id}>
                     <td>{expense.date || '-'}</td>
                     <td>{expense.category || '-'}</td>
