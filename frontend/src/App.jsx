@@ -2017,9 +2017,14 @@ function ContactsPage() {
         </form>
       </div>
 
-      <div className="panel">
-        <h4>Contact list</h4>
-        <div className="form-row">
+      <div className="panel contacts-panel">
+        <div className="panel-header">
+          <div>
+            <h4>Contact list</h4>
+            <p className="muted">Filter by date, status or recent call time to find the right customer quickly.</p>
+          </div>
+        </div>
+        <div className="form-row filter-bar">
           <input type="date" value={contactFromDate} onChange={(e) => setContactFromDate(e.target.value)} />
           <input type="date" value={contactToDate} onChange={(e) => setContactToDate(e.target.value)} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -2033,7 +2038,7 @@ function ContactsPage() {
           </select>
           <input type="datetime-local" value={lastContactedFrom} onChange={(e) => setLastContactedFrom(e.target.value)} />
           <input type="datetime-local" value={lastContactedTo} onChange={(e) => setLastContactedTo(e.target.value)} />
-          <button className="btn secondary" type="button" onClick={downloadContactsCsv}>Download contacts CSV</button>
+          <button className="btn secondary" type="button" onClick={downloadContactsCsv}>Download CSV</button>
           <button className="btn secondary" type="button" onClick={() => { setContactFromDate(''); setContactToDate(''); setStatusFilter(''); setLastContactedFrom(''); setLastContactedTo(''); }}>Clear</button>
         </div>
 

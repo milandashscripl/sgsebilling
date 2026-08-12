@@ -57,6 +57,22 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .stat-card h4, .panel h4 { margin-top: 0; }
 .panel { padding: 20px; border-radius: 24px; }
 .page-header { display: flex; flex-direction: column; gap: 8px; padding: 18px 0; }
+.contacts-panel { padding: 24px; border-radius: 26px; background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,250,255,0.92)); border: 1px solid rgba(63,154,232,0.14); }
+.panel-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.filter-bar { gap: 10px; flex-wrap: wrap; }
+.contact-card { background: #FFFFFF; border: 1px solid rgba(31,58,85,0.08); box-shadow: 0 14px 30px rgba(31,58,85,0.06); padding: 18px; margin-bottom: 18px; }
+.contact-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; }
+.call-log-row { gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.call-history { padding: 14px; background: rgba(63,154,232,0.06); border-radius: 16px; margin-top: 12px; }
+.call-history-entry { padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.9); border: 1px solid rgba(63,154,232,0.12); margin-top: 10px; }
+.empty-state { padding: 36px; text-align: center; border: 1px dashed rgba(63,154,232,0.2); border-radius: 20px; background: rgba(255,255,255,0.95); }
+.status-badge { display: inline-flex; align-items: center; justify-content: center; padding: 6px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 700; margin-top: 6px; }
+.status-hot-lead { background: rgba(240, 121, 118, 0.14); color: #B43D34; }
+.status-warm-lead { background: rgba(245, 166, 35, 0.14); color: #9C5E11; }
+.status-cool-lead { background: rgba(102, 147, 255, 0.14); color: #2F4BA0; }
+.status-may-convert { background: rgba(94, 203, 157, 0.14); color: #136648; }
+.status-not-interested { background: rgba(166, 174, 191, 0.14); color: #4D5973; }
+.status-following-up { background: rgba(63, 154, 232, 0.14); color: #1F5C8E; }
 .action-grid { display: flex; gap: 12px; flex-wrap: wrap; }
 .highlight-list { margin: 0; padding-left: 18px; color: #3F4F29; }
 .highlight-list li { margin-bottom: 8px; }
