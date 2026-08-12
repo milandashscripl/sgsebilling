@@ -34,17 +34,17 @@
         <img src="/logo.svg" alt="Suryaghar logo" style="width:84px;height:84px;border-radius:6px;background:#fff;padding:6px;border:1px solid #eef2f6" />
         <div>
           <div class="company">
-            <h2>SURYAGHAR SOLAR ENERGY</h2>
+            <h2 id="company-name">SURYAGHAR SOLAR ENERGY</h2>
           </div>
-          <div class="meta">1ST FLOOR, GAJAPATI MANDAP, AMBAPALI CHOWK, BARGARH, ODISHA, 768028<br>GSTIN/UIN: 27XXXXX1234F1Z5<br>Phone: 9348628946 | Email: suryagharsolarenergy@gmail.com</div>
+          <div class="meta" id="company-meta">1ST FLOOR, GAJAPATI MANDAP, AMBAPALI CHOWK, BARGARH, ODISHA, 768028<br>GSTIN/UIN: 27XXXXX1234F1Z5<br>Phone: 9348628946 | Email: suryagharsolarenergy@gmail.com</div>
         </div>
       </div>
       <div style="text-align:right">
         <div class="gst-title">GST INVOICE</div>
         <div style="margin-top:8px;font-size:13px; text-align:right">
-          <div><strong>Invoice No:</strong> SSE-162/2026-27</div>
-          <div><strong>Date:</strong> 26-07-26</div>
-          <div><strong>Terms of Payment:</strong> NEFT</div>
+          <div><strong>Invoice No:</strong> <span id="invoice-no">SSE-162/2026-27</span></div>
+          <div><strong>Date:</strong> <span id="invoice-date">26-07-26</span></div>
+          <div><strong>Terms of Payment:</strong> <span id="invoice-terms">NEFT</span></div>
         </div>
       </div>
     </div>
@@ -52,11 +52,11 @@
     <div class="section flex">
       <div class="box">
         <strong>Bill To</strong>
-        <div style="margin-top:6px">M/s. Green Home Pvt Ltd<br>Plot 21, Solar Park,<br>Pune - 411028<br>GSTIN: 27GHJKL9876M1Z2<br>State: Maharashtra</div>
+        <div style="margin-top:6px" id="bill-to">M/s. Green Home Pvt Ltd<br>Plot 21, Solar Park,<br>Pune - 411028<br>GSTIN: 27GHJKL9876M1Z2<br>State: Maharashtra</div>
       </div>
       <div class="box">
         <strong>Delivery / Ship To</strong>
-        <div style="margin-top:6px">Mr. R. Sharma<br>Sector 5, Model Colony<br>Phone: +91 91234 56789</div>
+        <div style="margin-top:6px" id="ship-to">Mr. R. Sharma<br>Sector 5, Model Colony<br>Phone: +91 91234 56789</div>
       </div>
     </div>
 
@@ -74,7 +74,7 @@
             <th style="width:12%" class="right">Amount (₹)</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="items-body">
           <tr>
             <td>
               1. PM SURYAGHAR SOLAR COMPONENTS<br>
@@ -102,11 +102,11 @@
 
       <div class="totals">
         <div class="card">
-          <div style="display:flex;justify-content:space-between"><div>Taxable Value</div><div>₹190,476.19</div></div>
-          <div style="display:flex;justify-content:space-between;margin-top:6px"><div>State Tax (SGST) 2.5%</div><div>₹4,761.90</div></div>
-          <div style="display:flex;justify-content:space-between;margin-top:6px"><div>Central Tax (CGST) 2.5%</div><div>₹4,761.90</div></div>
-          <div style="display:flex;justify-content:space-between;margin-top:6px"><div>Total Tax</div><div>₹9,523.81</div></div>
-          <div style="border-top:1px dashed #e2eef8;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-weight:700"><div>TOTAL</div><div>₹200,000.00</div></div>
+          <div style="display:flex;justify-content:space-between"><div>Taxable Value</div><div id="taxable-value">₹190,476.19</div></div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px"><div>State Tax (SGST) <span id="sgst-rate">2.5%</span></div><div id="sgst-amount">₹4,761.90</div></div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px"><div>Central Tax (CGST) <span id="cgst-rate">2.5%</span></div><div id="cgst-amount">₹4,761.90</div></div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px"><div>Total Tax</div><div id="total-tax">₹9,523.81</div></div>
+          <div style="border-top:1px dashed #e2eef8;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-weight:700"><div>TOTAL</div><div id="grand-total">₹200,000.00</div></div>
         </div>
       </div>
 
@@ -149,6 +149,32 @@
         }
       }
     } catch (e) { /* ignore */ }
+
+    // If an invoice object is present in sessionStorage (set by the app), populate fields
+    try {
+      const invJson = sessionStorage.getItem('invoicePreview');
+      if (invJson) {
+        const inv = JSON.parse(invJson);
+        document.getElementById('company-name').textContent = inv.sellerName || document.getElementById('company-name').textContent;
+        if (inv.sellerAddress) document.getElementById('company-meta').innerHTML = inv.sellerAddress.replace(/\n/g, '<br>');
+        if (inv.invoiceNumber) document.getElementById('invoice-no').textContent = inv.invoiceNumber;
+        if (inv.createdAt) document.getElementById('invoice-date').textContent = new Date(inv.createdAt).toLocaleDateString('en-IN');
+        if (inv.notes) document.getElementById('invoice-terms').textContent = inv.notes;
+        if (inv.partyName) document.getElementById('bill-to').innerHTML = inv.partyName + '<br>' + (inv.partyAddress || '') ;
+        if (inv.items && inv.items.length) {
+          const tbody = document.getElementById('items-body');
+          tbody.innerHTML = '';
+          inv.items.forEach(it => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${it.description || it.name}</td><td>${it.hsn || it.hsnSac || ''}</td><td class="right">${it.quantity || it.qty || 1}</td><td class="right">${(it.rate || it.price || it.unitPrice || 0).toLocaleString()}</td><td class="right">${it.sgstRate || 0}</td><td class="right">${it.cgstRate || 0}</td><td class="right">${it.igstRate || 0}</td><td class="right">${(it.amount || it.lineTotal || (it.quantity*(it.rate||it.price||0))).toLocaleString()}</td>`;
+            tbody.appendChild(tr);
+          });
+        }
+        if (inv.subtotal !== undefined) document.getElementById('taxable-value').textContent = '₹' + Number(inv.subtotal).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+        if (inv.gstAmount !== undefined) document.getElementById('total-tax').textContent = '₹' + Number(inv.gstAmount).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+        if (inv.grandTotal !== undefined) document.getElementById('grand-total').textContent = '₹' + Number(inv.grandTotal).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+      }
+    } catch (e) { console.warn('invoice preview parse error', e); }
   </script>
 </body>
 </html>
