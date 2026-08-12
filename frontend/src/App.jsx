@@ -2042,25 +2042,39 @@ function ContactsPage() {
           <button className="btn secondary" type="button" onClick={() => { setContactFromDate(''); setContactToDate(''); setStatusFilter(''); setLastContactedFrom(''); setLastContactedTo(''); }}>Clear</button>
         </div>
 
-        {contacts.filter((c) => applyLastContactFilter(c)).length === 0 ? <p className="muted">No contacts match filters.</p> : contacts.filter((c) => applyLastContactFilter(c)).map((contact) => (
-          <div key={contact.id || contact._id} className="panel" style={{ padding: '12px' }}>
+        {contacts.length === 0 ? (
+          <div className="empty-state">
+            <h4>No contacts yet</h4>
+            <p className="muted">There are no saved lead records yet. Add a contact above to start tracking calls and follow-ups.</p>
+          </div>
+        ) : contacts.filter((c) => applyLastContactFilter(c)).length === 0 ? (
+          <div className="empty-state">
+            <h4>No contacts match filters</h4>
+            <p className="muted">Try clearing the filter values or adjusting the date range.</p>
+          </div>
+        ) : contacts.filter((c) => applyLastContactFilter(c)).map((contact) => (
+          <div key={contact.id || contact._id} className="panel contact-card">
             <div className="list-row">
               <div>
                 <strong>{contact.name}</strong>
                 <div className="muted">Caller: {contact.callerName || 'Unknown'} • {contact.contactNumber} • {contact.consumerNumber || 'No consumer number'}</div>
-                <div className="muted">Status: {contact.status}</div>
+                <span className={`badge status-badge status-${String(contact.status || 'Warm Lead').replace(/\s+/g, '-').toLowerCase()}`}>{contact.status}</span>
               </div>
               <div className="inline-actions">
                 <button className="btn secondary" type="button" onClick={() => editContact(contact)}>Edit</button>
                 <button className="btn secondary" type="button" onClick={() => deleteContact(contact.id || contact._id)}>Delete</button>
               </div>
             </div>
-            <div className="muted">Review: {contact.review || 'No review yet'}</div>
-            <div className="muted">Follow-up: {contact.followUpStrategy || 'No strategy defined'}</div>
-            <div className="muted">Follow-ups completed: {contact.followUpCount || 0}</div>
-            <div className="muted">Last contacted: {contact.lastContacted ? new Date(contact.lastContacted).toLocaleString() : 'Never'}</div>
-            <div className="muted">Next follow-up: {contact.nextFollowUp ? new Date(contact.nextFollowUp).toLocaleDateString() : 'Not scheduled'}</div>
-            <div className="form-row" style={{ marginTop: '12px' }}>
+            <div className="contact-meta">
+              <p className="muted"><strong>Review:</strong> {contact.review || 'No review yet'}</p>
+              <p className="muted"><strong>Plan:</strong> {contact.followUpStrategy || 'No strategy defined'}</p>
+              <p className="muted"><strong>Calls:</strong> {contact.followUpCount || 0}</p>
+            </div>
+            <div className="contact-meta">
+              <p className="muted"><strong>Last contacted:</strong> {contact.lastContacted ? new Date(contact.lastContacted).toLocaleString() : 'Never'}</p>
+              <p className="muted"><strong>Next follow-up:</strong> {contact.nextFollowUp ? new Date(contact.nextFollowUp).toLocaleDateString() : 'Not scheduled'}</p>
+            </div>
+            <div className="form-row call-log-row">
               <select value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)}>
                 <option value="Contacted">Contacted</option>
                 <option value="Hot Lead">Hot Lead</option>
@@ -2073,12 +2087,12 @@ function ContactsPage() {
               <button className="btn primary" type="button" onClick={() => logContactCall(contact)}>Log call</button>
             </div>
             {contact.callHistory && contact.callHistory.length > 0 && (
-              <div style={{ marginTop: '12px' }}>
+              <div className="call-history">
                 <strong>Recent call history</strong>
                 {contact.callHistory.slice(-3).reverse().map((entry, index) => (
-                  <div key={`${contact.id || contact._id}-call-${index}`} className="muted" style={{ marginTop: '6px' }}>
-                    <div>{new Date(entry.timestamp).toLocaleString()} — {entry.status || entry.outcome}</div>
-                    <div>{entry.note || 'No note recorded'}</div>
+                  <div key={`${contact.id || contact._id}-call-${index}`} className="call-history-entry">
+                    <div><strong>{new Date(entry.timestamp).toLocaleString()}</strong> — {entry.status || entry.outcome}</div>
+                    <div className="muted">{entry.note || 'No note recorded'}</div>
                   </div>
                 ))}
               </div>
