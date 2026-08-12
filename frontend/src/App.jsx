@@ -1859,6 +1859,22 @@ function ContactsPage() {
   const [callNote, setCallNote] = useState('');
   const [callTimestamp, setCallTimestamp] = useState('');
 
+  const loadContacts = async () => {
+    try {
+      const response = await api.get('/contacts', {
+        params: {
+          fromDate: contactFromDate || undefined,
+          toDate: contactToDate || undefined
+        }
+      });
+      setContacts(response.data.contacts || response.data || []);
+    } catch (error) {
+      console.error('Could not load contacts', error);
+      setContacts([]);
+      setMessage(error.response?.data?.message || 'Unable to load contacts');
+    }
+  };
+
   useEffect(() => { loadContacts(); }, [contactFromDate, contactToDate]);
 
   const resetForm = () => {
