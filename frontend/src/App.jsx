@@ -137,6 +137,7 @@ function AuthenticatedApp({ user, logout, setUser }) {
           <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/billing">Billing</NavLink>
           <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/accounting">Accounting</NavLink>
           <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/contacts">Contacts</NavLink>
+          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/calling">Calling</NavLink>
           <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/profile">Shop profile</NavLink>
           <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/reports">Reports</NavLink>
           {user.role === 'admin' && <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/users">Users</NavLink>}
@@ -149,6 +150,7 @@ function AuthenticatedApp({ user, logout, setUser }) {
             <Route path="/stock" element={<StockPage />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/calling" element={<CallingPage />} />
             <Route path="/profile" element={<ProfilePage user={user} setUser={setUser} />} />
             <Route path="/reports" element={<ReportsPage />} />
             {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
@@ -2169,6 +2171,266 @@ function UsersPage() {
             <div>{user.role}</div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function CallingPage() {
+  const [contacts, setContacts] = useState([]);
+  const [calls, setCalls] = useState([]);
+  const [message, setMessage] = useState('');
+  const [sortBy, setSortBy] = useState('latest');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingCallId, setEditingCallId] = useState(null);
+  const [editingNote, setEditingNote] = useState('');
+
+  useEffect(() => {
+    loadCalls();
+  }, []);
+
+  const loadCalls = async () => {
+    try {
+      const res = await api.get('/contacts');
+      setContacts(res.data);
+      
+      // Aggregate all calls from all contacts
+      const allCalls = [];
+      res.data.forEach((contact) => {
+        if (contact.callHistory && Array.isArray(contact.callHistory)) {
+          contact.callHistory.forEach((call) => {
+            allCalls.push({
+              ...call,
+              id: `${contact._id}-${call.timestamp}`,
+              contactId: contact._id,
+              contactName: contact.name,
+              contactNumber: contact.contactNumber,
+              consumerNumber: contact.consumerNumber,
+              review: contact.review,
+              status: call.status || contact.status,
+              callerName: contact.callerName
+            });
+          });
+        }
+      });
+      
+      setCalls(allCalls);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to load calls');
+    }
+  };
+
+  const sortCalls = (callsToSort) => {
+    const sorted = [...callsToSort];
+    if (sortBy === 'latest') {
+      sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    } else if (sortBy === 'oldest') {
+      sorted.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    } else if (sortBy === 'status') {
+      sorted.sort((a, b) => (a.status || '').localeCompare(b.status || ''));
+    } else if (sortBy === 'name') {
+      sorted.sort((a, b) => (a.contactName || '').localeCompare(b.contactName || ''));
+    }
+    return sorted;
+  };
+
+  const filteredCalls = sortCalls(calls.filter((call) => {
+    const matchesStatus = !filterStatus || call.status === filterStatus;
+    const matchesSearch = !searchTerm || 
+      call.contactName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      call.contactNumber.includes(searchTerm) ||
+      (call.note && call.note.toLowerCase().includes(searchTerm.toLowerCase()));
+    return matchesStatus && matchesSearch;
+  }));
+
+  const updateCallNote = async (contactId, callTimestamp, newNote) => {
+    try {
+      const contact = contacts.find(c => c._id === contactId);
+      if (!contact) throw new Error('Contact not found');
+      
+      const updatedContact = {
+        ...contact,
+        callHistory: contact.callHistory.map(call => 
+          new Date(call.timestamp).toISOString() === new Date(callTimestamp).toISOString()
+            ? { ...call, note: newNote }
+            : call
+        )
+      };
+      
+      await api.put(`/contacts/${contactId}`, updatedContact);
+      setMessage('Call note updated successfully');
+      setEditingCallId(null);
+      await loadCalls();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to update call note');
+    }
+  };
+
+  const deleteCall = async (contactId, callTimestamp) => {
+    if (!window.confirm('Delete this call record?')) return;
+    
+    try {
+      const contact = contacts.find(c => c._id === contactId);
+      if (!contact) throw new Error('Contact not found');
+      
+      const updatedContact = {
+        ...contact,
+        callHistory: contact.callHistory.filter(call => 
+          new Date(call.timestamp).toISOString() !== new Date(callTimestamp).toISOString()
+        ),
+        followUpCount: Math.max(0, (contact.followUpCount || 1) - 1)
+      };
+      
+      await api.put(`/contacts/${contactId}`, updatedContact);
+      setMessage('Call record deleted successfully');
+      await loadCalls();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to delete call record');
+    }
+  };
+
+  const getStatusColor = (status) => {
+    const statusMap = {
+      'Hot Lead': '#B43D34',
+      'Warm Lead': '#9C5E11',
+      'Cool Lead': '#2F4BA0',
+      'May Convert': '#136648',
+      'Not Interested': '#4D5973',
+      'Following Up': '#1F5C8E',
+      'Contacted': '#1F5C8E'
+    };
+    return statusMap[status] || '#5E6F83';
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <p className="eyebrow">Call Management</p>
+          <h3>Call History & Follow-ups</h3>
+          <p className="muted">Review all customer calls, manage notes, and track customer engagement.</p>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="form-grid">
+          <input 
+            placeholder="Search by name, phone, or note..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="Hot Lead">Hot Lead</option>
+            <option value="Warm Lead">Warm Lead</option>
+            <option value="Cool Lead">Cool Lead</option>
+            <option value="May Convert">May Convert</option>
+            <option value="Not Interested">Not Interested</option>
+            <option value="Following Up">Following Up</option>
+            <option value="Contacted">Contacted</option>
+          </select>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="latest">Latest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="name">By name</option>
+            <option value="status">By status</option>
+          </select>
+        </div>
+        {message && <p className="muted" style={{ marginTop: '12px', color: message.includes('successfully') ? '#2E6E42' : '#C23C3C' }}>{message}</p>}
+      </div>
+
+      <div className="panel">
+        {filteredCalls.length === 0 ? (
+          <div className="empty-state">
+            <p className="muted">No calls found. {calls.length === 0 ? 'Start by adding contacts and logging calls.' : 'Try adjusting your filters.'}</p>
+          </div>
+        ) : (
+          <div>
+            <p className="muted" style={{ marginBottom: '16px' }}>Showing {filteredCalls.length} call{filteredCalls.length !== 1 ? 's' : ''}</p>
+            {filteredCalls.map((call) => (
+              <div key={call.id} className="calling-list-item">
+                <div className="calling-item-header">
+                  <div>
+                    <div className="calling-item-name">{call.contactName}</div>
+                    <div className="calling-item-date">
+                      {new Date(call.timestamp).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  </div>
+                  <div className="calling-item-status">
+                    <span className="status-badge" style={{ background: `rgba(${getStatusColor(call.status)}, 0.1)`, color: getStatusColor(call.status) }}>
+                      {call.status || 'Unknown'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="calling-item-details">
+                  <div className="calling-item-detail">
+                    <span className="calling-item-detail-label">Mobile:</span> {call.contactNumber}
+                  </div>
+                  <div className="calling-item-detail">
+                    <span className="calling-item-detail-label">Consumer #:</span> {call.consumerNumber || 'N/A'}
+                  </div>
+                  <div className="calling-item-detail">
+                    <span className="calling-item-detail-label">Outcome:</span> {call.outcome || 'Contacted'}
+                  </div>
+                  {call.callerName && (
+                    <div className="calling-item-detail">
+                      <span className="calling-item-detail-label">Caller:</span> {call.callerName}
+                    </div>
+                  )}
+                </div>
+
+                {call.review && (
+                  <div className="calling-item-review">
+                    <strong>Customer Review:</strong> {call.review}
+                  </div>
+                )}
+
+                {editingCallId === call.id ? (
+                  <div className="form-row" style={{ marginTop: '10px' }}>
+                    <textarea
+                      placeholder="Call note"
+                      value={editingNote}
+                      onChange={(e) => setEditingNote(e.target.value)}
+                      style={{ flex: '1 1 100%', minHeight: '80px' }}
+                    />
+                    <div className="inline-actions" style={{ flex: '1 1 100%' }}>
+                      <button className="btn primary" onClick={() => updateCallNote(call.contactId, call.timestamp, editingNote)}>Save</button>
+                      <button className="btn secondary" onClick={() => setEditingCallId(null)}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {call.note && (
+                      <div className="calling-item-review" style={{ marginTop: '10px', borderLeftColor: '#3F9AE8' }}>
+                        <strong>Note:</strong> {call.note}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div className="calling-item-actions">
+                  <button className="btn secondary" onClick={() => {
+                    setEditingCallId(call.id);
+                    setEditingNote(call.note || '');
+                  }}>
+                    {editingCallId === call.id ? 'Cancel' : 'Edit Note'}
+                  </button>
+                  <button className="btn secondary" onClick={() => deleteCall(call.contactId, call.timestamp)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
