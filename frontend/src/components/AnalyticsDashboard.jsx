@@ -17,19 +17,23 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 export default function AnalyticsDashboard() {
   const [reports, setReports] = useState({ totalSales: 0, totalPurchases: 0, totalReturns: 0 });
   const [accounting, setAccounting] = useState({ accounts: [], incomeTotal: 0, expenseTotal: 0, paymentMethods: [] });
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [r, a] = await Promise.all([api.get('/reports/summary'), api.get('/accounting/summary')]);
-        setReports(r.data || {});
-        setAccounting(a.data || {});
-      } catch (e) {
-        // ignore for now
-      }
-    };
-    load();
-  }, []);
+  const loadAll = async (from, to) => {
+    try {
+      const params = {};
+      if (from) params.fromDate = from;
+      if (to) params.toDate = to;
+      const [r, a] = await Promise.all([api.get('/reports/summary', { params }), api.get('/accounting/summary', { params })]);
+      setReports(r.data || {});
+      setAccounting(a.data || {});
+    } catch (e) {
+      // ignore for now
+    }
+  };
+
+  useEffect(() => { loadAll(); }, []);
 
   const salesPie = {
     labels: ['Sales', 'Purchases', 'Returns'],
@@ -56,9 +60,12 @@ export default function AnalyticsDashboard() {
   // Simple monthly sales bar (try to derive from invoices if available)
   const [monthlyBar, setMonthlyBar] = useState({ labels: [], datasets: [] });
   useEffect(() => {
-    const loadMonthly = async () => {
+    const loadMonthly = async (from, to) => {
       try {
-        const res = await api.get('/reports/invoices');
+        const params = {};
+        if (from) params.fromDate = from;
+        if (to) params.toDate = to;
+        const res = await api.get('/reports/invoices', { params });
         const invoices = res.data || [];
         const buckets = {};
         invoices.forEach((inv) => {
@@ -72,29 +79,70 @@ export default function AnalyticsDashboard() {
         // ignore
       }
     };
-    loadMonthly();
-  }, []);
+    loadMonthly(fromDate, toDate);
+  }, [fromDate, toDate]);
+
+  const applyFilter = () => loadAll(fromDate, toDate);
+
+  const exportInvoicesCsv = async () => {
+    try {
+      const params = {};
+      if (fromDate) params.fromDate = fromDate;
+      if (toDate) params.toDate = toDate;
+      const res = await api.get('/reports/invoices', { params });
+      const invoices = res.data || [];
+      const header = ['invoiceNumber', 'type', 'partyName', 'subtotal', 'gstAmount', 'grandTotal', 'createdAt'];
+      const lines = [header.join(',')].concat(invoices.map(inv => [inv.invoiceNumber || '', inv.type || '', (inv.partyName||'').replace(/,/g,' '), inv.subtotal||0, inv.gstAmount||0, inv.grandTotal||0, inv.createdAt||''].join(',')));
+      const csv = lines.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoices_${fromDate||'start'}_${toDate||'end'}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      // ignore
+    }
+  };
 
   return (
-    <div className="analytics-grid">
-      <div className="panel">
-        <h4>Sales / Purchases / Returns</h4>
-        <Pie data={salesPie} />
+    <div>
+      <div className="panel panel-header" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label className="muted">From</label>
+          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          <label className="muted">To</label>
+          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <button className="btn secondary" type="button" onClick={applyFilter}>Apply</button>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <button className="btn outline" type="button" onClick={exportInvoicesCsv}>Export CSV</button>
+        </div>
       </div>
 
-      <div className="panel">
-        <h4>Income vs Expenses</h4>
-        <Doughnut data={incomeExpensePie} />
-      </div>
+      <div className="analytics-grid">
+        <div className="panel">
+          <h4>Sales / Purchases / Returns</h4>
+          <Pie data={salesPie} />
+        </div>
 
-      <div className="panel">
-        <h4>Account Balances</h4>
-        {accountLabels.length ? <Doughnut data={accountsDoughnut} /> : <p className="muted">No account data</p>}
-      </div>
+        <div className="panel">
+          <h4>Income vs Expenses</h4>
+          <Doughnut data={incomeExpensePie} />
+        </div>
 
-      <div className="panel" style={{ gridColumn: '1 / -1' }}>
-        <h4>Monthly Sales</h4>
-        {monthlyBar.labels && monthlyBar.labels.length ? <Bar data={monthlyBar} /> : <p className="muted">No invoice history to build chart</p>}
+        <div className="panel">
+          <h4>Account Balances</h4>
+          {accountLabels.length ? <Doughnut data={accountsDoughnut} /> : <p className="muted">No account data</p>}
+        </div>
+
+        <div className="panel" style={{ gridColumn: '1 / -1' }}>
+          <h4>Monthly Sales</h4>
+          {monthlyBar.labels && monthlyBar.labels.length ? <Bar data={monthlyBar} /> : <p className="muted">No invoice history to build chart</p>}
+        </div>
       </div>
     </div>
   );
