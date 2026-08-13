@@ -359,6 +359,7 @@ function ContactsPage() {
           <label>Caller name<input value={form.callerName} onChange={(e)=>setForm({...form, callerName:e.target.value})} /></label>
           <label>Customer name<input value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} /></label>
           <label>Contact number<input value={form.contactNumber} onChange={(e)=>setForm({...form, contactNumber:e.target.value})} /></label>
+          <label>Consumer number<input value={form.consumerNumber} onChange={(e)=>setForm({...form, consumerNumber:e.target.value})} /></label>
           <label>Customer status<select value={form.status} onChange={(e)=>setForm({...form, status:e.target.value})}><option>Hot Lead</option><option>Warm Lead</option><option>Cool Lead</option><option>May Convert</option><option>Not Interested</option><option>Following Up</option></select></label>
           <label>Contacted now?<select value={form.markContacted ? 'contacted' : 'not_contacted'} onChange={(e)=>setForm({...form, markContacted: e.target.value==='contacted'})}><option value="contacted">Contacted</option><option value="not_contacted">Not contacted</option></select></label>
           <div style={{gridColumn:'1/-1', display:'flex', gap:8}}>
