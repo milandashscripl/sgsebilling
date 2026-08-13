@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from './config';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 
 const API = API_BASE_URL;
 
@@ -515,26 +516,61 @@ function Dashboard({ user }) {
     api.get('/items').then((res) => setItems(res.data));
   }, []);
 
+  const lowStockItems = items.filter((item) => Number(item.stock || 0) < 5);
+
   return (
-    <div>
-      <h3>Dashboard overview</h3>
+    <div className="dashboard-page">
+      <div className="page-header dashboard-header">
+        <div>
+          <p className="eyebrow">Performance overview</p>
+          <h3>Dashboard</h3>
+        </div>
+        <div className="dashboard-hero-pill">
+          Welcome {user.name}
+        </div>
+      </div>
+
       <div className="stats-grid">
-        <div className="stat-card"><h4>Sales</h4><p>₹{summary.totalSales.toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Purchases</h4><p>₹{summary.totalPurchases.toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Returns</h4><p>₹{summary.totalReturns.toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Invoices</h4><p>{summary.invoiceCount}</p></div>
+        <div className="stat-card stat-sales"><h4>Sales</h4><p>₹{(summary.totalSales || 0).toLocaleString()}</p><span>Current period</span></div>
+        <div className="stat-card stat-purchases"><h4>Purchases</h4><p>₹{(summary.totalPurchases || 0).toLocaleString()}</p><span>Inbound stock</span></div>
+        <div className="stat-card stat-returns"><h4>Returns</h4><p>₹{(summary.totalReturns || 0).toLocaleString()}</p><span>Returned value</span></div>
+        <div className="stat-card stat-invoices"><h4>Invoices</h4><p>{summary.invoiceCount || 0}</p><span>Transactions</span></div>
       </div>
-      <div className="panel">
-        <h4>Low stock items</h4>
-        <ul>
-          {items.filter((item) => item.stock < 5).map((item) => (
-            <li key={item._id}>{item.name} — {item.stock} in stock</li>
-          ))}
-        </ul>
+
+      <div className="dashboard-panels-grid">
+        <div className="panel quick-panel">
+          <h4>Low stock alert</h4>
+          {lowStockItems.length === 0 ? (
+            <p className="muted">No urgent stock issues.</p>
+          ) : (
+            <ul className="alert-list">
+              {lowStockItems.map((item) => (
+                <li key={item._id}><span>{item.name}</span><strong>{item.stock} left</strong></li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="panel quick-panel">
+          <h4>Sales pulse</h4>
+          <div className="pulse-row">
+            <div>
+              <span className="pulse-label">Volume</span>
+              <strong>{summary.invoiceCount || 0}</strong>
+            </div>
+            <div>
+              <span className="pulse-label">Target</span>
+              <strong>92%</strong>
+            </div>
+          </div>
+          <div className="mini-progress">
+            <span style={{ width: '92%' }} />
+          </div>
+          <p className="muted">Healthy sales momentum this cycle.</p>
+        </div>
       </div>
-      <div className="panel">
-        <p>Welcome {user.name}. Manage bills, stock, and reports from this elegant control center.</p>
-      </div>
+
+      <AnalyticsDashboard />
     </div>
   );
 }
