@@ -161,37 +161,64 @@ function AuthenticatedApp({ user, logout, setUser }) {
         </div>
       </nav>
       <div className="dashboard">
-        <aside className="sidebar">
-          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/dashboard">Dashboard</NavLink>
-          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/items">Items</NavLink>
-          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/stock">Stock</NavLink>
-          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/billing">Billing</NavLink>
-          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/accounting">Accounting</NavLink>
-          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/contacts">Contacts</NavLink>
-          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/calling">Calling</NavLink>
-          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/profile">Shop profile</NavLink>
-          <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/reports">Reports</NavLink>
-          {user.role === 'admin' && <NavLink className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'} to="/users">Users</NavLink>}
-        </aside>
-        <main className="content">
-          <Routes>
-            <Route path="/dashboard" element={<Dashboard user={user} />} />
-            <Route path="/items" element={<ItemsPage />} />
-            <Route path="/billing" element={<BillingPage />} />
-            <Route path="/stock" element={<StockPage />} />
-            <Route path="/accounting" element={<AccountingPage />} />
-            <Route path="/contacts" element={<ContactsPage />} />
-            <Route path="/calling" element={<CallingPage />} />
-            <Route path="/profile" element={<ProfilePage user={user} setUser={setUser} />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </main>
-      </div>
-    </div>
-  );
-}
+        <div className="panel">
+          <h4>{editingContactId ? 'Edit contact' : 'Add contact'}</h4>
+        <form className="form-grid" onSubmit={saveContact}>
+          <div>
+            <label className="field-label">Caller name</label>
+            <input placeholder="Caller name" value={form.callerName} onChange={(e) => setForm({ ...form, callerName: e.target.value })} />
+          </div>
+          <div>
+            <label className="field-label">Customer name</label>
+            <input placeholder="Customer name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div>
+            <label className="field-label">Contact number</label>
+            <input placeholder="Contact number" value={form.contactNumber} onChange={(e) => setForm({ ...form, contactNumber: e.target.value })} />
+          </div>
+          <div>
+            <label className="field-label">Consumer number</label>
+            <input placeholder="Consumer number" value={form.consumerNumber} onChange={(e) => setForm({ ...form, consumerNumber: e.target.value })} />
+          </div>
+          <div>
+            <label className="field-label">Customer status</label>
+            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              <option value="Hot Lead">Hot Lead</option>
+              <option value="Warm Lead">Warm Lead</option>
+              <option value="Cool Lead">Cool Lead</option>
+              <option value="May Convert">May Convert</option>
+              <option value="Not Interested">Not Interested</option>
+              <option value="Following Up">Following Up</option>
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Contacted now?</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <select value={form.markContacted ? 'contacted' : 'not_contacted'} onChange={(e) => setForm({ ...form, markContacted: e.target.value === 'contacted' })}>
+                <option value="contacted">Contacted</option>
+                <option value="not_contacted">Not contacted</option>
+              </select>
+              <span className="muted">If 'Contacted', last contacted time will be set to now.</span>
+            </div>
+          </div>
+          <div>
+            <label className="field-label">Next follow-up</label>
+            <input type="date" value={form.nextFollowUp} onChange={(e) => setForm({ ...form, nextFollowUp: e.target.value })} />
+          </div>
+          <div>
+            <label className="field-label">Follow-up count</label>
+            <input type="number" value={form.followUpCount} onChange={(e) => setForm({ ...form, followUpCount: e.target.value })} />
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label className="field-label">Review / notes</label>
+            <textarea placeholder="Review / notes" value={form.review} onChange={(e) => setForm({ ...form, review: e.target.value })} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn primary" type="submit">{editingContactId ? 'Update' : 'Add'}</button>
+            <button className="btn secondary" type="button" onClick={resetForm}>Clear</button>
+          </div>
+        </form>
+        </div>
 
 function Login({ setUser }) {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -2241,17 +2268,28 @@ function ContactsPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="form-row call-log-row">
-                      <select value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)}>
-                        <option value="Contacted">Contacted</option>
-                        <option value="Hot Lead">Hot Lead</option>
-                        <option value="Warm Lead">Warm Lead</option>
-                        <option value="May Convert">May Convert</option>
-                        <option value="Not Interested">Not Interested</option>
-                      </select>
-                      <input type="datetime-local" value={callTimestamp} onChange={(e) => setCallTimestamp(e.target.value)} />
-                      <input placeholder="Call note" value={callNote} onChange={(e) => setCallNote(e.target.value)} />
-                      <button className="btn primary" type="button" onClick={() => logContactCall(contact)}>Log call</button>
+                    <div className="form-row call-log-row" style={{ gap: 12 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <label className="field-label">Outcome / status</label>
+                        <select value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)}>
+                          <option value="Contacted">Contacted</option>
+                          <option value="Hot Lead">Hot Lead</option>
+                          <option value="Warm Lead">Warm Lead</option>
+                          <option value="May Convert">May Convert</option>
+                          <option value="Not Interested">Not Interested</option>
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <label className="field-label">Date & time</label>
+                        <input type="datetime-local" value={callTimestamp} onChange={(e) => setCallTimestamp(e.target.value)} />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        <label className="field-label">Call note</label>
+                        <input placeholder="Call note" value={callNote} onChange={(e) => setCallNote(e.target.value)} />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                        <button className="btn primary" type="button" onClick={() => logContactCall(contact)}>Log call</button>
+                      </div>
                     </div>
                     {contact.callHistory && contact.callHistory.length > 0 && (
                       <div className="call-history">
