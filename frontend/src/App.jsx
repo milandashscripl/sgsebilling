@@ -1934,7 +1934,8 @@ function ContactsPage() {
       followUpStrategy: '',
       followUpCount: '0',
       nextFollowUp: '',
-      lastContacted: ''
+      lastContacted: '',
+      markContacted: false
     });
     setEditingContactId(null);
     setMessage('');
@@ -1949,35 +1950,20 @@ function ContactsPage() {
 
     try {
       const nowIso = new Date().toISOString();
-      // When adding a new contact, assume it has been contacted and record review
+      // Create payload -- if user chose to mark contacted, set lastContacted but do not auto-create a call history entry
       const payload = {
         ...form,
-        followUpCount: editingContactId ? Number(form.followUpCount || 0) : Math.max(1, Number(form.followUpCount || 0)),
+        followUpCount: editingContactId ? Number(form.followUpCount || 0) : Number(form.followUpCount || 0) || 0,
         nextFollowUp: form.nextFollowUp || null,
-        lastContacted: editingContactId ? (form.lastContacted || null) : nowIso
+        lastContacted: form.markContacted ? nowIso : (editingContactId ? (form.lastContacted || null) : null)
       };
 
-      let created;
       if (editingContactId) {
         await api.put(`/contacts/${editingContactId}`, payload);
         setMessage('Contact updated');
       } else {
-        const res = await api.post('/contacts', payload);
-        created = res.data;
-        setMessage('Contact added and marked as contacted');
-      }
-      // If we created a new contact, also log an initial call entry using the review as note
-      if (created && created.id) {
-        try {
-          await api.post(`/contacts/${created.id}/calls`, {
-            timestamp: nowIso,
-            note: form.review || '',
-            outcome: form.status || 'Contacted',
-            statusOnCall: form.status || 'Warm Lead'
-          });
-        } catch (e) {
-          // non-fatal
-        }
+        await api.post('/contacts', payload);
+        setMessage(form.markContacted ? 'Contact added and marked as contacted' : 'Contact added');
       }
 
       resetForm();
@@ -2151,6 +2137,10 @@ function ContactsPage() {
             <option value="Not Interested">Not Interested</option>
             <option value="Following Up">Following Up</option>
           </select>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={!!form.markContacted} onChange={(e) => setForm({ ...form, markContacted: e.target.checked })} />
+            <span className="muted">Mark as contacted now (sets last contacted time)</span>
+          </label>
           <input placeholder="Next follow-up date" type="date" value={form.nextFollowUp} onChange={(e) => setForm({ ...form, nextFollowUp: e.target.value })} />
           <input placeholder="Last contacted" type="datetime-local" value={form.lastContacted} onChange={(e) => setForm({ ...form, lastContacted: e.target.value })} />
           <input placeholder="Follow-up count" type="number" min="0" value={form.followUpCount} onChange={(e) => setForm({ ...form, followUpCount: e.target.value })} />
