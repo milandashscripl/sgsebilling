@@ -1890,7 +1890,7 @@ function ContactsPage() {
     followUpStrategy: '',
     followUpCount: '0',
     nextFollowUp: '',
-    lastContacted: getNowLocalDateTime()
+    lastContacted: ''
   });
   const [editingContactId, setEditingContactId] = useState(null);
   const [message, setMessage] = useState('');
@@ -1932,7 +1932,7 @@ function ContactsPage() {
       followUpStrategy: '',
       followUpCount: '0',
       nextFollowUp: '',
-      lastContacted: getNowLocalDateTime()
+      lastContacted: ''
     });
     setEditingContactId(null);
     setMessage('');
@@ -1979,7 +1979,7 @@ function ContactsPage() {
       followUpStrategy: contact.followUpStrategy || '',
       followUpCount: String(contact.followUpCount || 0),
       nextFollowUp: contact.nextFollowUp ? contact.nextFollowUp.slice(0, 10) : '',
-      lastContacted: contact.lastContacted ? contact.lastContacted.slice(0, 16) : getNowLocalDateTime()
+      lastContacted: contact.lastContacted ? contact.lastContacted.slice(0, 16) : ''
     });
     setMessage('Editing contact');
   };
