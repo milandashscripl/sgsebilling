@@ -38,6 +38,25 @@ const emptyCategoryForm = {
   description: ''
 };
 
+// Date/time helpers
+const formatAbsoluteDate = (date) => {
+  if (!date) return 'Never';
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return 'Invalid date';
+  return d.toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+const getTimeAgo = (date) => {
+  if (!date) return 'Never';
+  const then = new Date(date).getTime();
+  if (Number.isNaN(then)) return 'Invalid date';
+  const diff = Math.floor((Date.now() - then) / 1000);
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+};
+
 function App() {
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user');
