@@ -1946,20 +1946,38 @@ function ContactsPage() {
     }
 
     try {
+      const nowIso = new Date().toISOString();
+      // When adding a new contact, assume it has been contacted and record review
       const payload = {
         ...form,
-        followUpCount: Number(form.followUpCount || 0),
+        followUpCount: editingContactId ? Number(form.followUpCount || 0) : Math.max(1, Number(form.followUpCount || 0)),
         nextFollowUp: form.nextFollowUp || null,
-        lastContacted: form.lastContacted || null
+        lastContacted: editingContactId ? (form.lastContacted || null) : nowIso
       };
 
+      let created;
       if (editingContactId) {
         await api.put(`/contacts/${editingContactId}`, payload);
         setMessage('Contact updated');
       } else {
-        await api.post('/contacts', payload);
-        setMessage('Contact added');
+        const res = await api.post('/contacts', payload);
+        created = res.data;
+        setMessage('Contact added and marked as contacted');
       }
+      // If we created a new contact, also log an initial call entry using the review as note
+      if (created && created.id) {
+        try {
+          await api.post(`/contacts/${created.id}/calls`, {
+            timestamp: nowIso,
+            note: form.review || '',
+            outcome: form.status || 'Contacted',
+            statusOnCall: form.status || 'Warm Lead'
+          });
+        } catch (e) {
+          // non-fatal
+        }
+      }
+
       resetForm();
       await loadContacts();
     } catch (error) {

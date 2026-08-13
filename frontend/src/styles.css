@@ -75,6 +75,17 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .date-slot-header { margin-bottom: 14px; padding: 14px 18px; border-radius: 18px; background: rgba(31,58,85,0.08); color: #1B2A3B; font-weight: 700; }
 .date-slot-list { display: grid; gap: 14px; }
 .contact-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; }
+/* Mobile-friendly tweaks for contact/calling */
+@media (max-width: 800px) {
+  .contact-card, .calling-list-item { padding: 14px; border-radius: 14px; }
+  .contact-header { display: block; }
+  .contact-header .muted { margin-top: 8px; }
+  .inline-actions { flex-direction: column; gap: 8px; }
+  .calling-item-actions { justify-content: stretch; }
+  .calling-item-actions .btn, .inline-actions .btn { width: 100%; }
+  .calling-item-details { display: grid; grid-template-columns: 1fr; }
+  .calling-item-time, .calling-item-time-relative { display: block; }
+}
 .call-log-row { gap: 10px; flex-wrap: wrap; margin-top: 10px; }
 .call-history { padding: 14px; background: rgba(63,154,232,0.06); border-radius: 16px; margin-top: 12px; }
 .call-history-entry { padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.9); border: 1px solid rgba(63,154,232,0.12); margin-top: 10px; }
