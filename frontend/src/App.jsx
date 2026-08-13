@@ -2080,6 +2080,15 @@ function ContactsPage() {
   }, {});
   const groupedDateKeys = Object.keys(groupedContacts).sort();
 
+  const countAll = contacts.length;
+  const countHot = contacts.filter(c => c.status === 'Hot Lead').length;
+  const countWarm = contacts.filter(c => c.status === 'Warm Lead').length;
+  const countCool = contacts.filter(c => c.status === 'Cool Lead').length;
+  const countMay = contacts.filter(c => c.status === 'May Convert').length;
+  const countNotInterested = contacts.filter(c => c.status === 'Not Interested').length;
+  const countFollowing = contacts.filter(c => c.status === 'Following Up').length;
+  const countNoResponse = contacts.filter(c => !c.callHistory || c.callHistory.length === 0).length;
+
   const deleteContact = async (id) => {
     if (!window.confirm('Delete this contact?')) return;
     try {
@@ -2116,14 +2125,14 @@ function ContactsPage() {
       {message && <p className="muted">{message}</p>}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '10px 0' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className={statusTab === 'all' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('all')}>All ({contacts.length})</button>
-          <button className={statusTab === 'hot' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('hot')}>Hot</button>
-          <button className={statusTab === 'warm' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('warm')}>Warm</button>
-          <button className={statusTab === 'cool' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('cool')}>Cool</button>
-          <button className={statusTab === 'mayconvert' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('mayconvert')}>May Convert</button>
-          <button className={statusTab === 'notinterested' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('notinterested')}>Not Interested</button>
-          <button className={statusTab === 'following' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('following')}>Following Up</button>
-          <button className={statusTab === 'no_response' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('no_response')}>No response</button>
+          <button className={statusTab === 'all' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('all')}>All ({countAll})</button>
+          <button className={statusTab === 'hot' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('hot')}>Hot ({countHot})</button>
+          <button className={statusTab === 'warm' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('warm')}>Warm ({countWarm})</button>
+          <button className={statusTab === 'cool' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('cool')}>Cool ({countCool})</button>
+          <button className={statusTab === 'mayconvert' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('mayconvert')}>May Convert ({countMay})</button>
+          <button className={statusTab === 'notinterested' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('notinterested')}>Not Interested ({countNotInterested})</button>
+          <button className={statusTab === 'following' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('following')}>Following Up ({countFollowing})</button>
+          <button className={statusTab === 'no_response' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('no_response')}>No response ({countNoResponse})</button>
         </div>
         <input placeholder="Search contacts (name, phone, review)" value={searchTermContacts} onChange={(e) => setSearchTermContacts(e.target.value)} style={{ marginLeft: 'auto', minWidth: 220 }} />
       </div>
