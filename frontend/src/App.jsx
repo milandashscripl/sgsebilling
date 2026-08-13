@@ -38,6 +38,8 @@ const emptyCategoryForm = {
   description: ''
 };
 
+const LEAD_STATUS_OPTIONS = ['Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Following Up', 'Not Interested'];
+
 // Date/time helpers
 const formatAbsoluteDate = (date) => {
   if (!date) return 'Never';
@@ -174,13 +176,13 @@ function AuthenticatedApp({ user, logout }) {
       </nav>
       <div className="dashboard">
         <aside className="sidebar">
-          <Link to="/dashboard">Dashboard</Link>
-          <Link to="/items">Items</Link>
-          <Link to="/billing">Billing</Link>
-          <Link to="/contacts">Contacts</Link>
-          <Link to="/accounting">Accounting</Link>
-          <Link to="/reports">Reports</Link>
-          {user.role === 'admin' && <Link to="/users">Users</Link>}
+          <Link className="sidebar-link" to="/dashboard">Dashboard</Link>
+          <Link className="sidebar-link" to="/items">Items</Link>
+          <Link className="sidebar-link" to="/billing">Billing</Link>
+          <Link className="sidebar-link" to="/contacts">Contacts</Link>
+          <Link className="sidebar-link" to="/accounting">Accounting</Link>
+          <Link className="sidebar-link" to="/reports">Reports</Link>
+          {user.role === 'admin' && <Link className="sidebar-link" to="/users">Users</Link>}
         </aside>
         <main className="content">
           <Routes>
@@ -278,7 +280,7 @@ function ContactsPage() {
   const [message, setMessage] = useState('');
   const [statusTab, setStatusTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [callForm, setCallForm] = useState({ contactId: null, note: '', outcome: 'Contacted', timestamp: '' });
+  const [callForm, setCallForm] = useState({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' });
 
   const loadContacts = async () => {
     setLoading(true);
@@ -293,6 +295,17 @@ function ContactsPage() {
   useEffect(() => { loadContacts(); }, []);
 
   const reset = () => { setForm({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Warm Lead', review: '', nextFollowUp: '', markContacted: false }); setEditingId(null); };
+
+  const getStageClass = (status) => {
+    const label = (status || '').toLowerCase();
+    if (label.includes('hot')) return 'status-hot-lead';
+    if (label.includes('warm')) return 'status-warm-lead';
+    if (label.includes('cool')) return 'status-cool-lead';
+    if (label.includes('convert')) return 'status-may-convert';
+    if (label.includes('following')) return 'status-following-up';
+    if (label.includes('not')) return 'status-not-interested';
+    return 'status-following-up';
+  };
 
   const save = async (e) => {
     e && e.preventDefault();
@@ -317,9 +330,9 @@ function ContactsPage() {
   const remove = async (id) => { if (!confirm('Delete this contact?')) return; try { await api.delete(`/contacts/${id}`); setMessage('Contact removed'); await loadContacts(); } catch { setMessage('Unable to delete'); } };
 
   const logCall = async (contact) => {
-    // keep backward compat: open inline call form
     const id = contact.id || contact._id;
-    setCallForm({ contactId: id, note: '', outcome: 'Contacted', timestamp: new Date().toISOString().slice(0,16) });
+    const currentStatus = contact.status || 'Warm Lead';
+    setCallForm({ contactId: id, note: '', outcome: 'Contacted', leadStage: currentStatus, timestamp: new Date().toISOString().slice(0,16) });
   };
 
   const submitCall = async (e) => {
@@ -327,22 +340,25 @@ function ContactsPage() {
     const id = callForm.contactId;
     if (!id) return setMessage('No contact selected');
     try {
+      const contact = contacts.find(c => (c._id === id || c.id === id));
+      const selectedLead = callForm.leadStage || contact?.status || 'Warm Lead';
       const payload = {
         timestamp: callForm.timestamp ? new Date(callForm.timestamp).toISOString() : new Date().toISOString(),
         note: callForm.note || '',
         outcome: callForm.outcome || 'Contacted',
-        statusOnCall: callForm.outcome === 'Not Interested' ? 'Not Interested' : (contacts.find(c => (c._id===id||c.id===id))?.status || 'Warm Lead')
+        statusOnCall: callForm.outcome === 'Not Interested' ? 'Not Interested' : selectedLead,
+        leadStage: selectedLead
       };
       await api.post(`/contacts/${id}/calls`, payload);
       setMessage('Call logged');
-      setCallForm({ contactId: null, note: '', outcome: 'Contacted', timestamp: '' });
+      setCallForm({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' });
       await loadContacts();
     } catch (err) {
       setMessage('Unable to log call');
     }
   };
 
-  const cancelCall = () => setCallForm({ contactId: null, note: '', outcome: 'Contacted', timestamp: '' });
+  const cancelCall = () => setCallForm({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' });
 
   const counts = {
     all: contacts.length,
@@ -367,9 +383,30 @@ function ContactsPage() {
   });
 
   return (
-    <div>
-      <h3>Contacts & Calls</h3>
-      {message && <p className="muted">{message}</p>}
+    <div className="contacts-page">
+      <div className="page-header contacts-header">
+        <div>
+          <p className="eyebrow">Sales pipeline</p>
+          <h3>Contacts & calls</h3>
+        </div>
+        <div className="contacts-summary-grid">
+          <div className="mini-stat">
+            <span className="mini-stat-label">Hot</span>
+            <strong>{counts.hot}</strong>
+          </div>
+          <div className="mini-stat warm">
+            <span className="mini-stat-label">Warm</span>
+            <strong>{counts.warm}</strong>
+          </div>
+          <div className="mini-stat cool">
+            <span className="mini-stat-label">Cool</span>
+            <strong>{counts.cool}</strong>
+          </div>
+        </div>
+      </div>
+
+      {message && <p className="status-message">{message}</p>}
+
       <div className="panel">
         <h4>{editingId ? 'Edit contact' : 'Add contact'}</h4>
         <form className="form-grid" onSubmit={save}>
@@ -377,7 +414,7 @@ function ContactsPage() {
           <label>Customer name<input value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} /></label>
           <label>Contact number<input value={form.contactNumber} onChange={(e)=>setForm({...form, contactNumber:e.target.value})} /></label>
           <label>Consumer number<input value={form.consumerNumber} onChange={(e)=>setForm({...form, consumerNumber:e.target.value})} /></label>
-          <label>Customer status<select value={form.status} onChange={(e)=>setForm({...form, status:e.target.value})}><option>Hot Lead</option><option>Warm Lead</option><option>Cool Lead</option><option>May Convert</option><option>Not Interested</option><option>Following Up</option></select></label>
+          <label>Customer status<select value={form.status} onChange={(e)=>setForm({...form, status:e.target.value})}>{LEAD_STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}</select></label>
           <label>Contacted now?<select value={form.markContacted ? 'contacted' : 'not_contacted'} onChange={(e)=>setForm({...form, markContacted: e.target.value==='contacted'})}><option value="contacted">Contacted</option><option value="not_contacted">Not contacted</option></select></label>
           <div style={{gridColumn:'1/-1', display:'flex', gap:8}}>
             <button className="btn primary" type="submit">{editingId ? 'Update' : 'Add'}</button>
@@ -386,69 +423,68 @@ function ContactsPage() {
         </form>
       </div>
 
-      <div className="panel">
-        <div style={{display:'flex', gap:8, alignItems:'center'}}>
+      <div className="panel contact-stream-panel">
+        <div className="filter-bar">
           <button className={statusTab==='all'?'btn primary':'btn outline'} onClick={()=>setStatusTab('all')}>All ({counts.all})</button>
           <button className={statusTab==='hot'?'btn primary':'btn outline'} onClick={()=>setStatusTab('hot')}>Hot ({counts.hot})</button>
           <button className={statusTab==='warm'?'btn primary':'btn outline'} onClick={()=>setStatusTab('warm')}>Warm ({counts.warm})</button>
           <button className={statusTab==='cool'?'btn primary':'btn outline'} onClick={()=>setStatusTab('cool')}>Cool ({counts.cool})</button>
           <button className={statusTab==='notinterested'?'btn primary':'btn outline'} onClick={()=>setStatusTab('notinterested')}>Not interested ({counts.notinterested})</button>
           <button className={statusTab==='no_response'?'btn primary':'btn outline'} onClick={()=>setStatusTab('no_response')}>No response ({counts.no_response})</button>
-          <input placeholder="Search" style={{marginLeft:'auto'}} value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
+          <input className="search-field" placeholder="Search customer or number" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
         </div>
+
         {loading ? <p className="muted">Loading...</p> : (
-          filtered.length === 0 ? <p className="muted">No contacts</p> : (
-            <div style={{display:'grid', gap:12}}>
+          filtered.length === 0 ? <p className="muted empty-state-inline">No contacts in this pipeline.</p> : (
+            <div className="contacts-list">
               {filtered.map((c) => {
                 const id = c.id || c._id;
                 const recent = c.lastContacted && (Date.now() - new Date(c.lastContacted).getTime()) < 24*60*60*1000;
-                const statusColor = (s) => {
-                  if (!s) return '#6c757d';
-                  if (s.toLowerCase().includes('hot')) return '#d9534f';
-                  if (s.toLowerCase().includes('warm')) return '#fd7e14';
-                  if (s.toLowerCase().includes('not')) return '#6c757d';
-                  return '#0d6efd';
-                };
 
                 return (
                   <div key={id} className="panel contact-card" style={{display:'flex', flexDirection:'column', gap:8}}>
-                    <div style={{display:'flex', gap:12, alignItems:'center'}}>
-                      <div style={{width:48, height:48, borderRadius:24, background:'#eef2f5', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700}}>{(c.name||'--').split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-                      <div style={{flex:1}}>
-                        <div style={{display:'flex', alignItems:'center', gap:8}}>
-                          <strong style={{fontSize:16}}>{c.name || 'Unknown'}</strong>
-                          {recent && <span className="badge" style={{background:'#28a745', color:'#fff'}}>RECENT</span>}
-                          <span style={{marginLeft:'auto', fontSize:12, color:'#6c757d'}}>{getTimeAgo(c.lastContacted)} • <span style={{marginLeft:6}}>{c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span></span>
+                    <div className="contact-card-head">
+                      <div className="contact-avatar">{(c.name || '--').split(' ').map(x => x[0]).slice(0, 2).join('')}</div>
+                      <div className="contact-primary">
+                        <div className="contact-name-row">
+                          <strong>{c.name || 'Unknown'}</strong>
+                          {recent && <span className="recent-badge">Recent</span>}
+                          <span className="contact-time">{getTimeAgo(c.lastContacted)} • {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span>
                         </div>
-                        <div className="muted">{c.contactNumber || '—'} • <strong style={{color:'#333'}}>{c.consumerNumber || '—'}</strong></div>
-                        <div style={{marginTop:6}}>
-                          <span className="badge" style={{background:statusColor(c.status), color:'#fff'}}>{c.status || 'Unknown'}</span>
-                          <span style={{marginLeft:8}} className="muted">Calls: {c.callHistory ? c.callHistory.length : 0}</span>
+                        <div className="contact-meta">
+                          <span>{c.contactNumber || '—'}</span>
+                          <span>{c.consumerNumber || '—'}</span>
+                          <span>Calls: {c.callHistory ? c.callHistory.length : 0}</span>
+                        </div>
+                        <div className="status-row">
+                          <span className={`status-badge ${getStageClass(c.status)}`}>{c.status || 'Unknown'}</span>
                         </div>
                       </div>
-                      <div style={{display:'flex', gap:8}}>
+                      <div className="contact-actions">
                         <button className="btn secondary" onClick={()=>edit(c)}>Edit</button>
                         <button className="btn secondary" onClick={()=>remove(id)}>Delete</button>
                       </div>
                     </div>
 
-                    <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                    <div className="call-log-row">
                       {callForm.contactId === id ? (
-                        <form onSubmit={submitCall} style={{display:'flex', gap:8, alignItems:'center', width:'100%'}}>
+                        <form className="call-form" onSubmit={submitCall}>
                           <select value={callForm.outcome} onChange={(e)=>setCallForm({...callForm, outcome:e.target.value})}>
                             <option>Contacted</option>
-                            <option>Hot Lead</option>
-                            <option>Warm Lead</option>
+                            <option>Follow-up</option>
                             <option>Not Interested</option>
                           </select>
+                          <select value={callForm.leadStage} onChange={(e)=>setCallForm({...callForm, leadStage:e.target.value})}>
+                            {LEAD_STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}
+                          </select>
                           <input type="datetime-local" value={callForm.timestamp} onChange={(e)=>setCallForm({...callForm, timestamp:e.target.value})} />
-                          <input placeholder="Note (optional)" value={callForm.note} onChange={(e)=>setCallForm({...callForm, note:e.target.value})} />
+                          <input type="text" placeholder="Call notes" value={callForm.note} onChange={(e)=>setCallForm({...callForm, note:e.target.value})} />
                           <button className="btn primary" type="submit">Save</button>
                           <button className="btn outline" type="button" onClick={cancelCall}>Cancel</button>
                         </form>
                       ) : (
-                        <div style={{display:'flex', gap:8}}>
-                          <button className="btn primary" onClick={()=>setCallForm({ contactId: id, note: '', outcome: 'Contacted', timestamp: new Date().toISOString().slice(0,16) })}>Log call</button>
+                        <div className="inline-actions">
+                          <button className="btn primary" onClick={()=>logCall(c)}>Log call</button>
                           <button className="btn outline" onClick={()=>{ window.open(`/contacts/${id}/export`, '_blank'); }}>Export</button>
                         </div>
                       )}

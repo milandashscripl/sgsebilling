@@ -57,6 +57,37 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .sidebar-link:hover { background: rgba(63, 154, 232, 0.16); color: #186FAF; transform: translateX(2px); }
 .sidebar-link.active { background: linear-gradient(135deg, #186FAF, #3F9AE8); color: #FFFFFF; box-shadow: 0 4px 12px rgba(63, 154, 232, 0.3); }
 .content { display: grid; gap: 16px; }
+.contacts-page { display: grid; gap: 18px; }
+.contacts-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.contacts-summary-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.mini-stat { min-width: 86px; padding: 10px 12px; border-radius: 16px; background: linear-gradient(135deg, rgba(217, 83, 79, 0.12), rgba(255,255,255,0.9)); border: 1px solid rgba(217, 83, 79, 0.12); display: grid; gap: 4px; }
+.mini-stat.warm { background: linear-gradient(135deg, rgba(253, 126, 20, 0.12), rgba(255,255,255,0.9)); border-color: rgba(253, 126, 20, 0.15); }
+.mini-stat.cool { background: linear-gradient(135deg, rgba(102, 147, 255, 0.12), rgba(255,255,255,0.9)); border-color: rgba(102, 147, 255, 0.15); }
+.mini-stat strong { font-size: 1.15rem; color: #1B2A3B; }
+.mini-stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #5E6F83; }
+.status-message { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(63, 154, 232, 0.08); border: 1px solid rgba(63, 154, 232, 0.12); color: #16406E; font-weight: 600; }
+.contact-stream-panel { display: grid; gap: 14px; }
+.filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.search-field { margin-left: auto; min-width: 220px; }
+.contacts-list { display: grid; gap: 12px; }
+.contact-card-head { display: flex; align-items: center; gap: 12px; }
+.contact-primary { flex: 1; display: grid; gap: 6px; }
+.contact-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.contact-name-row strong { font-size: 1.06rem; }
+.contact-time { margin-left: auto; font-size: 0.8rem; color: #5E6F83; }
+.contact-meta { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: 0.9rem; color: #5E6F83; }
+.status-row { display: flex; align-items: center; }
+.call-log-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.call-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%; }
+.call-form select, .call-form input[type="datetime-local"], .call-form input[type="text"] { flex: 1 1 160px; }
+.empty-state-inline { padding: 18px 0 6px; }
+.status-badge { display: inline-flex; align-items: center; justify-content: center; padding: 6px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; }
+.status-hot-lead { background: rgba(240, 121, 118, 0.14); color: #B43D34; }
+.status-warm-lead { background: rgba(245, 166, 35, 0.14); color: #9C5E11; }
+.status-cool-lead { background: rgba(102, 147, 255, 0.14); color: #2F4BA0; }
+.status-may-convert { background: rgba(94, 203, 157, 0.14); color: #136648; }
+.status-following-up { background: rgba(63, 154, 232, 0.14); color: #1F5C8E; }
+.status-not-interested { background: rgba(166, 174, 191, 0.14); color: #4D5973; }
 .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .stat-card { padding: 20px; border-radius: 24px; background: linear-gradient(180deg, rgba(63,154,232,0.12), rgba(255,255,255,0.7)); border: 1px solid rgba(63,154,232,0.14); transition: transform 0.2s ease, box-shadow 0.2s ease; }
 .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(63, 154, 232, 0.12); }
@@ -85,6 +116,13 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
   .calling-item-actions .btn, .inline-actions .btn { width: 100%; }
   .calling-item-details { display: grid; grid-template-columns: 1fr; }
   .calling-item-time, .calling-item-time-relative { display: block; }
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .search-field { margin-left: 0; min-width: 0; width: 100%; }
+  .contacts-header { flex-direction: column; align-items: flex-start; }
+  .contact-card-head { flex-direction: column; align-items: flex-start; }
+  .contact-time { margin-left: 0; }
+  .call-form { flex-direction: column; align-items: stretch; }
+  .call-form select, .call-form input[type="datetime-local"], .call-form input[type="text"] { width: 100%; }
 }
 .call-log-row { gap: 10px; flex-wrap: wrap; margin-top: 10px; }
 .call-history { padding: 14px; background: rgba(63,154,232,0.06); border-radius: 16px; margin-top: 12px; }
