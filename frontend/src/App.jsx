@@ -380,7 +380,8 @@ function ContactsPage() {
       const s = searchTerm.toLowerCase();
       const callerName = (c.callerName || '').toLowerCase();
       const customerName = (c.name || '').toLowerCase();
-      if (!callerName.includes(s) && !customerName.includes(s)) return false;
+      const contactNumber = (c.contactNumber || '').toLowerCase();
+      if (!callerName.includes(s) && !customerName.includes(s) && !contactNumber.includes(s)) return false;
     }
     if (statusTab === 'hot' && c.status !== 'Hot Lead') return false;
     if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
@@ -439,7 +440,7 @@ function ContactsPage() {
           <button className={statusTab==='cool'?'btn primary':'btn outline'} onClick={()=>setStatusTab('cool')}>Cool ({counts.cool})</button>
           <button className={statusTab==='notinterested'?'btn primary':'btn outline'} onClick={()=>setStatusTab('notinterested')}>Not interested ({counts.notinterested})</button>
           <button className={statusTab==='no_response'?'btn primary':'btn outline'} onClick={()=>setStatusTab('no_response')}>No response ({counts.no_response})</button>
-          <input className="search-field" placeholder="Search customer or number" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
+          <input className="search-field" placeholder="Search caller, customer or number" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
         </div>
 
         {loading ? <p className="muted">Loading...</p> : (
@@ -531,10 +532,12 @@ function Dashboard({ user }) {
   }, []);
 
   const lowStockItems = items.filter((item) => Number(item.stock || 0) < 5);
+  const netSales = (summary.totalSales || 0) - (summary.totalReturns || 0);
+  const operatingTrend = Math.max(0, Math.min(100, Math.round(((summary.totalSales || 0) / Math.max(1, (summary.totalPurchases || 0) + 1)) * 100)));
 
   return (
     <div className="dashboard-page">
-      <div className="page-header dashboard-header">
+      <div className="dashboard-hero">
         <div>
           <p className="eyebrow">Performance overview</p>
           <h3>Dashboard</h3>
@@ -544,11 +547,54 @@ function Dashboard({ user }) {
         </div>
       </div>
 
+      <div className="dashboard-summary-band">
+        <div className="summary-highlight">
+          <span>Net sales</span>
+          <strong>₹{netSales.toLocaleString()}</strong>
+        </div>
+        <div className="summary-highlight muted-highlight">
+          <span>Invoices</span>
+          <strong>{summary.invoiceCount || 0}</strong>
+        </div>
+        <div className="summary-highlight accent-highlight">
+          <span>Trend</span>
+          <strong>{operatingTrend}%</strong>
+        </div>
+      </div>
+
       <div className="stats-grid">
-        <div className="stat-card stat-sales"><h4>Sales</h4><p>₹{(summary.totalSales || 0).toLocaleString()}</p><span>Current period</span></div>
-        <div className="stat-card stat-purchases"><h4>Purchases</h4><p>₹{(summary.totalPurchases || 0).toLocaleString()}</p><span>Inbound stock</span></div>
-        <div className="stat-card stat-returns"><h4>Returns</h4><p>₹{(summary.totalReturns || 0).toLocaleString()}</p><span>Returned value</span></div>
-        <div className="stat-card stat-invoices"><h4>Invoices</h4><p>{summary.invoiceCount || 0}</p><span>Transactions</span></div>
+        <div className="stat-card stat-sales">
+          <div className="stat-card-header">
+            <h4>Sales</h4>
+            <span className="stat-trend up">+12%</span>
+          </div>
+          <p>₹{(summary.totalSales || 0).toLocaleString()}</p>
+          <span>Current period</span>
+        </div>
+        <div className="stat-card stat-purchases">
+          <div className="stat-card-header">
+            <h4>Purchases</h4>
+            <span className="stat-trend neutral">Stock</span>
+          </div>
+          <p>₹{(summary.totalPurchases || 0).toLocaleString()}</p>
+          <span>Inbound stock</span>
+        </div>
+        <div className="stat-card stat-returns">
+          <div className="stat-card-header">
+            <h4>Returns</h4>
+            <span className="stat-trend down">Watch</span>
+          </div>
+          <p>₹{(summary.totalReturns || 0).toLocaleString()}</p>
+          <span>Returned value</span>
+        </div>
+        <div className="stat-card stat-invoices">
+          <div className="stat-card-header">
+            <h4>Invoices</h4>
+            <span className="stat-trend up">Live</span>
+          </div>
+          <p>{summary.invoiceCount || 0}</p>
+          <span>Transactions</span>
+        </div>
       </div>
 
       <div className="dashboard-panels-grid">
@@ -578,7 +624,7 @@ function Dashboard({ user }) {
             </div>
           </div>
           <div className="mini-progress">
-            <span style={{ width: '92%' }} />
+            <span style={{ width: `${Math.min(92, operatingTrend)}%` }} />
           </div>
           <p className="muted">Healthy sales momentum this cycle.</p>
         </div>
