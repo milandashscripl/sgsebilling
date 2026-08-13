@@ -1902,6 +1902,8 @@ function ContactsPage() {
   const [callOutcome, setCallOutcome] = useState('Contacted');
   const [callNote, setCallNote] = useState('');
   const [callTimestamp, setCallTimestamp] = useState(getNowLocalDateTime());
+  const [statusTab, setStatusTab] = useState('all');
+  const [searchTermContacts, setSearchTermContacts] = useState('');
 
   const loadContacts = async () => {
     try {
@@ -2044,7 +2046,27 @@ function ContactsPage() {
     });
   };
 
-  const filteredContacts = contacts.filter((c) => applyLastContactFilter(c));
+  const filteredContacts = contacts.filter((c) => {
+    if (!applyLastContactFilter(c)) return false;
+    if (statusFilter && c.status !== statusFilter) return false;
+    // search
+    if (searchTermContacts) {
+      const txt = searchTermContacts.toLowerCase();
+      if (!((c.name || '').toLowerCase().includes(txt) || (c.contactNumber || '').includes(txt) || (c.consumerNumber || '').includes(txt) || (c.review || '').toLowerCase().includes(txt))) return false;
+    }
+    // status tabs
+    if (statusTab && statusTab !== 'all') {
+      if (statusTab === 'no_response') {
+        if (c.callHistory && c.callHistory.length) return false;
+      } else if (statusTab === 'hot' && c.status !== 'Hot Lead') return false;
+      else if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
+      else if (statusTab === 'cool' && c.status !== 'Cool Lead') return false;
+      else if (statusTab === 'mayconvert' && c.status !== 'May Convert') return false;
+      else if (statusTab === 'notinterested' && c.status !== 'Not Interested') return false;
+      else if (statusTab === 'following' && c.status !== 'Following Up') return false;
+    }
+    return true;
+  });
   const groupedContacts = filteredContacts.reduce((acc, contact) => {
     const key = contact.lastContacted ? new Date(contact.lastContacted).toISOString().slice(0, 10) : 'no-date';
     if (!acc[key]) {
@@ -2092,6 +2114,19 @@ function ContactsPage() {
     <div>
       <h3>Calling & Customer follow-up</h3>
       {message && <p className="muted">{message}</p>}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '10px 0' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className={statusTab === 'all' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('all')}>All ({contacts.length})</button>
+          <button className={statusTab === 'hot' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('hot')}>Hot</button>
+          <button className={statusTab === 'warm' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('warm')}>Warm</button>
+          <button className={statusTab === 'cool' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('cool')}>Cool</button>
+          <button className={statusTab === 'mayconvert' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('mayconvert')}>May Convert</button>
+          <button className={statusTab === 'notinterested' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('notinterested')}>Not Interested</button>
+          <button className={statusTab === 'following' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('following')}>Following Up</button>
+          <button className={statusTab === 'no_response' ? 'btn primary' : 'btn outline'} type="button" onClick={() => setStatusTab('no_response')}>No response</button>
+        </div>
+        <input placeholder="Search contacts (name, phone, review)" value={searchTermContacts} onChange={(e) => setSearchTermContacts(e.target.value)} style={{ marginLeft: 'auto', minWidth: 220 }} />
+      </div>
       <div className="panel">
         <h4>{editingContactId ? 'Edit contact' : 'Add contact'}</h4>
         <form className="form-grid" onSubmit={saveContact}>
