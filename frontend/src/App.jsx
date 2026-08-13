@@ -2138,8 +2138,11 @@ function ContactsPage() {
             <option value="Following Up">Following Up</option>
           </select>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" checked={!!form.markContacted} onChange={(e) => setForm({ ...form, markContacted: e.target.checked })} />
-            <span className="muted">Mark as contacted now (sets last contacted time)</span>
+            <select value={form.markContacted ? 'contacted' : 'not_contacted'} onChange={(e) => setForm({ ...form, markContacted: e.target.value === 'contacted' })}>
+              <option value="contacted">Contacted</option>
+              <option value="not_contacted">Not contacted</option>
+            </select>
+            <span className="muted">Choose whether the customer was contacted at creation; if 'Contacted', time is set to now.</span>
           </label>
           <input placeholder="Next follow-up date" type="date" value={form.nextFollowUp} onChange={(e) => setForm({ ...form, nextFollowUp: e.target.value })} />
           <input placeholder="Last contacted" type="datetime-local" value={form.lastContacted} onChange={(e) => setForm({ ...form, lastContacted: e.target.value })} />
