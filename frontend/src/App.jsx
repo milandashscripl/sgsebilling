@@ -1013,6 +1013,17 @@ function AccountingPage() {
     }
   };
 
+  const deleteExpense = async (id) => {
+    if (!window.confirm('Delete this expense?')) return;
+    try {
+      await api.delete(`/accounting/expenses/${id}`);
+      setMessage('Expense deleted');
+      await load();
+    } catch (err) {
+      setMessage('Unable to delete expense');
+    }
+  };
+
   return (
     <div>
       <h3>Accounting and daily cash book</h3>
@@ -1097,6 +1108,25 @@ function AccountingPage() {
           <input placeholder="Note" value={expenseForm.note} onChange={(e) => setExpenseForm({ ...expenseForm, note: e.target.value })} />
           <button className="btn primary" type="submit">Save expense</button>
         </form>
+      </div>
+
+      <div className="panel">
+        <h4>Recent expenses</h4>
+        {expenses.length === 0 ? <p className="muted">No expenses recorded</p> : (
+          expenses.map((exp) => (
+            <div className="list-row" key={exp._id}>
+              <div>
+                <strong>{exp.category || 'Expense'}</strong>
+                <div className="muted">{(accounts.find(a => a._id === exp.accountId)?.name) || exp.accountName || '—'} • {exp.paymentMethod} • {exp.date ? formatAbsoluteDate(exp.date) : (exp.createdAt ? formatAbsoluteDate(exp.createdAt) : '—')}</div>
+                {exp.note && <div className="muted">{exp.note}</div>}
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{color:'#C23C3C'}}>- ₹{Number(exp.amount || 0).toLocaleString()}</div>
+                <div style={{marginTop:8}}><button className="btn outline" onClick={() => deleteExpense(exp._id)}>Delete</button></div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="panel">
