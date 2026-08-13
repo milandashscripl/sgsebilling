@@ -304,6 +304,21 @@ h5 { color: #1B2A3B; font-weight: 700; }
 .calling-item-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
 .calling-item-actions .btn { font-size: 0.85rem; padding: 8px 14px; }
 
+/* Contacts-specific enhancements */
+.contact-avatar { width:48px; height:48px; border-radius:50%; background:#eef6fb; display:flex; align-items:center; justify-content:center; font-weight:700; color:#16406E; box-shadow: 0 6px 18px rgba(20,64,110,0.06); }
+.recent-badge { background:#28a745; color:#fff; padding:4px 8px; border-radius:999px; font-size:0.72rem; font-weight:700; }
+.contact-name-row { display:flex; align-items:center; gap:10px; }
+.contact-primary { display:flex; flex-direction:column; gap:6px; }
+.contact-actions { display:flex; gap:8px; align-items:center; }
+.call-form { display:flex; gap:8px; align-items:center; width:100%; }
+.call-form select, .call-form input[type="datetime-local"], .call-form input[type="text"] { padding:10px 12px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); }
+.call-form input[type="text"] { flex:1; }
+.call-form .btn { white-space:nowrap; }
+
+/* Make badges visually consistent */
+.badge { padding:6px 10px; border-radius:999px; background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); color:#16406E; font-weight:700; }
+
+
 /* Scroll behavior improvements */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: rgba(31, 58, 85, 0.05); border-radius: 10px; }
