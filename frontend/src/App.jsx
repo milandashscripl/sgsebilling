@@ -40,6 +40,11 @@ const emptyCategoryForm = {
 
 const LEAD_STATUS_OPTIONS = ['Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Following Up', 'Not Interested'];
 
+const toLocalDateTimeValue = (date = new Date()) => {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 // Date/time helpers
 const formatAbsoluteDate = (date) => {
   if (!date) return 'Never';
@@ -188,7 +193,7 @@ function AuthenticatedApp({ user, logout }) {
           <Routes>
             <Route path="/dashboard" element={<Dashboard user={user} />} />
             <Route path="/items" element={<ItemsPage />} />
-            <Route path="/billing" element={<BillingPage />} />
+            <Route path="/billing" element={<BillingPage user={user} />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/reports" element={<ReportsPage />} />
@@ -280,7 +285,7 @@ function ContactsPage() {
   const [message, setMessage] = useState('');
   const [statusTab, setStatusTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [callForm, setCallForm] = useState({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' });
+  const [callForm, setCallForm] = useState({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: toLocalDateTimeValue() });
 
   const loadContacts = async () => {
     setLoading(true);
@@ -332,7 +337,7 @@ function ContactsPage() {
   const logCall = async (contact) => {
     const id = contact.id || contact._id;
     const currentStatus = contact.status || 'Warm Lead';
-    setCallForm({ contactId: id, note: '', outcome: 'Contacted', leadStage: currentStatus, timestamp: new Date().toISOString().slice(0,16) });
+    setCallForm({ contactId: id, note: '', outcome: 'Contacted', leadStage: currentStatus, timestamp: toLocalDateTimeValue() });
   };
 
   const submitCall = async (e) => {
@@ -372,7 +377,9 @@ function ContactsPage() {
   const filtered = contacts.filter(c => {
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
-      if (!((c.name||'').toLowerCase().includes(s) || (c.contactNumber||'').includes(s) || (c.review||'').toLowerCase().includes(s))) return false;
+      const callerName = (c.callerName || '').toLowerCase();
+      const customerName = (c.name || '').toLowerCase();
+      if (!callerName.includes(s) && !customerName.includes(s)) return false;
     }
     if (statusTab === 'hot' && c.status !== 'Hot Lead') return false;
     if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
@@ -414,7 +421,7 @@ function ContactsPage() {
           <label>Customer name<input value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} /></label>
           <label>Contact number<input value={form.contactNumber} onChange={(e)=>setForm({...form, contactNumber:e.target.value})} /></label>
           <label>Consumer number<input value={form.consumerNumber} onChange={(e)=>setForm({...form, consumerNumber:e.target.value})} /></label>
-          <label>Customer status<select value={form.status} onChange={(e)=>setForm({...form, status:e.target.value})}>{LEAD_STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}</select></label>
+          <label>Lead stage<select value={form.status} onChange={(e)=>setForm({...form, status:e.target.value})}>{LEAD_STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}</select></label>
           <label>Contacted now?<select value={form.markContacted ? 'contacted' : 'not_contacted'} onChange={(e)=>setForm({...form, markContacted: e.target.value==='contacted'})}><option value="contacted">Contacted</option><option value="not_contacted">Not contacted</option></select></label>
           <div style={{gridColumn:'1/-1', display:'flex', gap:8}}>
             <button className="btn primary" type="submit">{editingId ? 'Update' : 'Add'}</button>
@@ -477,7 +484,7 @@ function ContactsPage() {
                           <select value={callForm.leadStage} onChange={(e)=>setCallForm({...callForm, leadStage:e.target.value})}>
                             {LEAD_STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}
                           </select>
-                          <input type="datetime-local" value={callForm.timestamp} onChange={(e)=>setCallForm({...callForm, timestamp:e.target.value})} />
+                          <input type="datetime-local" value={callForm.timestamp} onChange={(e)=>setCallForm({...callForm, timestamp:e.target.value || toLocalDateTimeValue()})} />
                           <input type="text" placeholder="Call notes" value={callForm.note} onChange={(e)=>setCallForm({...callForm, note:e.target.value})} />
                           <button className="btn primary" type="submit">Save</button>
                           <button className="btn outline" type="button" onClick={cancelCall}>Cancel</button>
@@ -485,7 +492,6 @@ function ContactsPage() {
                       ) : (
                         <div className="inline-actions">
                           <button className="btn primary" onClick={()=>logCall(c)}>Log call</button>
-                          <button className="btn outline" onClick={()=>{ window.open(`/contacts/${id}/export`, '_blank'); }}>Export</button>
                         </div>
                       )}
                     </div>
@@ -865,7 +871,7 @@ function ItemsPage() {
   );
 }
 
-function BillingPage() {
+function BillingPage({ user }) {
   const [items, setItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
   const [customerName, setCustomerName] = useState('');
@@ -875,6 +881,13 @@ function BillingPage() {
   const [partyGSTIN, setPartyGSTIN] = useState('');
   const [type, setType] = useState('sale');
   const [billingMessage, setBillingMessage] = useState('');
+
+  const vendor = {
+    name: user?.shopName || user?.name || 'SGSE Billing',
+    phone: user?.phone || user?.mobile || '',
+    address: user?.shopAddress || user?.address || 'Your business address',
+    logo: user?.shopLogoUrl || ''
+  };
 
   useEffect(() => { api.get('/items').then((res) => setItems(res.data)); }, []);
 
@@ -931,44 +944,100 @@ function BillingPage() {
   const total = subtotal + gstAmount;
 
   return (
-    <div>
-      <h3>Single-price billing</h3>
+    <div className="billing-page">
+      <div className="page-header">
+        <p className="eyebrow">Professional billing</p>
+        <h3>Invoice workspace</h3>
+      </div>
+
       <div className="billing-grid">
-        <div className="panel">
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            <option value="sale">Sale</option>
-            <option value="purchase">Purchase</option>
-            <option value="return">Return</option>
-          </select>
-          <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
-          <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
-          <input placeholder="Party GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
-          <input placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-          <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+        <div className="panel billing-form-panel">
+          <div className="billing-form-header">
+            <div>
+              <h4>New invoice</h4>
+              <p className="muted">Create a clean, branded bill with vendor details included.</p>
+            </div>
+            <select value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="sale">Sale</option>
+              <option value="purchase">Purchase</option>
+              <option value="return">Return</option>
+            </select>
+          </div>
+
+          <div className="billing-customer-grid">
+            <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
+            <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
+            <input placeholder="Party GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
+            <input placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+            <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+          </div>
+
           <div className="item-list">
             {items.map((item) => (
               <button key={item._id} className="item-chip" onClick={() => addItem(item)}>{item.name} — ₹{type === 'purchase' ? item.purchasePrice : item.salePrice}</button>
             ))}
           </div>
         </div>
-        <div className="panel">
-          {selectedItems.map((entry) => (
-            <div className="list-row" key={entry.item}>
-              <div><strong>{entry.name}</strong></div>
-              <div className="row-actions">
-                <button onClick={() => updateQty(entry.item, -1)}>-</button>
-                <span>{entry.quantity}</span>
-                <button onClick={() => updateQty(entry.item, 1)}>+</button>
+
+        <div className="panel invoice-preview-panel">
+          <div className="invoice-header">
+            <div className="invoice-brand">
+              {vendor.logo ? <img src={vendor.logo} alt={vendor.name} className="vendor-logo" /> : <div className="vendor-logo placeholder">{(vendor.name || 'SG').slice(0, 2).toUpperCase()}</div>}
+              <div>
+                <strong>{vendor.name}</strong>
+                <div className="muted">{vendor.address}</div>
+                {vendor.phone && <div className="muted">{vendor.phone}</div>}
               </div>
             </div>
-          ))}
-          <div className="totals">
-            <div>Subtotal: ₹{subtotal.toFixed(2)}</div>
-            <div>GST: ₹{gstAmount.toFixed(2)}</div>
-            <div><strong>Total: ₹{total.toFixed(2)}</strong></div>
+            <div className="invoice-meta">
+              <span>{type === 'sale' ? 'Sale Invoice' : type === 'purchase' ? 'Purchase Invoice' : 'Return Invoice'}</span>
+            </div>
           </div>
-          {billingMessage && <p className="muted">{billingMessage}</p>}
-          <button className="btn primary" onClick={saveInvoice}>Create bill</button>
+
+          <div className="invoice-customer-box">
+            <div>
+              <span className="invoice-label">Bill to</span>
+              <strong>{partyName || customerName || 'Walk-in Customer'}</strong>
+            </div>
+            <div>
+              <span className="invoice-label">Phone</span>
+              <strong>{partyPhone || customerPhone || '—'}</strong>
+            </div>
+            <div>
+              <span className="invoice-label">GSTIN</span>
+              <strong>{partyGSTIN || '—'}</strong>
+            </div>
+          </div>
+
+          <div className="invoice-items">
+            {selectedItems.length === 0 ? (
+              <div className="muted empty-invoice-state">No items added yet.</div>
+            ) : (
+              selectedItems.map((entry) => (
+                <div className="invoice-item-row" key={entry.item}>
+                  <div>
+                    <strong>{entry.name}</strong>
+                    <div className="muted">₹{entry.price} × {entry.quantity}</div>
+                  </div>
+                  <div className="invoice-item-actions">
+                    <button className="btn small" onClick={() => updateQty(entry.item, -1)}>-</button>
+                    <span>{entry.quantity}</span>
+                    <button className="btn small" onClick={() => updateQty(entry.item, 1)}>+</button>
+                  </div>
+                  <strong>₹{(entry.quantity * entry.price).toFixed(2)}</strong>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="invoice-totals">
+            <div><span>Subtotal</span><strong>₹{subtotal.toFixed(2)}</strong></div>
+            <div><span>GST</span><strong>₹{gstAmount.toFixed(2)}</strong></div>
+            <div className="grand-total"><span>Total</span><strong>₹{total.toFixed(2)}</strong></div>
+          </div>
+
+          {billingMessage && <p className="muted billing-message">{billingMessage}</p>}
+          <button className="btn primary invoice-create-btn" onClick={saveInvoice}>Create bill</button>
         </div>
       </div>
     </div>

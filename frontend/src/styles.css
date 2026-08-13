@@ -52,11 +52,33 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 
 .topbar { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-radius: 20px; margin-bottom: 18px; background: linear-gradient(135deg, #FFFFFF 0%, #E6F1FB 100%); position: sticky; top: 0; z-index: 20; box-shadow: 0 4px 12px rgba(31, 58, 85, 0.08); }
 .dashboard { display: grid; grid-template-columns: 260px 1fr; gap: 18px; }
-.sidebar { border-radius: 20px; padding: 18px; display: grid; gap: 10px; align-self: start; position: sticky; top: 18px; background: rgba(255,255,255,0.92); min-width: 220px; box-shadow: 0 4px 12px rgba(31, 58, 85, 0.06); }
+.sidebar { border-radius: 20px; padding: 18px; display: grid; gap: 10px; align-self: start; position: sticky; top: 18px; background: rgba(255,255,255,0.92); min-width: 220px; box-shadow: 0 4px 12px rgba(31, 58, 85, 0.06); height: fit-content; }
 .sidebar-link { display: block; padding: 14px 16px; border-radius: 14px; background: rgba(31, 58, 85, 0.06); color: #1B2A3B; font-weight: 600; transition: background 0.2s ease, transform 0.2s ease, color 0.2s ease; font-size: 0.95rem; }
 .sidebar-link:hover { background: rgba(63, 154, 232, 0.16); color: #186FAF; transform: translateX(2px); }
 .sidebar-link.active { background: linear-gradient(135deg, #186FAF, #3F9AE8); color: #FFFFFF; box-shadow: 0 4px 12px rgba(63, 154, 232, 0.3); }
 .content { display: grid; gap: 16px; }
+.billing-page { display: grid; gap: 18px; }
+.billing-form-panel, .invoice-preview-panel { display: grid; gap: 18px; }
+.billing-form-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.billing-customer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.invoice-preview-panel { background: linear-gradient(180deg, #fffdf8, #ffffff); }
+.invoice-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid rgba(31, 58, 85, 0.08); }
+.invoice-brand { display: flex; align-items: center; gap: 12px; }
+.vendor-logo { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; background: #eef6fb; box-shadow: 0 8px 18px rgba(20, 64, 110, 0.08); }
+.vendor-logo.placeholder { display: flex; align-items: center; justify-content: center; font-weight: 800; color: #16406E; background: linear-gradient(135deg, #e8f3ff, #fff3d8); }
+.invoice-meta { padding: 8px 12px; background: rgba(24, 111, 175, 0.08); border-radius: 999px; font-weight: 700; color: #16406E; }
+.invoice-customer-box { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; background: rgba(24, 111, 175, 0.03); border: 1px solid rgba(24, 111, 175, 0.08); border-radius: 16px; padding: 14px; }
+.invoice-label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #5E6F83; margin-bottom: 4px; }
+.invoice-items { display: grid; gap: 10px; }
+.invoice-item-row { display: grid; grid-template-columns: 1.4fr 0.8fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(31, 58, 85, 0.08); }
+.invoice-item-actions { display: flex; align-items: center; gap: 8px; justify-content: center; }
+.btn.small { padding: 7px 10px; border-radius: 8px; min-width: 32px; }
+.invoice-totals { display: grid; gap: 8px; margin-top: 6px; }
+.invoice-totals > div { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; }
+.grand-total { border-top: 2px solid rgba(24, 111, 175, 0.15); padding-top: 12px !important; font-size: 1.1rem; }
+.billing-message { margin: 0; }
+.invoice-create-btn { width: 100%; }
+.empty-invoice-state { border: 1px dashed rgba(31, 58, 85, 0.2); border-radius: 14px; padding: 18px; text-align: center; background: rgba(31, 58, 85, 0.02); }
 .contacts-page { display: grid; gap: 18px; }
 .contacts-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
 .contacts-summary-grid { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -184,7 +206,7 @@ h5 { color: #1B2A3B; font-weight: 700; }
 @media (max-width: 900px) {
   .public-screen, .dashboard, .stats-grid, .form-grid, .billing-grid { grid-template-columns: 1fr; }
   .dashboard { gap: 18px; grid-template-columns: 1fr; }
-  .sidebar { width: 100%; position: relative; top: 0; display: flex; overflow-x: auto; gap: 10px; padding: 12px; flex-wrap: nowrap; min-height: auto; }
+  .sidebar { width: 100%; position: sticky; top: 12px; display: flex; overflow-x: auto; gap: 10px; padding: 12px; flex-wrap: nowrap; min-height: auto; }
   .sidebar-link { flex-shrink: 0; flex: 0 1 auto; text-align: center; padding: 10px 14px; font-size: 0.9rem; white-space: nowrap; }
   .topbar { position: relative; flex-wrap: wrap; }
   .topbar > div:first-child { flex: 1; min-width: 100%; }
@@ -247,6 +269,8 @@ h5 { color: #1B2A3B; font-weight: 700; }
   input, select, textarea { padding: 11px 12px; font-size: 16px; border-radius: 10px; }
   .contact-card { padding: 12px; border-radius: 12px; margin-bottom: 10px; }
   .contact-meta { gap: 10px; flex-direction: column; align-items: flex-start; font-size: 0.8rem; }
+  .billing-customer-grid, .invoice-customer-box { grid-template-columns: 1fr; }
+  .invoice-item-row { grid-template-columns: 1fr; align-items: flex-start; }
   .contact-meta > * { flex: 1 1 100%; }
   .list-row { flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 0; }
   .inline-actions { gap: 6px; }
