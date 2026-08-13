@@ -130,6 +130,7 @@ function AuthenticatedApp({ user, logout }) {
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/items">Items</Link>
           <Link to="/billing">Billing</Link>
+          <Link to="/contacts">Contacts</Link>
           <Link to="/accounting">Accounting</Link>
           <Link to="/reports">Reports</Link>
           {user.role === 'admin' && <Link to="/users">Users</Link>}
@@ -139,6 +140,7 @@ function AuthenticatedApp({ user, logout }) {
             <Route path="/dashboard" element={<Dashboard user={user} />} />
             <Route path="/items" element={<ItemsPage />} />
             <Route path="/billing" element={<BillingPage />} />
+            <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
@@ -218,6 +220,144 @@ function Register({ setUser }) {
       <input type="password" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
       <button className="btn primary" type="submit">Register</button>
     </form>
+  );
+}
+
+function ContactsPage() {
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Warm Lead', review: '', nextFollowUp: '', markContacted: false });
+  const [editingId, setEditingId] = useState(null);
+  const [message, setMessage] = useState('');
+  const [statusTab, setStatusTab] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const loadContacts = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/contacts');
+      setContacts(res.data || []);
+    } catch (err) {
+      setMessage('Unable to load contacts');
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadContacts(); }, []);
+
+  const reset = () => { setForm({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Warm Lead', review: '', nextFollowUp: '', markContacted: false }); setEditingId(null); };
+
+  const save = async (e) => {
+    e && e.preventDefault();
+    try {
+      const payload = { ...form, lastContacted: form.markContacted ? new Date().toISOString() : null };
+      if (editingId) {
+        await api.put(`/contacts/${editingId}`, payload);
+        setMessage('Contact updated');
+      } else {
+        await api.post('/contacts', payload);
+        setMessage('Contact added');
+      }
+      reset();
+      await loadContacts();
+    } catch (err) {
+      setMessage(err?.response?.data?.message || 'Unable to save contact');
+    }
+  };
+
+  const edit = (c) => { setEditingId(c.id || c._id); setForm({ name: c.name || '', callerName: c.callerName || '', contactNumber: c.contactNumber || '', consumerNumber: c.consumerNumber || '', status: c.status || 'Warm Lead', review: c.review || '', nextFollowUp: c.nextFollowUp ? c.nextFollowUp.slice(0,10) : '', markContacted: !!c.lastContacted }); };
+
+  const remove = async (id) => { if (!confirm('Delete this contact?')) return; try { await api.delete(`/contacts/${id}`); setMessage('Contact removed'); await loadContacts(); } catch { setMessage('Unable to delete'); } };
+
+  const logCall = async (contact) => {
+    const note = window.prompt('Call note (optional)', '') || '';
+    const outcome = window.prompt('Outcome (Contacted / Not Interested / Hot Lead / Warm Lead)', 'Contacted') || 'Contacted';
+    try {
+      await api.post(`/contacts/${contact.id || contact._id}/calls`, { timestamp: new Date().toISOString(), note, outcome, statusOnCall: outcome === 'Not Interested' ? 'Not Interested' : contact.status || 'Warm Lead' });
+      setMessage('Call logged');
+      await loadContacts();
+    } catch {
+      setMessage('Unable to log call');
+    }
+  };
+
+  const counts = {
+    all: contacts.length,
+    hot: contacts.filter(c => c.status === 'Hot Lead').length,
+    warm: contacts.filter(c => c.status === 'Warm Lead').length,
+    cool: contacts.filter(c => c.status === 'Cool Lead').length,
+    notinterested: contacts.filter(c => c.status === 'Not Interested').length,
+    no_response: contacts.filter(c => !c.callHistory || c.callHistory.length === 0).length
+  };
+
+  const filtered = contacts.filter(c => {
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      if (!((c.name||'').toLowerCase().includes(s) || (c.contactNumber||'').includes(s) || (c.review||'').toLowerCase().includes(s))) return false;
+    }
+    if (statusTab === 'hot' && c.status !== 'Hot Lead') return false;
+    if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
+    if (statusTab === 'cool' && c.status !== 'Cool Lead') return false;
+    if (statusTab === 'notinterested' && c.status !== 'Not Interested') return false;
+    if (statusTab === 'no_response' && c.callHistory && c.callHistory.length) return false;
+    return true;
+  });
+
+  return (
+    <div>
+      <h3>Contacts & Calls</h3>
+      {message && <p className="muted">{message}</p>}
+      <div className="panel">
+        <h4>{editingId ? 'Edit contact' : 'Add contact'}</h4>
+        <form className="form-grid" onSubmit={save}>
+          <label>Caller name<input value={form.callerName} onChange={(e)=>setForm({...form, callerName:e.target.value})} /></label>
+          <label>Customer name<input value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} /></label>
+          <label>Contact number<input value={form.contactNumber} onChange={(e)=>setForm({...form, contactNumber:e.target.value})} /></label>
+          <label>Customer status<select value={form.status} onChange={(e)=>setForm({...form, status:e.target.value})}><option>Hot Lead</option><option>Warm Lead</option><option>Cool Lead</option><option>May Convert</option><option>Not Interested</option><option>Following Up</option></select></label>
+          <label>Contacted now?<select value={form.markContacted ? 'contacted' : 'not_contacted'} onChange={(e)=>setForm({...form, markContacted: e.target.value==='contacted'})}><option value="contacted">Contacted</option><option value="not_contacted">Not contacted</option></select></label>
+          <div style={{gridColumn:'1/-1', display:'flex', gap:8}}>
+            <button className="btn primary" type="submit">{editingId ? 'Update' : 'Add'}</button>
+            <button className="btn secondary" type="button" onClick={reset}>Clear</button>
+          </div>
+        </form>
+      </div>
+
+      <div className="panel">
+        <div style={{display:'flex', gap:8, alignItems:'center'}}>
+          <button className={statusTab==='all'?'btn primary':'btn outline'} onClick={()=>setStatusTab('all')}>All ({counts.all})</button>
+          <button className={statusTab==='hot'?'btn primary':'btn outline'} onClick={()=>setStatusTab('hot')}>Hot ({counts.hot})</button>
+          <button className={statusTab==='warm'?'btn primary':'btn outline'} onClick={()=>setStatusTab('warm')}>Warm ({counts.warm})</button>
+          <button className={statusTab==='cool'?'btn primary':'btn outline'} onClick={()=>setStatusTab('cool')}>Cool ({counts.cool})</button>
+          <button className={statusTab==='notinterested'?'btn primary':'btn outline'} onClick={()=>setStatusTab('notinterested')}>Not interested ({counts.notinterested})</button>
+          <button className={statusTab==='no_response'?'btn primary':'btn outline'} onClick={()=>setStatusTab('no_response')}>No response ({counts.no_response})</button>
+          <input placeholder="Search" style={{marginLeft:'auto'}} value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
+        </div>
+        {loading ? <p className="muted">Loading...</p> : (
+          filtered.length === 0 ? <p className="muted">No contacts</p> : (
+            <div style={{display:'grid', gap:12}}>
+              {filtered.map((c) => (
+                <div key={c.id||c._id} className="panel contact-card">
+                  <div style={{display:'flex', justifyContent:'space-between'}}>
+                    <div>
+                      <strong>{c.name}</strong>
+                      <div className="muted">{c.contactNumber} • {c.consumerNumber || '-'}</div>
+                    </div>
+                    <div style={{textAlign:'right'}}>
+                      <div className="muted">{c.status}</div>
+                      <div className="muted">Last: {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</div>
+                    </div>
+                  </div>
+                  <div style={{marginTop:8, display:'flex', gap:8}}>
+                    <button className="btn secondary" onClick={()=>edit(c)}>Edit</button>
+                    <button className="btn secondary" onClick={()=>remove(c.id||c._id)}>Delete</button>
+                    <button className="btn primary" onClick={()=>logCall(c)}>Log call</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+      </div>
+    </div>
   );
 }
 
