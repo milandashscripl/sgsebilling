@@ -158,6 +158,7 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
   .search-field { margin-left: 0; min-width: 0; width: 100%; }
   .contacts-header { flex-direction: column; align-items: flex-start; }
   .contact-card-head { flex-direction: column; align-items: flex-start; }
+  .contact-detail-strip { grid-template-columns: 1fr; }
   .contact-time { margin-left: 0; }
   .call-form { flex-direction: column; align-items: stretch; }
   .call-form select, .call-form input[type="datetime-local"], .call-form input[type="text"] { width: 100%; }
@@ -195,7 +196,10 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 
 .analytics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
 .analytics-grid .panel { min-height: 220px; display: flex; flex-direction: column; gap: 12px; }
-.analytics-grid .panel canvas { max-height: 260px; }
+.chart-panel { min-height: 300px; }
+.chart-wrap { position: relative; width: 100%; min-height: 210px; height: 240px; }
+.large-chart-wrap { height: 290px; }
+.analytics-grid .panel canvas { max-height: 100%; width: 100% !important; }
 .panel-header input[type="date"] { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--input-border); }
 .panel-header .btn.outline { background: transparent; border: 1px solid rgba(31,58,85,0.08); color: #134069; padding: 8px 12px; border-radius: 10px; }
 .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -393,6 +397,11 @@ h5 { color: #1B2A3B; font-weight: 700; }
 .call-form select, .call-form input[type="datetime-local"], .call-form input[type="text"] { padding:10px 12px; border-radius:10px; border:1px solid var(--input-border); background:var(--input-bg); }
 .call-form input[type="text"] { flex:1; }
 .call-form .btn { white-space:nowrap; }
+.contact-detail-strip { display: grid; grid-template-columns: minmax(120px, 180px) 1fr; gap: 10px; }
+.detail-pill { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: rgba(24, 111, 175, 0.06); border: 1px solid rgba(24, 111, 175, 0.08); }
+.review-pill { background: rgba(63, 154, 232, 0.05); }
+.detail-label { font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: #5E6F83; }
+.detail-pill strong { font-size: 0.9rem; color: #1B2A3B; line-height: 1.4; } 
 
 /* Make badges visually consistent */
 .badge { padding:6px 10px; border-radius:999px; background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); color:#16406E; font-weight:700; }

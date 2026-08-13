@@ -35,6 +35,26 @@ export default function AnalyticsDashboard() {
 
   useEffect(() => { loadAll(); }, []);
 
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          boxWidth: 12,
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => `${context.label}: ₹${Number(context.parsed || 0).toLocaleString()}`
+        }
+      }
+    }
+  };
+
   const salesPie = {
     labels: ['Sales', 'Purchases', 'Returns'],
     datasets: [{
@@ -124,24 +144,32 @@ export default function AnalyticsDashboard() {
       </div>
 
       <div className="analytics-grid">
-        <div className="panel">
+        <div className="panel chart-panel">
           <h4>Sales / Purchases / Returns</h4>
-          <Pie data={salesPie} />
+          <div className="chart-wrap">
+            <Pie data={salesPie} options={chartOptions} />
+          </div>
         </div>
 
-        <div className="panel">
+        <div className="panel chart-panel">
           <h4>Income vs Expenses</h4>
-          <Doughnut data={incomeExpensePie} />
+          <div className="chart-wrap">
+            <Doughnut data={incomeExpensePie} options={chartOptions} />
+          </div>
         </div>
 
-        <div className="panel">
+        <div className="panel chart-panel">
           <h4>Account Balances</h4>
-          {accountLabels.length ? <Doughnut data={accountsDoughnut} /> : <p className="muted">No account data</p>}
+          <div className="chart-wrap">
+            {accountLabels.length ? <Doughnut data={accountsDoughnut} options={chartOptions} /> : <p className="muted">No account data</p>}
+          </div>
         </div>
 
-        <div className="panel" style={{ gridColumn: '1 / -1' }}>
+        <div className="panel chart-panel wide-chart" style={{ gridColumn: '1 / -1' }}>
           <h4>Monthly Sales</h4>
-          {monthlyBar.labels && monthlyBar.labels.length ? <Bar data={monthlyBar} /> : <p className="muted">No invoice history to build chart</p>}
+          <div className="chart-wrap large-chart-wrap">
+            {monthlyBar.labels && monthlyBar.labels.length ? <Bar data={monthlyBar} options={{ ...chartOptions, plugins: { ...chartOptions.plugins, legend: { display: false } } }} /> : <p className="muted">No invoice history to build chart</p>}
+          </div>
         </div>
       </div>
     </div>

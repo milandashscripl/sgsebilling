@@ -448,6 +448,9 @@ function ContactsPage() {
               {filtered.map((c) => {
                 const id = c.id || c._id;
                 const recent = c.lastContacted && (Date.now() - new Date(c.lastContacted).getTime()) < 24*60*60*1000;
+                const latestCall = Array.isArray(c.callHistory) && c.callHistory.length ? c.callHistory[c.callHistory.length - 1] : null;
+                const reviewText = (c.review || latestCall?.note || '').trim();
+                const callerName = (c.callerName || 'Not assigned').trim() || 'Not assigned';
 
                 return (
                   <div key={id} className="panel contact-card" style={{display:'flex', flexDirection:'column', gap:8}}>
@@ -471,6 +474,17 @@ function ContactsPage() {
                       <div className="contact-actions">
                         <button className="btn secondary" onClick={()=>edit(c)}>Edit</button>
                         <button className="btn secondary" onClick={()=>remove(id)}>Delete</button>
+                      </div>
+                    </div>
+
+                    <div className="contact-detail-strip">
+                      <div className="detail-pill">
+                        <span className="detail-label">Caller</span>
+                        <strong>{callerName}</strong>
+                      </div>
+                      <div className="detail-pill review-pill">
+                        <span className="detail-label">Review</span>
+                        <strong>{reviewText || 'No review entered'}</strong>
                       </div>
                     </div>
 
