@@ -278,6 +278,7 @@ function ContactsPage() {
   const [message, setMessage] = useState('');
   const [statusTab, setStatusTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [callForm, setCallForm] = useState({ contactId: null, note: '', outcome: 'Contacted', timestamp: '' });
 
   const loadContacts = async () => {
     setLoading(true);
@@ -316,16 +317,32 @@ function ContactsPage() {
   const remove = async (id) => { if (!confirm('Delete this contact?')) return; try { await api.delete(`/contacts/${id}`); setMessage('Contact removed'); await loadContacts(); } catch { setMessage('Unable to delete'); } };
 
   const logCall = async (contact) => {
-    const note = window.prompt('Call note (optional)', '') || '';
-    const outcome = window.prompt('Outcome (Contacted / Not Interested / Hot Lead / Warm Lead)', 'Contacted') || 'Contacted';
+    // keep backward compat: open inline call form
+    const id = contact.id || contact._id;
+    setCallForm({ contactId: id, note: '', outcome: 'Contacted', timestamp: new Date().toISOString().slice(0,16) });
+  };
+
+  const submitCall = async (e) => {
+    e && e.preventDefault();
+    const id = callForm.contactId;
+    if (!id) return setMessage('No contact selected');
     try {
-      await api.post(`/contacts/${contact.id || contact._id}/calls`, { timestamp: new Date().toISOString(), note, outcome, statusOnCall: outcome === 'Not Interested' ? 'Not Interested' : contact.status || 'Warm Lead' });
+      const payload = {
+        timestamp: callForm.timestamp ? new Date(callForm.timestamp).toISOString() : new Date().toISOString(),
+        note: callForm.note || '',
+        outcome: callForm.outcome || 'Contacted',
+        statusOnCall: callForm.outcome === 'Not Interested' ? 'Not Interested' : (contacts.find(c => (c._id===id||c.id===id))?.status || 'Warm Lead')
+      };
+      await api.post(`/contacts/${id}/calls`, payload);
       setMessage('Call logged');
+      setCallForm({ contactId: null, note: '', outcome: 'Contacted', timestamp: '' });
       await loadContacts();
-    } catch {
+    } catch (err) {
       setMessage('Unable to log call');
     }
   };
+
+  const cancelCall = () => setCallForm({ contactId: null, note: '', outcome: 'Contacted', timestamp: '' });
 
   const counts = {
     all: contacts.length,
@@ -382,25 +399,63 @@ function ContactsPage() {
         {loading ? <p className="muted">Loading...</p> : (
           filtered.length === 0 ? <p className="muted">No contacts</p> : (
             <div style={{display:'grid', gap:12}}>
-              {filtered.map((c) => (
-                <div key={c.id||c._id} className="panel contact-card">
-                  <div style={{display:'flex', justifyContent:'space-between'}}>
-                    <div>
-                      <strong>{c.name}</strong>
-                      <div className="muted">{c.contactNumber} • {c.consumerNumber || '-'}</div>
+              {filtered.map((c) => {
+                const id = c.id || c._id;
+                const recent = c.lastContacted && (Date.now() - new Date(c.lastContacted).getTime()) < 24*60*60*1000;
+                const statusColor = (s) => {
+                  if (!s) return '#6c757d';
+                  if (s.toLowerCase().includes('hot')) return '#d9534f';
+                  if (s.toLowerCase().includes('warm')) return '#fd7e14';
+                  if (s.toLowerCase().includes('not')) return '#6c757d';
+                  return '#0d6efd';
+                };
+
+                return (
+                  <div key={id} className="panel contact-card" style={{display:'flex', flexDirection:'column', gap:8}}>
+                    <div style={{display:'flex', gap:12, alignItems:'center'}}>
+                      <div style={{width:48, height:48, borderRadius:24, background:'#eef2f5', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700}}>{(c.name||'--').split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
+                      <div style={{flex:1}}>
+                        <div style={{display:'flex', alignItems:'center', gap:8}}>
+                          <strong style={{fontSize:16}}>{c.name || 'Unknown'}</strong>
+                          {recent && <span className="badge" style={{background:'#28a745', color:'#fff'}}>RECENT</span>}
+                          <span style={{marginLeft:'auto', fontSize:12, color:'#6c757d'}}>{getTimeAgo(c.lastContacted)} • <span style={{marginLeft:6}}>{c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span></span>
+                        </div>
+                        <div className="muted">{c.contactNumber || '—'} • <strong style={{color:'#333'}}>{c.consumerNumber || '—'}</strong></div>
+                        <div style={{marginTop:6}}>
+                          <span className="badge" style={{background:statusColor(c.status), color:'#fff'}}>{c.status || 'Unknown'}</span>
+                          <span style={{marginLeft:8}} className="muted">Calls: {c.callHistory ? c.callHistory.length : 0}</span>
+                        </div>
+                      </div>
+                      <div style={{display:'flex', gap:8}}>
+                        <button className="btn secondary" onClick={()=>edit(c)}>Edit</button>
+                        <button className="btn secondary" onClick={()=>remove(id)}>Delete</button>
+                      </div>
                     </div>
-                    <div style={{textAlign:'right'}}>
-                      <div className="muted">{c.status}</div>
-                      <div className="muted">Last: {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</div>
+
+                    <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                      {callForm.contactId === id ? (
+                        <form onSubmit={submitCall} style={{display:'flex', gap:8, alignItems:'center', width:'100%'}}>
+                          <select value={callForm.outcome} onChange={(e)=>setCallForm({...callForm, outcome:e.target.value})}>
+                            <option>Contacted</option>
+                            <option>Hot Lead</option>
+                            <option>Warm Lead</option>
+                            <option>Not Interested</option>
+                          </select>
+                          <input type="datetime-local" value={callForm.timestamp} onChange={(e)=>setCallForm({...callForm, timestamp:e.target.value})} />
+                          <input placeholder="Note (optional)" value={callForm.note} onChange={(e)=>setCallForm({...callForm, note:e.target.value})} />
+                          <button className="btn primary" type="submit">Save</button>
+                          <button className="btn outline" type="button" onClick={cancelCall}>Cancel</button>
+                        </form>
+                      ) : (
+                        <div style={{display:'flex', gap:8}}>
+                          <button className="btn primary" onClick={()=>setCallForm({ contactId: id, note: '', outcome: 'Contacted', timestamp: new Date().toISOString().slice(0,16) })}>Log call</button>
+                          <button className="btn outline" onClick={()=>{ window.open(`/contacts/${id}/export`, '_blank'); }}>Export</button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div style={{marginTop:8, display:'flex', gap:8}}>
-                    <button className="btn secondary" onClick={()=>edit(c)}>Edit</button>
-                    <button className="btn secondary" onClick={()=>remove(c.id||c._id)}>Delete</button>
-                    <button className="btn primary" onClick={()=>logCall(c)}>Log call</button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )
         )}
