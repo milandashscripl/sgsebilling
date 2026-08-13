@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from './config';
@@ -84,9 +84,37 @@ function App() {
 
   return (
     <div className="app-shell">
-      {user ? <AuthenticatedApp user={user} logout={logout} /> : <PublicApp setUser={setUser} />}
+      <ErrorBoundary>
+        {user ? <AuthenticatedApp user={user} logout={logout} /> : <PublicApp setUser={setUser} />}
+      </ErrorBoundary>
     </div>
   );
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    // eslint-disable-next-line no-console
+    console.error('Unhandled error in App:', error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 24 }}>
+          <h3>Application error</h3>
+          <p className="muted">An unexpected error occurred. Check the browser console for details.</p>
+          <pre style={{ whiteSpace: 'pre-wrap', background: '#f8d7da', padding: 12 }}>{String(this.state.error)}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function PublicApp({ setUser }) {
