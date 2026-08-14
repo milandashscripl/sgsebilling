@@ -91,6 +91,34 @@ router.get('/expenses', auth, async (req, res) => {
   }
 });
 
+router.get('/expenses/export', auth, async (req, res) => {
+  try {
+    const filter = {};
+    const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : null;
+    const toDate = req.query.toDate ? new Date(req.query.toDate) : null;
+
+    if (fromDate && !Number.isNaN(fromDate.getTime())) {
+      filter.date = { ...filter.date, $gte: fromDate.toISOString() };
+    }
+    if (toDate && !Number.isNaN(toDate.getTime())) {
+      const endOfDay = new Date(toDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      filter.date = { ...filter.date, $lte: endOfDay.toISOString() };
+    }
+
+    const expenses = await Expense.find(filter).sort({ date: -1 }).lean();
+    const csv = ['date,category,amount,accountId,paymentMethod,note']
+      .concat(expenses.map((expense) => `${expense.date || ''},${expense.category || 'General'},${expense.amount || 0},${expense.accountId || ''},${expense.paymentMethod || 'cash'},${String(expense.note || '').replace(/,/g, ' ')}`))
+      .join('\n');
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment('expenses.csv');
+    res.send(csv);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.post('/expenses', auth, async (req, res) => {
   try {
     const expense = await Expense.create({

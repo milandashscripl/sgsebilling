@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Link, NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import { downloadInvoicePdf } from './utils/invoicePdf';
 
 const API = API_BASE_URL;
 
@@ -1098,10 +1100,33 @@ function BillingPage({ user }) {
         customerName,
         customerPhone,
         type,
-        items: selectedItems.map((entry) => ({ ...entry, total: entry.quantity * entry.price }))
+        items: selectedItems.map((entry) => ({ ...entry, itemId: entry.item, total: entry.quantity * entry.price }))
       };
-      await api.post('/invoices', payload);
-      setBillingMessage('Invoice created successfully');
+      const res = await api.post('/invoices', payload);
+      const savedInvoice = res.data || {};
+      const printableInvoice = {
+        ...savedInvoice,
+        sellerName: vendor.name,
+        sellerAddress: vendor.address,
+        sellerPhone: vendor.phone,
+        sellerGSTIN: user?.shopGSTIN || '',
+        sellerLogo: vendor.logo,
+        items: (savedInvoice.items || selectedItems.map((entry) => ({
+          item: entry.item,
+          name: entry.name,
+          quantity: entry.quantity,
+          price: entry.price,
+          sgstRate: entry.sgstRate || 0,
+          cgstRate: entry.cgstRate || 0,
+          igstRate: entry.igstRate || 0,
+          total: entry.quantity * entry.price
+        }))).map((entry) => ({
+          ...entry,
+          total: Number(entry.total || ((Number(entry.quantity || 0) * Number(entry.price || 0))))
+        }))
+      };
+      await downloadInvoicePdf(printableInvoice);
+      setBillingMessage('Invoice created successfully and PDF downloaded');
       setSelectedItems([]);
       setPartyName('');
       setPartyPhone('');
@@ -1214,7 +1239,7 @@ function BillingPage({ user }) {
           </div>
 
           {billingMessage && <p className="muted billing-message">{billingMessage}</p>}
-          <button className="btn primary invoice-create-btn" onClick={saveInvoice}>Create bill</button>
+          <button className="btn primary invoice-create-btn" onClick={saveInvoice}>Create bill & download PDF</button>
         </div>
       </div>
     </div>
@@ -1307,6 +1332,67 @@ function AccountingPage() {
     }
   };
 
+  const downloadExpenseCsv = async () => {
+    try {
+      const res = await api.get('/accounting/expenses/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'expenses.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to export expenses');
+    }
+  };
+
+  const downloadExpensePdf = () => {
+    if (!expenses.length) {
+      setMessage('No expenses to export');
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 12;
+    const lineHeight = 7;
+    let y = 16;
+
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text('Expense Report', margin, y);
+    y += 10;
+
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, margin, y);
+    y += 12;
+
+    doc.setFillColor(238, 243, 255);
+    doc.rect(margin, y - 4, pageWidth - margin * 2, 8, 'F');
+    doc.text('Category', margin + 2, y);
+    doc.text('Amount', pageWidth - margin - 22, y, { align: 'right' });
+    y += 10;
+
+    expenses.slice(0, 20).forEach((exp) => {
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(exp.category || 'General', margin + 2, y);
+      doc.text(`₹${Number(exp.amount || 0).toLocaleString()}`, pageWidth - margin - 2, y, { align: 'right' });
+      y += lineHeight;
+      doc.setFontSize(8);
+      doc.text(`${exp.date ? formatAbsoluteDate(exp.date) : '—'} • ${exp.paymentMethod || 'cash'}`, margin + 2, y);
+      y += 4;
+      doc.setFontSize(10);
+    });
+
+    doc.save('expenses.pdf');
+  };
+
   return (
     <div>
       <h3>Accounting and daily cash book</h3>
@@ -1395,7 +1481,13 @@ function AccountingPage() {
       </div>
 
       <div className="panel">
-        <h4>Recent expenses</h4>
+        <div className="panel-header">
+          <h4>Recent expenses</h4>
+          <div className="inline-actions">
+            <button className="btn secondary" type="button" onClick={downloadExpenseCsv}>Download CSV</button>
+            <button className="btn secondary" type="button" onClick={downloadExpensePdf}>Download PDF</button>
+          </div>
+        </div>
         {expenses.length === 0 ? <p className="muted">No expenses recorded</p> : (
           expenses.map((exp) => (
             <div className="list-row" key={exp._id}>

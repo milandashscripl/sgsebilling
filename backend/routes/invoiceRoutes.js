@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const auth = require('../middleware/auth');
 const Invoice = require('../models/Invoice');
 const Transaction = require('../models/Transaction');
+const Item = require('../models/Item');
 
 const router = express.Router();
 
@@ -104,6 +105,22 @@ router.post('/', auth, async (req, res) => {
         note: `Payment for invoice ${invoiceNumber}`,
         createdBy: req.user._id
       });
+    }
+
+    for (const entry of invoiceItems) {
+      if (!entry.item) continue;
+      const item = await Item.findById(entry.item);
+      if (!item) continue;
+      const quantity = Number(entry.quantity || 0);
+      if (!quantity) continue;
+
+      if (type === 'sale') {
+        item.stock = Math.max(0, Number(item.stock || 0) - quantity);
+      } else if (type === 'purchase' || type === 'return') {
+        item.stock = Number(item.stock || 0) + quantity;
+      }
+
+      await item.save();
     }
 
     res.status(201).json({ ...invoice.toObject(), id: String(invoice._id) });
