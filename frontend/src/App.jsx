@@ -1059,6 +1059,7 @@ function BillingPage({ user }) {
   const [partyPhone, setPartyPhone] = useState('');
   const [partyGSTIN, setPartyGSTIN] = useState('');
   const [type, setType] = useState('sale');
+  const [itemSearch, setItemSearch] = useState('');
   const [billingMessage, setBillingMessage] = useState('');
 
   const vendor = {
@@ -1069,6 +1070,14 @@ function BillingPage({ user }) {
   };
 
   useEffect(() => { api.get('/items').then((res) => setItems(res.data)); }, []);
+
+  const filteredItems = items.filter((item) => {
+    const query = itemSearch.trim().toLowerCase();
+    if (!query) return true;
+    return [item.name, item.itemType, item.category, item.specification]
+      .filter(Boolean)
+      .some((field) => String(field).toLowerCase().includes(query));
+  });
 
   const addItem = (item) => {
     setSelectedItems((prev) => {
@@ -1174,10 +1183,26 @@ function BillingPage({ user }) {
             <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
           </div>
 
+          <div className="item-search-block">
+            <label className="muted">Search items</label>
+            <input
+              placeholder="Search by item, type, category..."
+              value={itemSearch}
+              onChange={(e) => setItemSearch(e.target.value)}
+            />
+          </div>
+
           <div className="item-list">
-            {items.map((item) => (
-              <button key={item._id} className="item-chip" onClick={() => addItem(item)}>{item.name} — ₹{type === 'purchase' ? item.purchasePrice : item.salePrice}</button>
-            ))}
+            {filteredItems.length === 0 ? (
+              <p className="muted empty-invoice-state">No matching items found.</p>
+            ) : (
+              filteredItems.map((item) => (
+                <button key={item._id} className="item-chip" onClick={() => addItem(item)}>
+                  <span>{item.name}</span>
+                  <small>₹{type === 'purchase' ? item.purchasePrice : item.salePrice}</small>
+                </button>
+              ))
+            )}
           </div>
         </div>
 

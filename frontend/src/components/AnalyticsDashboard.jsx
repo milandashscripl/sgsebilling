@@ -129,16 +129,16 @@ export default function AnalyticsDashboard() {
   };
 
   return (
-    <div>
-      <div className="panel panel-header" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+    <div className="analytics-shell">
+      <div className="panel analytics-filter-panel">
+        <div className="analytics-filter-row">
           <label className="muted">From</label>
           <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           <label className="muted">To</label>
           <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
           <button className="btn secondary" type="button" onClick={applyFilter}>Apply</button>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div className="analytics-filter-action">
           <button className="btn outline" type="button" onClick={exportInvoicesCsv}>Export CSV</button>
         </div>
       </div>
@@ -147,28 +147,36 @@ export default function AnalyticsDashboard() {
         <div className="panel chart-panel">
           <h4>Sales / Purchases / Returns</h4>
           <div className="chart-wrap">
-            <Pie data={salesPie} options={chartOptions} />
+            {reports.totalSales || reports.totalPurchases || reports.totalReturns ? (
+              <Pie data={salesPie} options={chartOptions} />
+            ) : (
+              <p className="muted empty-chart-state">No sales data yet.</p>
+            )}
           </div>
         </div>
 
         <div className="panel chart-panel">
           <h4>Income vs Expenses</h4>
           <div className="chart-wrap">
-            <Doughnut data={incomeExpensePie} options={chartOptions} />
+            {accounting.incomeTotal || accounting.expenseTotal ? (
+              <Doughnut data={incomeExpensePie} options={chartOptions} />
+            ) : (
+              <p className="muted empty-chart-state">No accounting data yet.</p>
+            )}
           </div>
         </div>
 
         <div className="panel chart-panel">
           <h4>Account Balances</h4>
           <div className="chart-wrap">
-            {accountLabels.length ? <Doughnut data={accountsDoughnut} options={chartOptions} /> : <p className="muted">No account data</p>}
+            {accountLabels.length ? <Doughnut data={accountsDoughnut} options={chartOptions} /> : <p className="muted empty-chart-state">No account data</p>}
           </div>
         </div>
 
-        <div className="panel chart-panel wide-chart" style={{ gridColumn: '1 / -1' }}>
+        <div className="panel chart-panel wide-chart">
           <h4>Monthly Sales</h4>
           <div className="chart-wrap large-chart-wrap">
-            {monthlyBar.labels && monthlyBar.labels.length ? <Bar data={monthlyBar} options={{ ...chartOptions, plugins: { ...chartOptions.plugins, legend: { display: false } } }} /> : <p className="muted">No invoice history to build chart</p>}
+            {monthlyBar.labels && monthlyBar.labels.length ? <Bar data={monthlyBar} options={{ ...chartOptions, plugins: { ...chartOptions.plugins, legend: { display: false } } }} /> : <p className="muted empty-chart-state">No invoice history to build chart</p>}
           </div>
         </div>
       </div>
