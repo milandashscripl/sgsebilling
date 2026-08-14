@@ -298,6 +298,7 @@ function ContactsPage() {
   const [statusTab, setStatusTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [callForm, setCallForm] = useState({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: toLocalDateTimeValue() });
+  const [selectedCaller, setSelectedCaller] = useState(null);
 
   const loadContacts = async () => {
     setLoading(true);
@@ -399,8 +400,21 @@ function ContactsPage() {
     if (statusTab === 'cool' && c.status !== 'Cool Lead') return false;
     if (statusTab === 'notinterested' && c.status !== 'Not Interested') return false;
     if (statusTab === 'no_response' && c.callHistory && c.callHistory.length) return false;
+    if (statusTab === 'no_response' && selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
     return true;
   });
+
+  const noResponseContacts = contacts.filter(c => !c.callHistory || c.callHistory.length === 0);
+  const callerList = [...new Set(noResponseContacts.map(c => c.callerName || 'Not assigned'))].sort();
+  
+  const handleStatusTabChange = (tab) => {
+    setStatusTab(tab);
+    if (tab !== 'no_response') {
+      setSelectedCaller(null);
+    } else if (callerList.length > 0 && !selectedCaller) {
+      setSelectedCaller(callerList[0]);
+    }
+  };
 
   return (
     <div className="contacts-page">
@@ -445,14 +459,32 @@ function ContactsPage() {
 
       <div className="panel contact-stream-panel">
         <div className="filter-bar">
-          <button className={statusTab==='all'?'btn primary':'btn outline'} onClick={()=>setStatusTab('all')}>All ({counts.all})</button>
-          <button className={statusTab==='hot'?'btn primary':'btn outline'} onClick={()=>setStatusTab('hot')}>Hot ({counts.hot})</button>
-          <button className={statusTab==='warm'?'btn primary':'btn outline'} onClick={()=>setStatusTab('warm')}>Warm ({counts.warm})</button>
-          <button className={statusTab==='cool'?'btn primary':'btn outline'} onClick={()=>setStatusTab('cool')}>Cool ({counts.cool})</button>
-          <button className={statusTab==='notinterested'?'btn primary':'btn outline'} onClick={()=>setStatusTab('notinterested')}>Not interested ({counts.notinterested})</button>
-          <button className={statusTab==='no_response'?'btn primary':'btn outline'} onClick={()=>setStatusTab('no_response')}>No response ({counts.no_response})</button>
+          <button className={statusTab==='all'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('all')}>All ({counts.all})</button>
+          <button className={statusTab==='hot'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('hot')}>Hot ({counts.hot})</button>
+          <button className={statusTab==='warm'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('warm')}>Warm ({counts.warm})</button>
+          <button className={statusTab==='cool'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('cool')}>Cool ({counts.cool})</button>
+          <button className={statusTab==='notinterested'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('notinterested')}>Not interested ({counts.notinterested})</button>
+          <button className={statusTab==='no_response'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('no_response')}>No response ({counts.no_response})</button>
           <input className="search-field" placeholder="Search caller, customer or number" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
         </div>
+
+        {statusTab === 'no_response' && callerList.length > 0 && (
+          <div className="caller-tabs">
+            {callerList.map((caller) => {
+              const callerCount = noResponseContacts.filter(c => (c.callerName || 'Not assigned') === caller).length;
+              return (
+                <button 
+                  key={caller}
+                  className={selectedCaller === caller ? 'btn primary' : 'btn outline'}
+                  onClick={() => setSelectedCaller(caller)}
+                  style={{ fontSize: '0.9rem', padding: '8px 12px' }}
+                >
+                  {caller} ({callerCount})
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {loading ? <p className="muted">Loading...</p> : (
           filtered.length === 0 ? <p className="muted empty-state-inline">No contacts in this pipeline.</p> : (

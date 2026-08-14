@@ -142,6 +142,7 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .status-message { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(63, 154, 232, 0.08); border: 1px solid rgba(63, 154, 232, 0.12); color: #16406E; font-weight: 600; }
 .contact-stream-panel { display: grid; gap: 14px; }
 .filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.caller-tabs { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid rgba(31, 58, 85, 0.08); margin-top: 8px; }
 .search-field { margin-left: auto; min-width: 220px; }
 .contacts-list { display: grid; gap: 12px; }
 .contact-card-head { display: flex; align-items: center; gap: 12px; }
