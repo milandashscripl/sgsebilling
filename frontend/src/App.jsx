@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from './config';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
@@ -180,20 +180,29 @@ function AuthenticatedApp({ user, logout }) {
           <button className="btn secondary" onClick={logout}>Logout</button>
         </div>
       </nav>
-      <div className="dashboard">
+      <div className="dashboard-shell">
         <aside className="sidebar">
-          <Link className="sidebar-link" to="/dashboard">Dashboard</Link>
-          <Link className="sidebar-link" to="/items">Items</Link>
-          <Link className="sidebar-link" to="/billing">Billing</Link>
-          <Link className="sidebar-link" to="/contacts">Contacts</Link>
-          <Link className="sidebar-link" to="/accounting">Accounting</Link>
-          <Link className="sidebar-link" to="/reports">Reports</Link>
-          {user.role === 'admin' && <Link className="sidebar-link" to="/users">Users</Link>}
+          <div className="sidebar-brand">
+            <span className="sidebar-brand-mark">SG</span>
+            <div>
+              <strong>SGSE</strong>
+              <small>Business hub</small>
+            </div>
+          </div>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/dashboard">Overview</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink>
+          {user.role === 'admin' && <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/users">Users</NavLink>}
         </aside>
         <main className="content">
           <Routes>
             <Route path="/dashboard" element={<Dashboard user={user} />} />
             <Route path="/items" element={<ItemsPage />} />
+            <Route path="/stock" element={<StockPage />} />
             <Route path="/billing" element={<BillingPage user={user} />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/accounting" element={<AccountingPage />} />
@@ -525,15 +534,37 @@ function ContactsPage() {
 function Dashboard({ user }) {
   const [summary, setSummary] = useState({ totalSales: 0, totalPurchases: 0, totalReturns: 0, invoiceCount: 0 });
   const [items, setItems] = useState([]);
+  const [contacts, setContacts] = useState([]);
 
   useEffect(() => {
-    api.get('/reports/summary').then((res) => setSummary(res.data));
-    api.get('/items').then((res) => setItems(res.data));
+    Promise.all([
+      api.get('/reports/summary'),
+      api.get('/items'),
+      api.get('/contacts')
+    ]).then(([summaryRes, itemsRes, contactsRes]) => {
+      setSummary(summaryRes.data || {});
+      setItems(itemsRes.data || []);
+      setContacts(contactsRes.data || []);
+    });
   }, []);
 
-  const lowStockItems = items.filter((item) => Number(item.stock || 0) < 5);
+  const lowStockItems = items.filter((item) => Number(item.stock || 0) <= 5);
   const netSales = (summary.totalSales || 0) - (summary.totalReturns || 0);
-  const operatingTrend = Math.max(0, Math.min(100, Math.round(((summary.totalSales || 0) / Math.max(1, (summary.totalPurchases || 0) + 1)) * 100)));
+  const marginRate = summary.totalSales ? Math.max(0, Math.min(100, ((summary.totalSales - summary.totalPurchases) / Math.max(summary.totalSales, 1)) * 100)) : 0;
+  const inventoryValue = items.reduce((sum, item) => sum + Number(item.stock || 0) * Number(item.salePrice || 0), 0);
+
+  const callerBreakdown = contacts.reduce((acc, contact) => {
+    const callerName = (contact.callerName || 'Unassigned').trim() || 'Unassigned';
+    acc[callerName] = (acc[callerName] || 0) + 1;
+    return acc;
+  }, {});
+
+  const topCallerEntries = Object.entries(callerBreakdown).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const responseCount = contacts.filter((contact) => contact.callHistory?.length || contact.lastContacted).length;
+  const responseRate = contacts.length ? (responseCount / contacts.length) * 100 : 0;
+  const noResponseCount = contacts.filter((contact) => !(contact.callHistory?.length || contact.lastContacted)).length;
+  const contactedCount = contacts.filter((contact) => contact.lastContacted || contact.callHistory?.some((call) => call.outcome === 'Contacted')).length;
+  const followUpCount = contacts.filter((contact) => contact.callHistory?.some((call) => call.outcome === 'Follow-up')).length;
 
   return (
     <div className="dashboard-page">
@@ -557,8 +588,8 @@ function Dashboard({ user }) {
           <strong>{summary.invoiceCount || 0}</strong>
         </div>
         <div className="summary-highlight accent-highlight">
-          <span>Trend</span>
-          <strong>{operatingTrend}%</strong>
+          <span>Margin</span>
+          <strong>{marginRate.toFixed(1)}%</strong>
         </div>
       </div>
 
@@ -566,7 +597,7 @@ function Dashboard({ user }) {
         <div className="stat-card stat-sales">
           <div className="stat-card-header">
             <h4>Sales</h4>
-            <span className="stat-trend up">+12%</span>
+            <span className="stat-trend up">Live</span>
           </div>
           <p>₹{(summary.totalSales || 0).toLocaleString()}</p>
           <span>Current period</span>
@@ -589,11 +620,11 @@ function Dashboard({ user }) {
         </div>
         <div className="stat-card stat-invoices">
           <div className="stat-card-header">
-            <h4>Invoices</h4>
-            <span className="stat-trend up">Live</span>
+            <h4>Inventory</h4>
+            <span className="stat-trend up">Value</span>
           </div>
-          <p>{summary.invoiceCount || 0}</p>
-          <span>Transactions</span>
+          <p>₹{inventoryValue.toLocaleString()}</p>
+          <span>Stock holding</span>
         </div>
       </div>
 
@@ -619,14 +650,64 @@ function Dashboard({ user }) {
               <strong>{summary.invoiceCount || 0}</strong>
             </div>
             <div>
-              <span className="pulse-label">Target</span>
-              <strong>92%</strong>
+              <span className="pulse-label">Margin</span>
+              <strong>{marginRate.toFixed(1)}%</strong>
             </div>
           </div>
           <div className="mini-progress">
-            <span style={{ width: `${Math.min(92, operatingTrend)}%` }} />
+            <span style={{ width: `${Math.min(100, Math.max(0, marginRate))}%` }} />
           </div>
-          <p className="muted">Healthy sales momentum this cycle.</p>
+          <p className="muted">Healthy sales momentum and stock discipline this cycle.</p>
+        </div>
+      </div>
+
+      <div className="analytics-strip">
+        <div className="panel analytics-tile">
+          <div className="panel-header compact-header">
+            <h4>Caller analytics</h4>
+          </div>
+          <div className="mini-metric-grid">
+            <div className="mini-metric">
+              <span>Active callers</span>
+              <strong>{Object.keys(callerBreakdown).length}</strong>
+            </div>
+            <div className="mini-metric">
+              <span>Top caller</span>
+              <strong>{topCallerEntries[0]?.[0] || 'N/A'}</strong>
+            </div>
+          </div>
+          <ul className="leaderboard-list">
+            {topCallerEntries.length === 0 ? (
+              <li className="muted">No caller activity yet.</li>
+            ) : (
+              topCallerEntries.map(([name, count]) => (
+                <li key={name}><span>{name}</span><strong>{count}</strong></li>
+              ))
+            )}
+          </ul>
+        </div>
+
+        <div className="panel analytics-tile">
+          <div className="panel-header compact-header">
+            <h4>Response analytics</h4>
+          </div>
+          <div className="mini-metric-grid">
+            <div className="mini-metric green">
+              <span>Response rate</span>
+              <strong>{responseRate.toFixed(0)}%</strong>
+            </div>
+            <div className="mini-metric amber">
+              <span>Follow-ups</span>
+              <strong>{followUpCount}</strong>
+            </div>
+          </div>
+          <div className="response-meter">
+            <div className="response-meter-fill" style={{ width: `${Math.min(100, responseRate)}%` }} />
+          </div>
+          <div className="response-breakdown">
+            <span>Reached: {contactedCount}</span>
+            <span>No response: {noResponseCount}</span>
+          </div>
         </div>
       </div>
 
@@ -1147,7 +1228,7 @@ function AccountingPage() {
   const [summary, setSummary] = useState({ accounts: [], paymentMethods: [], incomeTotal: 0, expenseTotal: 0 });
   const [accountForm, setAccountForm] = useState({ name: '', type: 'cash', openingBalance: '0', notes: '' });
   const [transactionForm, setTransactionForm] = useState({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
-  const [expenseForm, setExpenseForm] = useState({ category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
+  const [expenseForm, setExpenseForm] = useState({ date: toLocalDateTimeValue(), category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
   const [message, setMessage] = useState('');
 
   const load = async () => {
@@ -1204,9 +1285,10 @@ function AccountingPage() {
     try {
       await api.post('/accounting/expenses', {
         ...expenseForm,
+        date: expenseForm.date || toLocalDateTimeValue(),
         amount: Number(expenseForm.amount || 0)
       });
-      setExpenseForm({ category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
+      setExpenseForm({ date: toLocalDateTimeValue(), category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
       setMessage('Expense saved');
       await load();
     } catch (error) {
@@ -1292,6 +1374,7 @@ function AccountingPage() {
       <div className="panel">
         <h4>Daily expenses</h4>
         <form className="form-grid" onSubmit={addExpense}>
+          <input type="datetime-local" value={expenseForm.date} onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })} />
           <input placeholder="Expense category" value={expenseForm.category} onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })} />
           <input placeholder="Amount" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} />
           <select value={expenseForm.accountId} onChange={(e) => setExpenseForm({ ...expenseForm, accountId: e.target.value })}>
@@ -1351,6 +1434,98 @@ function AccountingPage() {
             <div>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function StockPage() {
+  const [items, setItems] = useState([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const load = async (query = '') => {
+    try {
+      const res = await api.get('/reports/stock', { params: query ? { search: query } : {} });
+      setItems(res.data || []);
+    } catch (error) {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const lowStock = items.filter((item) => Number(item.stock || 0) <= 5);
+  const inventoryValue = items.reduce((sum, item) => sum + Number(item.stock || 0) * Number(item.salePrice || 0), 0);
+
+  return (
+    <div className="stock-page">
+      <div className="page-header">
+        <p className="eyebrow">Inventory control</p>
+        <h3>Stock overview</h3>
+      </div>
+
+      <div className="stats-grid">
+        <div className="stat-card stat-sales">
+          <h4>Items tracked</h4>
+          <p>{items.length}</p>
+          <span>Stock records</span>
+        </div>
+        <div className="stat-card stat-purchases">
+          <h4>Low stock</h4>
+          <p>{lowStock.length}</p>
+          <span>Needs attention</span>
+        </div>
+        <div className="stat-card stat-invoices">
+          <h4>Inventory value</h4>
+          <p>₹{inventoryValue.toLocaleString()}</p>
+          <span>Current stock</span>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-header stock-header">
+          <h4>Stock monitor</h4>
+          <input className="search-field" placeholder="Search item or SKU" value={search} onChange={(e) => {
+            setSearch(e.target.value);
+            load(e.target.value);
+          }} />
+        </div>
+
+        {loading ? <p className="muted">Loading stock...</p> : (
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Type</th>
+                  <th>Category</th>
+                  <th>Stock</th>
+                  <th>Sale price</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const stockLevel = Number(item.stock || 0);
+                  const status = stockLevel <= 5 ? 'Critical' : stockLevel <= 15 ? 'Low' : 'Healthy';
+                  return (
+                    <tr key={item._id}>
+                      <td>{item.name}</td>
+                      <td>{item.itemType || 'General'}</td>
+                      <td>{item.category || 'General'}</td>
+                      <td>{stockLevel}</td>
+                      <td>₹{Number(item.salePrice || 0).toLocaleString()}</td>
+                      <td><span className={`status-badge ${status === 'Critical' ? 'status-hot-lead' : status === 'Low' ? 'status-warm-lead' : 'status-may-convert'}`}>{status}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
