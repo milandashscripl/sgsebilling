@@ -67,6 +67,17 @@ const getTimeAgo = (date) => {
   return `${Math.floor(diff / 86400)}d ago`;
 };
 
+const getStageClass = (status) => {
+  const label = (status || '').toLowerCase();
+  if (label.includes('hot')) return 'status-hot-lead';
+  if (label.includes('warm')) return 'status-warm-lead';
+  if (label.includes('cool')) return 'status-cool-lead';
+  if (label.includes('convert')) return 'status-may-convert';
+  if (label.includes('following')) return 'status-following-up';
+  if (label.includes('not')) return 'status-not-interested';
+  return 'status-following-up';
+};
+
 function App() {
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user');
@@ -313,17 +324,6 @@ function ContactsPage() {
   useEffect(() => { loadContacts(); }, []);
 
   const reset = () => { setForm({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Warm Lead', review: '', nextFollowUp: '', markContacted: false }); setEditingId(null); };
-
-  const getStageClass = (status) => {
-    const label = (status || '').toLowerCase();
-    if (label.includes('hot')) return 'status-hot-lead';
-    if (label.includes('warm')) return 'status-warm-lead';
-    if (label.includes('cool')) return 'status-cool-lead';
-    if (label.includes('convert')) return 'status-may-convert';
-    if (label.includes('following')) return 'status-following-up';
-    if (label.includes('not')) return 'status-not-interested';
-    return 'status-following-up';
-  };
 
   const save = async (e) => {
     e && e.preventDefault();
@@ -1683,10 +1683,16 @@ function StockPage() {
 function ReportsPage() {
   const [summary, setSummary] = useState({ totalSales: 0, totalPurchases: 0, totalReturns: 0, invoiceCount: 0 });
   const [stock, setStock] = useState([]);
+  const [calls, setCalls] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get('/reports/summary').then((res) => setSummary(res.data));
-    api.get('/reports/stock').then((res) => setStock(res.data));
+    setLoading(true);
+    Promise.all([
+      api.get('/reports/summary').then((res) => setSummary(res.data)),
+      api.get('/reports/stock').then((res) => setStock(res.data)),
+      api.get('/reports/calling').then((res) => setCalls(res.data))
+    ]).finally(() => setLoading(false));
   }, []);
 
   const downloadReport = async (path, filename, type = 'csv') => {
@@ -1705,41 +1711,191 @@ function ReportsPage() {
     }
   };
 
-  const downloadPdfReport = async () => {
-    const content = [
-      'SGSE Billing Report',
-      `Sales: ₹${summary.totalSales.toLocaleString()}`,
-      `Purchases: ₹${summary.totalPurchases.toLocaleString()}`,
-      `Returns: ₹${summary.totalReturns.toLocaleString()}`,
-      `Invoice count: ${summary.invoiceCount}`,
-      '',
-      'Stock Report',
-      ...stock.map((item) => `${item.name} | ${item.itemType || '-'} | ${item.category || 'General'} | Stock: ${item.stock}`)
-    ].join('\n');
+  const downloadPdfReport = (reportType = 'summary') => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let yPos = 20;
+      const lineHeight = 7;
+      const pageMargin = 15;
+      const pageWidthUsable = pageWidth - 2 * pageMargin;
 
-    const blob = new Blob([content], { type: 'application/pdf' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'sgse-report.pdf');
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+      const addTitle = (title) => {
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.text(title, pageMargin, yPos);
+        yPos += 10;
+      };
+
+      const addSectionHeader = (header) => {
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text(header, pageMargin, yPos);
+        yPos += 8;
+      };
+
+      const addLine = (label, value) => {
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text(`${label}: ${value}`, pageMargin, yPos);
+        yPos += lineHeight;
+      };
+
+      const addTable = (headers, rows) => {
+        if (yPos + rows.length * 6 > pageHeight - pageMargin) {
+          doc.addPage();
+          yPos = pageMargin;
+        }
+
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        const colWidth = (pageWidthUsable - pageMargin) / headers.length;
+        headers.forEach((header, idx) => {
+          doc.text(header, pageMargin + idx * colWidth, yPos);
+        });
+        yPos += 6;
+
+        doc.setFont(undefined, 'normal');
+        rows.forEach((row) => {
+          if (yPos + 5 > pageHeight - pageMargin) {
+            doc.addPage();
+            yPos = pageMargin;
+          }
+          row.forEach((cell, idx) => {
+            doc.text(String(cell || '-'), pageMargin + idx * colWidth, yPos);
+          });
+          yPos += 5;
+        });
+        yPos += 3;
+      };
+
+      const dateStr = new Date().toLocaleDateString('en-IN');
+      addTitle('SGSE Billing System - Reports');
+      addLine('Generated on', dateStr);
+      yPos += 5;
+
+      if (reportType === 'summary' || reportType === 'all') {
+        addSectionHeader('Financial Summary');
+        addLine('Total Sales', `₹${summary.totalSales.toLocaleString()}`);
+        addLine('Total Purchases', `₹${summary.totalPurchases.toLocaleString()}`);
+        addLine('Total Returns', `₹${summary.totalReturns.toLocaleString()}`);
+        addLine('Invoice Count', `${summary.invoiceCount}`);
+        yPos += 5;
+      }
+
+      if (reportType === 'stock' || reportType === 'all') {
+        addSectionHeader('Stock Report');
+        if (stock.length) {
+          const stockHeaders = ['Item', 'Type', 'Category', 'Stock', 'Sale Price'];
+          const stockRows = stock.map((item) => [
+            item.name || '-',
+            item.itemType || '-',
+            item.category || '-',
+            item.stock || 0,
+            `₹${item.salePrice || 0}`
+          ]);
+          addTable(stockHeaders, stockRows);
+        } else {
+          addLine('Status', 'No stock data available');
+        }
+      }
+
+      if (reportType === 'calling' || reportType === 'all') {
+        addSectionHeader('Calling Report');
+        if (calls.length) {
+          const callHeaders = ['Contact', 'Caller', 'Phone', 'Calls', 'Status', 'Last Contact'];
+          const callRows = calls.map((c) => [
+            c.name || '-',
+            c.callerName || 'Not assigned',
+            c.contactNumber || '-',
+            (c.callHistory || []).length,
+            c.status || '-',
+            c.lastContacted ? new Date(c.lastContacted).toLocaleDateString('en-IN') : 'Never'
+          ]);
+          addTable(callHeaders, callRows);
+        } else {
+          addLine('Status', 'No calling data available');
+        }
+      }
+
+      const fileName = `sgse-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+    } catch (error) {
+      window.alert('Unable to generate PDF report');
+    }
   };
 
   return (
-    <div>
-      <h3>Reports and print-ready summaries</h3>
-      <div className="stats-grid">
-        <div className="stat-card"><h4>Total sales</h4><p>₹{summary.totalSales.toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Total purchases</h4><p>₹{summary.totalPurchases.toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Total returns</h4><p>₹{summary.totalReturns.toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Invoice count</h4><p>{summary.invoiceCount}</p></div>
+    <div className="reports-page">
+      <div className="page-header">
+        <div>
+          <p className="eyebrow">Business analytics</p>
+          <h3>Reports & analytics</h3>
+        </div>
       </div>
 
+      <div className="stats-grid">
+        <div className="stat-card">
+          <h4>Total sales</h4>
+          <p>₹{summary.totalSales.toLocaleString()}</p>
+        </div>
+        <div className="stat-card">
+          <h4>Total purchases</h4>
+          <p>₹{summary.totalPurchases.toLocaleString()}</p>
+        </div>
+        <div className="stat-card">
+          <h4>Total returns</h4>
+          <p>₹{summary.totalReturns.toLocaleString()}</p>
+        </div>
+        <div className="stat-card">
+          <h4>Invoice count</h4>
+          <p>{summary.invoiceCount}</p>
+        </div>
+      </div>
+
+      {/* Calling Report Section */}
       <div className="panel">
-        <h4>Stock report</h4>
+        <h4>Calling Report ({calls.length} contacts)</h4>
+        {loading ? (
+          <p className="muted">Loading...</p>
+        ) : calls.length > 0 ? (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Contact</th>
+                <th>Caller</th>
+                <th>Phone</th>
+                <th>Calls</th>
+                <th>Status</th>
+                <th>Last Contact</th>
+              </tr>
+            </thead>
+            <tbody>
+              {calls.map((c) => (
+                <tr key={c._id || c.id}>
+                  <td>{c.name}</td>
+                  <td>{c.callerName || 'Not assigned'}</td>
+                  <td>{c.contactNumber}</td>
+                  <td>{(c.callHistory || []).length}</td>
+                  <td><span className={`status-badge ${getStageClass(c.status)}`}>{c.status}</span></td>
+                  <td>{c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="muted empty-state-inline">No calling data available</p>
+        )}
+        <div className="inline-actions">
+          <button className="btn primary" onClick={() => downloadPdfReport('calling')}>Download Calling PDF</button>
+          <button className="btn secondary" onClick={() => downloadReport('/reports/calling/export', 'calling-report.csv')}>Download Calling CSV</button>
+        </div>
+      </div>
+
+      {/* Stock Report Section */}
+      <div className="panel">
+        <h4>Stock Report</h4>
         <table className="table">
           <thead>
             <tr>
@@ -1765,18 +1921,22 @@ function ReportsPage() {
           </tbody>
         </table>
         <div className="inline-actions">
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/stock/export', 'stock.csv')}>Download stock CSV</button>
+          <button className="btn primary" onClick={() => downloadPdfReport('stock')}>Download Stock PDF</button>
+          <button className="btn secondary" onClick={() => downloadReport('/reports/stock/export', 'stock.csv')}>Download Stock CSV</button>
         </div>
       </div>
 
+      {/* All Reports Download Section */}
       <div className="panel">
+        <h4>All Reports & Exports</h4>
         <div className="inline-actions">
-          <button className="btn primary" type="button" onClick={() => downloadReport('/reports/invoices/export', 'invoices.csv')}>Download invoices CSV</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/sales/export', 'sales.csv')}>Download sales CSV</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/purchases/export', 'purchases.csv')}>Download purchases CSV</button>
-          <button className="btn secondary" type="button" onClick={() => downloadReport('/reports/returns/export', 'returns.csv')}>Download returns CSV</button>
-          <button className="btn secondary" type="button" onClick={downloadPdfReport}>Download PDF report</button>
-          <button className="btn secondary" type="button" onClick={() => window.print()}>Print report</button>
+          <button className="btn primary" onClick={() => downloadPdfReport('all')}>Download All Reports PDF</button>
+          <button className="btn secondary" onClick={() => downloadReport('/reports/invoices/export', 'invoices.csv')}>Invoices CSV</button>
+          <button className="btn secondary" onClick={() => downloadReport('/reports/sales/export', 'sales.csv')}>Sales CSV</button>
+          <button className="btn secondary" onClick={() => downloadReport('/reports/purchases/export', 'purchases.csv')}>Purchases CSV</button>
+          <button className="btn secondary" onClick={() => downloadReport('/reports/returns/export', 'returns.csv')}>Returns CSV</button>
+          <button className="btn outline" onClick={() => downloadPdfReport('summary')}>Summary PDF</button>
+          <button className="btn outline" onClick={() => window.print()}>Print Page</button>
         </div>
       </div>
     </div>

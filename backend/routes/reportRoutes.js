@@ -2,6 +2,7 @@ const express = require('express');
 const auth = require('../middleware/auth');
 const Item = require('../models/Item');
 const Invoice = require('../models/Invoice');
+const Contact = require('../models/Contact');
 
 const router = express.Router();
 
@@ -185,6 +186,60 @@ router.get('/returns/export', auth, async (req, res) => {
     res.header('Content-Type', 'text/csv');
     res.attachment('returns.csv');
     res.send(csv);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/calling/export', auth, async (req, res) => {
+  try {
+    const search = (req.query.search || '').trim();
+    const filter = {};
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { callerName: { $regex: search, $options: 'i' } },
+        { contactNumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    applyDateRange(req, filter, 'lastContacted');
+    const contacts = await Contact.find(filter).lean();
+    
+    const rows = ['contactName,callerName,contactNumber,consumerNumber,status,totalCalls,lastContacted,review'];
+    contacts.forEach((contact) => {
+      const totalCalls = (contact.callHistory || []).length;
+      rows.push(
+        `${sanitizeCsvValue(contact.name)},${sanitizeCsvValue(contact.callerName || 'Not assigned')},${sanitizeCsvValue(contact.contactNumber)},${sanitizeCsvValue(contact.consumerNumber)},${sanitizeCsvValue(contact.status)},${totalCalls},${contact.lastContacted ? contact.lastContacted.toISOString() : 'Never'},${sanitizeCsvValue(contact.review)}`
+      );
+    });
+
+    const csv = rows.join('\n');
+    res.header('Content-Type', 'text/csv');
+    res.attachment('calling-report.csv');
+    res.send(csv);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/calling', auth, async (req, res) => {
+  try {
+    const search = (req.query.search || '').trim();
+    const filter = {};
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { callerName: { $regex: search, $options: 'i' } },
+        { contactNumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    applyDateRange(req, filter, 'lastContacted');
+    const contacts = await Contact.find(filter).sort({ lastContacted: -1 }).lean();
+    res.json(contacts.map((contact) => ({ ...contact, id: String(contact._id) })));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
