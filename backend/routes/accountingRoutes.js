@@ -7,19 +7,12 @@ const Expense = require('../models/Expense');
 const router = express.Router();
 
 const getAccountBalance = async (accountId, openingBalance) => {
+  const id = accountId.toString();
+  const matchStage = { $match: { $or: [{ accountId }, { accountId: id }] } };
   const [incomeTotal, expenseTotal, expenseOutflow] = await Promise.all([
-    Transaction.aggregate([
-      { $match: { accountId, type: 'income' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ]),
-    Transaction.aggregate([
-      { $match: { accountId, type: 'expense' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ]),
-    Expense.aggregate([
-      { $match: { accountId } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ])
+    Transaction.aggregate([matchStage, { $match: { type: 'income' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+    Transaction.aggregate([matchStage, { $match: { type: 'expense' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+    Expense.aggregate([{ $match: { $or: [{ accountId }, { accountId: id }] } }, { $group: { _id: null, total: { $sum: '$amount' } } }])
   ]);
 
   return openingBalance + (incomeTotal[0]?.total || 0) - (expenseTotal[0]?.total || 0) - (expenseOutflow[0]?.total || 0);
@@ -131,6 +124,16 @@ router.post('/expenses', auth, async (req, res) => {
       createdBy: req.user._id
     });
     res.status(201).json({ ...expense.toObject(), id: String(expense._id) });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.delete('/expenses/:id', auth, async (req, res) => {
+  try {
+    const deleted = await Expense.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: 'Expense not found' });
+    res.json({ message: 'Expense deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

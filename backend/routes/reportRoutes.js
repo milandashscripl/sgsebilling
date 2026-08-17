@@ -6,6 +6,25 @@ const Contact = require('../models/Contact');
 
 const router = express.Router();
 
+const sanitizeCsvValue = (value) => String(value || '').replace(/,/g, ' ').replace(/\r|\n/g, ' ');
+
+const applyDateRange = (req, filter, field) => {
+  const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : null;
+  const toDate = req.query.toDate ? new Date(req.query.toDate) : null;
+  const range = {};
+
+  if (fromDate && !Number.isNaN(fromDate.getTime())) {
+    range.$gte = fromDate;
+  }
+  if (toDate && !Number.isNaN(toDate.getTime())) {
+    toDate.setHours(23, 59, 59, 999);
+    range.$lte = toDate;
+  }
+  if (Object.keys(range).length) {
+    filter[field] = range;
+  }
+};
+
 router.get('/summary', auth, async (req, res) => {
   try {
     const dateFilter = {};
@@ -60,25 +79,6 @@ router.get('/stock', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
-const sanitizeCsvValue = (value) => String(value || '').replace(/,/g, ' ').replace(/\r|\n/g, ' ');
-
-const applyDateRange = (req, filter, field) => {
-  const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : null;
-  const toDate = req.query.toDate ? new Date(req.query.toDate) : null;
-  const range = {};
-
-  if (fromDate && !Number.isNaN(fromDate.getTime())) {
-    range.$gte = fromDate;
-  }
-  if (toDate && !Number.isNaN(toDate.getTime())) {
-    toDate.setHours(23, 59, 59, 999);
-    range.$lte = toDate;
-  }
-  if (Object.keys(range).length) {
-    filter[field] = range;
-  }
-};
 
 router.get('/invoices', auth, async (req, res) => {
   try {

@@ -1,14 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Link, NavLink, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { jsPDF } from 'jspdf';
-import { API_BASE_URL } from './config';
+import api from './api';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import { downloadInvoicePdf } from './utils/invoicePdf';
-
-const API = API_BASE_URL;
-
-const api = axios.create({ baseURL: API });
 
 const emptyItemForm = {
   name: '',
@@ -94,7 +89,6 @@ function App() {
       return;
     }
 
-    api.defaults.headers.common.Authorization = `Bearer ${token}`;
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
@@ -244,7 +238,6 @@ function Login({ setUser }) {
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
-      api.defaults.headers.common.Authorization = `Bearer ${token}`;
       setUser(res.data.user);
       navigate('/dashboard');
     } catch (err) {
@@ -279,7 +272,6 @@ function Register({ setUser }) {
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
-      api.defaults.headers.common.Authorization = `Bearer ${token}`;
       setUser(res.data.user);
       navigate('/dashboard');
     } catch (err) {
@@ -338,6 +330,7 @@ function ContactsPage() {
       }
       reset();
       await loadContacts();
+      setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage(err?.response?.data?.message || 'Unable to save contact');
     }
@@ -371,6 +364,7 @@ function ContactsPage() {
       setMessage('Call logged');
       setCallForm({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' });
       await loadContacts();
+      setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage('Unable to log call');
     }
@@ -1101,7 +1095,7 @@ function BillingPage({ user }) {
     logo: user?.shopLogoUrl || ''
   };
 
-  useEffect(() => { api.get('/items').then((res) => setItems(res.data)); }, []);
+  useEffect(() => { api.get('/items').then((res) => setItems(res.data || [])).catch(() => {}); }, []);
 
   const filteredItems = items.filter((item) => {
     const query = itemSearch.trim().toLowerCase();
@@ -1342,6 +1336,7 @@ function AccountingPage() {
       setAccountForm({ name: '', type: 'cash', openingBalance: '0', notes: '' });
       setMessage('Account created');
       await load();
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Unable to create account');
     }
@@ -1357,6 +1352,7 @@ function AccountingPage() {
       setTransactionForm({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
       setMessage('Ledger entry saved');
       await load();
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Unable to save ledger');
     }
@@ -1373,6 +1369,7 @@ function AccountingPage() {
       setExpenseForm({ date: toLocalDateTimeValue(), category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
       setMessage('Expense saved');
       await load();
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Unable to save expense');
     }
@@ -1384,6 +1381,7 @@ function AccountingPage() {
       await api.delete(`/accounting/expenses/${id}`);
       setMessage('Expense deleted');
       await load();
+      setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage('Unable to delete expense');
     }
@@ -1946,7 +1944,7 @@ function ReportsPage() {
 function UsersPage() {
   const [users, setUsers] = useState([]);
 
-  useEffect(() => { api.get('/users').then((res) => setUsers(res.data)); }, []);
+  useEffect(() => { api.get('/users').then((res) => setUsers(res.data || [])).catch(() => {}); }, []);
 
   return (
     <div>
