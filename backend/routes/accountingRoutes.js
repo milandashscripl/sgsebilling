@@ -33,6 +33,29 @@ router.get('/accounts', auth, async (req, res) => {
   }
 });
 
+router.post('/accounts/:id/deposit', auth, async (req, res) => {
+  try {
+    const account = await Account.findById(req.params.id);
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+    const amount = Number(req.body.amount || 0);
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Enter a valid amount' });
+    await Transaction.create({
+      date: new Date().toISOString().slice(0, 10),
+      accountId: account._id,
+      type: 'income',
+      amount,
+      paymentMethod: req.body.paymentMethod || 'cash',
+      reference: req.body.reference || 'Direct deposit',
+      note: req.body.note || 'Balance added directly',
+      createdBy: req.user._id
+    });
+    const balance = await getAccountBalance(account._id, Number(account.openingBalance || 0));
+    res.json({ message: 'Balance added', balance });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.post('/accounts', auth, async (req, res) => {
   try {
     const account = await Account.create({

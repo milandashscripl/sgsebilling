@@ -200,7 +200,8 @@ function AuthenticatedApp({ user, logout }) {
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/assigned">My Calls</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink>
           {user.role === 'admin' && <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/users">Users</NavLink>}
@@ -212,6 +213,7 @@ function AuthenticatedApp({ user, logout }) {
             <Route path="/stock" element={<StockPage />} />
             <Route path="/billing" element={<BillingPage user={user} />} />
             <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/assigned" element={<AssignedContactsPage user={user} />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
@@ -1306,6 +1308,8 @@ function AccountingPage() {
   const [transactionForm, setTransactionForm] = useState({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
   const [expenseForm, setExpenseForm] = useState({ date: toLocalDateTimeValue(), category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
   const [message, setMessage] = useState('');
+  const [depositTarget, setDepositTarget] = useState(null);
+  const [depositForm, setDepositForm] = useState({ amount: '', paymentMethod: 'cash', note: '' });
 
   const load = async () => {
     try {
@@ -1466,7 +1470,47 @@ function AccountingPage() {
               <strong>{account.name}</strong>
               <div className="muted">{account.type} • {account.notes || 'No notes'}</div>
             </div>
-            <div><strong>₹{Number(account.balance || 0).toLocaleString()}</strong></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <strong>₹{Number(account.balance || 0).toLocaleString()}</strong>
+              <button className="btn outline" style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                onClick={() => setDepositTarget(depositTarget === account._id ? null : account._id)}>
+                + Add Balance
+              </button>
+            </div>
+            {depositTarget === account._id && (
+              <form className="form-grid" style={{ gridColumn: '1/-1', marginTop: 8 }}
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    await api.post(`/accounting/accounts/${account._id}/deposit`, depositForm);
+                    setMessage('Balance added successfully');
+                    setDepositTarget(null);
+                    setDepositForm({ amount: '', paymentMethod: 'cash', note: '' });
+                    await load();
+                    setTimeout(() => setMessage(''), 3000);
+                  } catch (err) {
+                    setMessage(err.response?.data?.message || 'Unable to add balance');
+                  }
+                }}>
+                <input placeholder="Amount" type="number" min="1" value={depositForm.amount}
+                  onChange={(e) => setDepositForm({ ...depositForm, amount: e.target.value })} />
+                <select value={depositForm.paymentMethod}
+                  onChange={(e) => setDepositForm({ ...depositForm, paymentMethod: e.target.value })}>
+                  <option value="cash">Cash</option>
+                  <option value="bank">Bank Transfer</option>
+                  <option value="phonepe">PhonePe</option>
+                  <option value="gpay">GPay</option>
+                  <option value="neft">NEFT</option>
+                  <option value="rtgs">RTGS</option>
+                </select>
+                <input placeholder="Note (optional)" value={depositForm.note}
+                  onChange={(e) => setDepositForm({ ...depositForm, note: e.target.value })} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn primary" type="submit">Add</button>
+                  <button className="btn secondary" type="button" onClick={() => setDepositTarget(null)}>Cancel</button>
+                </div>
+              </form>
+            )}
           </div>
         ))}
       </div>
@@ -1956,6 +2000,154 @@ function UsersPage() {
             <div>{user.role}</div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function AssignedContactsPage({ user }) {
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [callForm, setCallForm] = useState({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: toLocalDateTimeValue() });
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+
+  const myName = user?.name || '';
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/contacts');
+      setContacts((res.data || []).filter(c => (c.callerName || '').trim().toLowerCase() === myName.trim().toLowerCase()));
+    } catch { setMessage('Unable to load contacts'); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const submitCall = async (e) => {
+    e && e.preventDefault();
+    const id = callForm.contactId;
+    if (!id) return;
+    try {
+      const contact = contacts.find(c => (c._id === id || c.id === id));
+      const selectedLead = callForm.leadStage || contact?.status || 'Warm Lead';
+      await api.post(`/contacts/${id}/calls`, {
+        timestamp: callForm.timestamp ? new Date(callForm.timestamp).toISOString() : new Date().toISOString(),
+        note: callForm.note || '',
+        outcome: callForm.outcome || 'Contacted',
+        statusOnCall: callForm.outcome === 'Not Interested' ? 'Not Interested' : selectedLead,
+        leadStage: selectedLead
+      });
+      setMessage('Call logged');
+      setCallForm({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' });
+      await load();
+      setTimeout(() => setMessage(''), 3000);
+    } catch { setMessage('Unable to log call'); }
+  };
+
+  const counts = {
+    all: contacts.length,
+    no_response: contacts.filter(c => !c.callHistory || c.callHistory.length === 0).length,
+    hot: contacts.filter(c => c.status === 'Hot Lead').length,
+    warm: contacts.filter(c => c.status === 'Warm Lead').length,
+    cool: contacts.filter(c => c.status === 'Cool Lead').length,
+    notinterested: contacts.filter(c => c.status === 'Not Interested').length,
+  };
+
+  const filtered = contacts.filter(c => {
+    if (search) {
+      const s = search.toLowerCase();
+      if (!(c.name || '').toLowerCase().includes(s) && !(c.contactNumber || '').toLowerCase().includes(s)) return false;
+    }
+    if (statusFilter === 'no_response') return !c.callHistory || c.callHistory.length === 0;
+    if (statusFilter === 'hot') return c.status === 'Hot Lead';
+    if (statusFilter === 'warm') return c.status === 'Warm Lead';
+    if (statusFilter === 'cool') return c.status === 'Cool Lead';
+    if (statusFilter === 'notinterested') return c.status === 'Not Interested';
+    return true;
+  });
+
+  return (
+    <div className="contacts-page">
+      <div className="page-header">
+        <p className="eyebrow">Your assigned pipeline</p>
+        <h3>My Calls — {myName}</h3>
+      </div>
+      {message && <p className="status-message">{message}</p>}
+      <div className="panel contact-stream-panel">
+        <div className="filter-bar">
+          <button className={statusFilter === 'all' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('all')}>All ({counts.all})</button>
+          <button className={statusFilter === 'no_response' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('no_response')}>No response ({counts.no_response})</button>
+          <button className={statusFilter === 'hot' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('hot')}>Hot ({counts.hot})</button>
+          <button className={statusFilter === 'warm' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('warm')}>Warm ({counts.warm})</button>
+          <button className={statusFilter === 'cool' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('cool')}>Cool ({counts.cool})</button>
+          <button className={statusFilter === 'notinterested' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('notinterested')}>Not interested ({counts.notinterested})</button>
+          <input className="search-field" placeholder="Search name or number" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        {loading ? <p className="muted">Loading...</p> : filtered.length === 0 ? (
+          <p className="muted empty-state-inline">No contacts assigned to you in this category.</p>
+        ) : (
+          <div className="contacts-list">
+            {filtered.map((c) => {
+              const id = c.id || c._id;
+              const latestCall = Array.isArray(c.callHistory) && c.callHistory.length ? c.callHistory[c.callHistory.length - 1] : null;
+              const reviewText = (c.review || latestCall?.note || '').trim();
+              return (
+                <div key={id} className="panel contact-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className="contact-card-head">
+                    <div className="contact-avatar">{(c.name || '--').split(' ').map(x => x[0]).slice(0, 2).join('')}</div>
+                    <div className="contact-primary">
+                      <div className="contact-name-row">
+                        <strong>{c.name || 'Unknown'}</strong>
+                        <span className="contact-time">{getTimeAgo(c.lastContacted)} • {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span>
+                      </div>
+                      <div className="contact-meta">
+                        <span>{c.contactNumber || '—'}</span>
+                        <span>{c.consumerNumber || '—'}</span>
+                        <span>Calls: {c.callHistory ? c.callHistory.length : 0}</span>
+                      </div>
+                      <div className="status-row">
+                        <span className={`status-badge ${getStageClass(c.status)}`}>{c.status || 'Unknown'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {reviewText && (
+                    <div className="contact-detail-strip">
+                      <div className="detail-pill review-pill">
+                        <span className="detail-label">Review</span>
+                        <strong>{reviewText}</strong>
+                      </div>
+                    </div>
+                  )}
+                  <div className="call-log-row">
+                    {callForm.contactId === id ? (
+                      <form className="call-form" onSubmit={submitCall}>
+                        <select value={callForm.outcome} onChange={(e) => setCallForm({ ...callForm, outcome: e.target.value })}>
+                          <option>Contacted</option>
+                          <option>Follow-up</option>
+                          <option>Not Interested</option>
+                        </select>
+                        <select value={callForm.leadStage} onChange={(e) => setCallForm({ ...callForm, leadStage: e.target.value })}>
+                          {LEAD_STATUS_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                        </select>
+                        <input type="datetime-local" value={callForm.timestamp} onChange={(e) => setCallForm({ ...callForm, timestamp: e.target.value || toLocalDateTimeValue() })} />
+                        <input type="text" placeholder="Call notes" value={callForm.note} onChange={(e) => setCallForm({ ...callForm, note: e.target.value })} />
+                        <button className="btn primary" type="submit">Save</button>
+                        <button className="btn outline" type="button" onClick={() => setCallForm({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' })}>Cancel</button>
+                      </form>
+                    ) : (
+                      <div className="inline-actions">
+                        <button className="btn primary" onClick={() => setCallForm({ contactId: id, note: '', outcome: 'Contacted', leadStage: c.status || 'Warm Lead', timestamp: toLocalDateTimeValue() })}>Log call</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
