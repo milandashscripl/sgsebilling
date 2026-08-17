@@ -7,8 +7,8 @@ const contactSchema = new mongoose.Schema({
   callerName: { type: String, trim: true, default: '' },
   status: {
     type: String,
-    enum: ['Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Not Interested', 'Following Up'],
-    default: 'Warm Lead'
+    enum: ['Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Not Interested', 'Following Up', 'Not Yet Called', 'No Response'],
+    default: 'Not Yet Called'
   },
   review: { type: String, default: '' },
   followUpStrategy: { type: String, default: '' },

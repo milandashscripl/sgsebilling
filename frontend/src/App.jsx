@@ -36,7 +36,7 @@ const emptyCategoryForm = {
   description: ''
 };
 
-const LEAD_STATUS_OPTIONS = ['Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Following Up', 'Not Interested'];
+const LEAD_STATUS_OPTIONS = ['Not Yet Called', 'Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Following Up', 'Not Interested', 'No Response'];
 
 const toLocalDateTimeValue = (date = new Date()) => {
   const pad = (value) => String(value).padStart(2, '0');
@@ -69,6 +69,7 @@ const getStageClass = (status) => {
   if (label.includes('cool')) return 'status-cool-lead';
   if (label.includes('convert')) return 'status-may-convert';
   if (label.includes('following')) return 'status-following-up';
+  if (label.includes('not yet') || label.includes('no response')) return 'status-cool-lead';
   if (label.includes('not')) return 'status-not-interested';
   return 'status-following-up';
 };
@@ -297,7 +298,7 @@ function Register({ setUser }) {
 function ContactsPage() {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Warm Lead', review: '', nextFollowUp: '', markContacted: false });
+  const [form, setForm] = useState({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Not Yet Called', review: '', nextFollowUp: '', markContacted: false });
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState('');
   const [statusTab, setStatusTab] = useState('all');
@@ -317,7 +318,7 @@ function ContactsPage() {
 
   useEffect(() => { loadContacts(); }, []);
 
-  const reset = () => { setForm({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Warm Lead', review: '', nextFollowUp: '', markContacted: false }); setEditingId(null); };
+  const reset = () => { setForm({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Not Yet Called', review: '', nextFollowUp: '', markContacted: false }); setEditingId(null); };
 
   const save = async (e) => {
     e && e.preventDefault();
@@ -380,7 +381,8 @@ function ContactsPage() {
     warm: contacts.filter(c => c.status === 'Warm Lead').length,
     cool: contacts.filter(c => c.status === 'Cool Lead').length,
     notinterested: contacts.filter(c => c.status === 'Not Interested').length,
-    no_response: contacts.filter(c => !c.callHistory || c.callHistory.length === 0).length
+    no_response: contacts.filter(c => c.status === 'No Response').length,
+    not_yet_called: contacts.filter(c => c.status === 'Not Yet Called' || (!c.callHistory || c.callHistory.length === 0)).length
   };
 
   const filtered = contacts.filter(c => {
@@ -395,17 +397,18 @@ function ContactsPage() {
     if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
     if (statusTab === 'cool' && c.status !== 'Cool Lead') return false;
     if (statusTab === 'notinterested' && c.status !== 'Not Interested') return false;
-    if (statusTab === 'no_response' && c.callHistory && c.callHistory.length) return false;
-    if (statusTab === 'no_response' && selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
+    if (statusTab === 'no_response' && c.status !== 'No Response') return false;
+    if (statusTab === 'not_yet_called' && !(c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0)) return false;
+    if (statusTab === 'not_yet_called' && selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
     return true;
   });
 
-  const noResponseContacts = contacts.filter(c => !c.callHistory || c.callHistory.length === 0);
-  const callerList = [...new Set(noResponseContacts.map(c => c.callerName || 'Not assigned'))].sort();
-  
+  const notYetCalledContacts = contacts.filter(c => c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0);
+  const callerList = [...new Set(notYetCalledContacts.map(c => c.callerName || 'Not assigned'))].sort();
+
   const handleStatusTabChange = (tab) => {
     setStatusTab(tab);
-    if (tab !== 'no_response') {
+    if (tab !== 'not_yet_called') {
       setSelectedCaller(null);
     } else if (callerList.length > 0 && !selectedCaller) {
       setSelectedCaller(callerList[0]);
@@ -461,15 +464,23 @@ function ContactsPage() {
           <button className={statusTab==='cool'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('cool')}>Cool ({counts.cool})</button>
           <button className={statusTab==='notinterested'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('notinterested')}>Not interested ({counts.notinterested})</button>
           <button className={statusTab==='no_response'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('no_response')}>No response ({counts.no_response})</button>
+          <button className={statusTab==='not_yet_called'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('not_yet_called')}>Not yet called ({counts.not_yet_called})</button>
           <input className="search-field" placeholder="Search caller, customer or number" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
         </div>
 
-        {statusTab === 'no_response' && callerList.length > 0 && (
+        {statusTab === 'not_yet_called' && callerList.length > 0 && (
           <div className="caller-tabs">
+            <button
+              className={selectedCaller === null ? 'btn primary' : 'btn outline'}
+              onClick={() => setSelectedCaller(null)}
+              style={{ fontSize: '0.9rem', padding: '8px 12px' }}
+            >
+              All callers ({notYetCalledContacts.length})
+            </button>
             {callerList.map((caller) => {
-              const callerCount = noResponseContacts.filter(c => (c.callerName || 'Not assigned') === caller).length;
+              const callerCount = notYetCalledContacts.filter(c => (c.callerName || 'Not assigned') === caller).length;
               return (
-                <button 
+                <button
                   key={caller}
                   className={selectedCaller === caller ? 'btn primary' : 'btn outline'}
                   onClick={() => setSelectedCaller(caller)}
@@ -2049,11 +2060,12 @@ function AssignedContactsPage({ user }) {
 
   const counts = {
     all: contacts.length,
-    no_response: contacts.filter(c => !c.callHistory || c.callHistory.length === 0).length,
+    not_yet_called: contacts.filter(c => c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0).length,
     hot: contacts.filter(c => c.status === 'Hot Lead').length,
     warm: contacts.filter(c => c.status === 'Warm Lead').length,
     cool: contacts.filter(c => c.status === 'Cool Lead').length,
     notinterested: contacts.filter(c => c.status === 'Not Interested').length,
+    no_response: contacts.filter(c => c.status === 'No Response').length,
   };
 
   const filtered = contacts.filter(c => {
@@ -2061,11 +2073,12 @@ function AssignedContactsPage({ user }) {
       const s = search.toLowerCase();
       if (!(c.name || '').toLowerCase().includes(s) && !(c.contactNumber || '').toLowerCase().includes(s)) return false;
     }
-    if (statusFilter === 'no_response') return !c.callHistory || c.callHistory.length === 0;
+    if (statusFilter === 'not_yet_called') return c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0;
     if (statusFilter === 'hot') return c.status === 'Hot Lead';
     if (statusFilter === 'warm') return c.status === 'Warm Lead';
     if (statusFilter === 'cool') return c.status === 'Cool Lead';
     if (statusFilter === 'notinterested') return c.status === 'Not Interested';
+    if (statusFilter === 'no_response') return c.status === 'No Response';
     return true;
   });
 
@@ -2079,11 +2092,12 @@ function AssignedContactsPage({ user }) {
       <div className="panel contact-stream-panel">
         <div className="filter-bar">
           <button className={statusFilter === 'all' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('all')}>All ({counts.all})</button>
-          <button className={statusFilter === 'no_response' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('no_response')}>No response ({counts.no_response})</button>
+          <button className={statusFilter === 'not_yet_called' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('not_yet_called')}>Not yet called ({counts.not_yet_called})</button>
           <button className={statusFilter === 'hot' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('hot')}>Hot ({counts.hot})</button>
           <button className={statusFilter === 'warm' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('warm')}>Warm ({counts.warm})</button>
           <button className={statusFilter === 'cool' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('cool')}>Cool ({counts.cool})</button>
           <button className={statusFilter === 'notinterested' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('notinterested')}>Not interested ({counts.notinterested})</button>
+          <button className={statusFilter === 'no_response' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('no_response')}>No response ({counts.no_response})</button>
           <input className="search-field" placeholder="Search name or number" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         {loading ? <p className="muted">Loading...</p> : filtered.length === 0 ? (
