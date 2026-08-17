@@ -1105,6 +1105,8 @@ function BillingPage({ user }) {
   const [fsGstRate, setFsGstRate] = useState('18');
   const [fsDescription, setFsDescription] = useState('');
   const [fsDiscount, setFsDiscount] = useState('0');
+  const [fsSelectedItem, setFsSelectedItem] = useState(null);
+  const [fsItemSearch, setFsItemSearch] = useState('');
   const [discount, setDiscount] = useState('0');
   const [vendorForm, setVendorForm] = useState({ name: user?.name || '', shopName: user?.shopName || '', shopAddress: user?.shopAddress || '', shopGSTIN: user?.shopGSTIN || '', phone: user?.phone || '', shopLogoUrl: user?.shopLogoUrl || '' });
   const [vendorMsg, setVendorMsg] = useState('');
@@ -1211,7 +1213,7 @@ function BillingPage({ user }) {
     try {
       let invoiceItems, invoiceSubtotal, invoiceGst, invoiceTotal;
       if (billingMode === 'fullsetup') {
-        invoiceItems = [{ name: fsDescription || 'Service / Goods', quantity: 1, price: fsFinalTaxable, sgstRate: 0, cgstRate: 0, igstRate: 0, total: fsFinalTaxable }];
+        invoiceItems = [{ name: fsSelectedItem?.name || fsDescription || 'Service / Goods', quantity: 1, price: fsFinalTaxable, sgstRate: 0, cgstRate: 0, igstRate: 0, total: fsFinalTaxable }];
         invoiceSubtotal = fsFinalTaxable;
         invoiceGst = fsGstAmt;
         invoiceTotal = fsFinalTotal;
@@ -1238,7 +1240,7 @@ function BillingPage({ user }) {
       });
       setBillingMessage('Invoice created and PDF downloaded');
       setSelectedItems([]); setPartyName(''); setPartyPhone(''); setPartyGSTIN(''); setCustomerName(''); setCustomerPhone('');
-      setFsPayable(''); setFsDescription(''); setFsDiscount('0'); setDiscount('0');
+      setFsPayable(''); setFsDescription(''); setFsDiscount('0'); setDiscount('0'); setFsSelectedItem(null); setFsItemSearch('');
       setTimeout(() => setBillingMessage(''), 4000);
     } catch (err) {
       setBillingMessage(err.response?.data?.message || 'Unable to create invoice');
@@ -1353,28 +1355,70 @@ function BillingPage({ user }) {
             </>
           ) : (
             <div className="fullsetup-form">
-              <div className="fullsetup-grid">
-                <label className="field-label-wrap">
-                  Payable amount (&#8377;) &mdash; GST inclusive
-                  <input type="number" min="0" placeholder="e.g. 11800" value={fsPayable} onChange={(e) => setFsPayable(e.target.value)} />
-                </label>
-                <label className="field-label-wrap">
-                  GST rate (%)
-                  <div className="gst-rate-row">
-                    {['0', '5', '12', '18', '28'].map((r) => (
-                      <button key={r} type="button" className={fsGstRate === r ? 'gst-chip active' : 'gst-chip'} onClick={() => setFsGstRate(r)}>{r}%</button>
-                    ))}
-                    <input type="number" min="0" max="100" placeholder="custom" value={fsGstRate} onChange={(e) => setFsGstRate(e.target.value)} style={{ maxWidth: 80 }} />
+              {/* Step 1: pick item */}
+              <div className="fs-step">
+                <span className="fs-step-label">1. Select item</span>
+                {fsSelectedItem ? (
+                  <div className="fs-selected-item">
+                    <div>
+                      <strong>{fsSelectedItem.name}</strong>
+                      <span className="muted" style={{ marginLeft: 8 }}>{fsSelectedItem.itemType || ''}{fsSelectedItem.category ? ` · ${fsSelectedItem.category}` : ''}</span>
+                    </div>
+                    <button className="btn outline" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => { setFsSelectedItem(null); setFsItemSearch(''); }}>Change</button>
                   </div>
-                </label>
-                <label className="field-label-wrap">
-                  Discount on taxable (%)
-                  <input type="number" min="0" max="100" placeholder="0" value={fsDiscount} onChange={(e) => setFsDiscount(e.target.value)} />
-                </label>
-                <label className="field-label-wrap" style={{ gridColumn: '1/-1' }}>
-                  Description / item name
-                  <input placeholder="e.g. Solar panel installation, Consulting services..." value={fsDescription} onChange={(e) => setFsDescription(e.target.value)} />
-                </label>
+                ) : (
+                  <>
+                    <input placeholder="Search item by name, type, category..." value={fsItemSearch} onChange={(e) => setFsItemSearch(e.target.value)} />
+                    {fsItemSearch.trim() && (
+                      <div className="fs-item-results">
+                        {items.filter((it) => {
+                          const q = fsItemSearch.toLowerCase();
+                          return [it.name, it.itemType, it.category, it.specification].filter(Boolean).some((f) => f.toLowerCase().includes(q));
+                        }).slice(0, 8).map((it) => (
+                          <button key={it._id} className="fs-item-result-row" onClick={() => {
+                            setFsSelectedItem(it);
+                            setFsItemSearch('');
+                            if (!fsGstRate || fsGstRate === '18') {
+                              const rate = (it.sgstRate || 0) + (it.cgstRate || 0) + (it.igstRate || 0);
+                              if (rate > 0) setFsGstRate(String(rate));
+                            }
+                          }}>
+                            <span>{it.name}</span>
+                            <span className="muted">{it.itemType || ''}{it.category ? ` · ${it.category}` : ''}</span>
+                          </button>
+                        ))}
+                        {items.filter((it) => {
+                          const q = fsItemSearch.toLowerCase();
+                          return [it.name, it.itemType, it.category, it.specification].filter(Boolean).some((f) => f.toLowerCase().includes(q));
+                        }).length === 0 && <p className="muted" style={{ padding: '8px 12px' }}>No items found</p>}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Step 2: pricing */}
+              <div className="fs-step">
+                <span className="fs-step-label">2. Enter final payable amount &amp; GST</span>
+                <div className="fullsetup-grid">
+                  <label className="field-label-wrap">
+                    Final payable (&#8377;) &mdash; GST inclusive
+                    <input type="number" min="0" placeholder="e.g. 11800" value={fsPayable} onChange={(e) => setFsPayable(e.target.value)} />
+                  </label>
+                  <label className="field-label-wrap">
+                    GST rate (%)
+                    <div className="gst-rate-row">
+                      {['0', '5', '12', '18', '28'].map((r) => (
+                        <button key={r} type="button" className={fsGstRate === r ? 'gst-chip active' : 'gst-chip'} onClick={() => setFsGstRate(r)}>{r}%</button>
+                      ))}
+                      <input type="number" min="0" max="100" placeholder="custom" value={fsGstRate} onChange={(e) => setFsGstRate(e.target.value)} style={{ maxWidth: 80 }} />
+                    </div>
+                  </label>
+                  <label className="field-label-wrap">
+                    Discount on taxable (%)
+                    <input type="number" min="0" max="100" placeholder="0" value={fsDiscount} onChange={(e) => setFsDiscount(e.target.value)} />
+                  </label>
+                </div>
               </div>
               {fsPayableNum > 0 && (
                 <div className="fullsetup-breakdown">
@@ -1416,13 +1460,13 @@ function BillingPage({ user }) {
               fsPayableNum > 0 ? (
                 <div className="invoice-item-row">
                   <div>
-                    <strong>{fsDescription || 'Service / Goods'}</strong>
-                    <div className="muted">GST {fsGstRateNum}% incl.</div>
+                    <strong>{fsSelectedItem?.name || fsDescription || 'Service / Goods'}</strong>
+                    <div className="muted">{fsSelectedItem ? `${fsSelectedItem.itemType || ''}${fsSelectedItem.category ? ' · ' + fsSelectedItem.category : ''}` : ''} GST {fsGstRateNum}% incl.</div>
                   </div>
                   <div className="invoice-item-actions"><span>Qty: 1</span></div>
                   <strong>&#8377;{fsFinalTaxable.toFixed(2)}</strong>
                 </div>
-              ) : <div className="muted empty-invoice-state">Enter payable amount to preview.</div>
+              ) : <div className="muted empty-invoice-state">{fsSelectedItem ? 'Enter payable amount to preview.' : 'Select an item first.'}</div>
             ) : (
               selectedItems.length === 0
                 ? <div className="muted empty-invoice-state">No items added yet.</div>
