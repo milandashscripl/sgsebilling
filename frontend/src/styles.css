@@ -654,3 +654,41 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
 .status-message { padding: 11px 16px; border-radius: var(--radius-md); background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(24,111,175,0.06)); border: 1px solid rgba(34,197,94,0.2); color: #166534; font-weight: 600; font-size: 0.9rem; }
 .page-header h3 { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; color: #16406E; }
 .eyebrow { color: #3E6A9E; text-transform: uppercase; letter-spacing: 0.22em; font-size: 0.75rem; font-weight: 600; }
+
+/* ═══════════════════════════════════════════════
+   BILLING MODE TOGGLE BAR
+═══════════════════════════════════════════════ */
+.billing-mode-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+.billing-mode-btn { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: var(--radius-lg); border: 2px solid var(--panel-border); background: var(--panel-bg); cursor: pointer; text-align: left; transition: all 0.18s ease; box-shadow: var(--panel-shadow); }
+.billing-mode-btn:hover { border-color: rgba(24,111,175,0.3); background: rgba(24,111,175,0.04); transform: translateY(-1px); }
+.billing-mode-btn.active { border-color: #186FAF; background: linear-gradient(135deg, rgba(24,111,175,0.10), rgba(63,154,232,0.06)); box-shadow: 0 4px 16px rgba(24,111,175,0.14); }
+.billing-mode-btn.active .mode-label strong { color: #186FAF; }
+.mode-label { display: flex; flex-direction: column; gap: 3px; }
+.mode-label strong { font-size: 0.95rem; color: #1B2A3B; font-weight: 700; }
+.mode-label small { font-size: 0.78rem; color: #5E6F83; font-weight: 400; }
+@media (max-width: 640px) { .billing-mode-bar { grid-template-columns: 1fr; } }
+
+/* ═══════════════════════════════════════════════
+   FULL-SETUP BILLING FORM
+═══════════════════════════════════════════════ */
+.fullsetup-form { display: grid; gap: 16px; }
+.fullsetup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .fullsetup-grid { grid-template-columns: 1fr; } }
+.gst-rate-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.gst-chip { padding: 7px 14px; border-radius: 999px; border: 1.5px solid rgba(24,111,175,0.2); background: transparent; color: #186FAF; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.15s ease; }
+.gst-chip:hover { background: rgba(24,111,175,0.08); border-color: rgba(24,111,175,0.4); }
+.gst-chip.active { background: linear-gradient(135deg, #186FAF, #3F9AE8); color: #fff; border-color: transparent; box-shadow: 0 3px 10px rgba(24,111,175,0.3); }
+.fullsetup-breakdown { background: linear-gradient(135deg, rgba(24,111,175,0.05), rgba(63,154,232,0.03)); border: 1px solid rgba(24,111,175,0.12); border-radius: var(--radius-md); padding: 16px; display: grid; gap: 10px; }
+.breakdown-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; padding: 4px 0; border-bottom: 1px solid rgba(31,58,85,0.06); }
+.breakdown-row:last-child { border-bottom: none; }
+.breakdown-row span { color: #5E6F83; }
+.breakdown-row strong { color: #1B2A3B; font-weight: 700; }
+.breakdown-row.total-row { padding-top: 10px; margin-top: 4px; border-top: 2px solid rgba(24,111,175,0.15); border-bottom: none; }
+.breakdown-row.total-row span { font-weight: 700; color: #1B2A3B; font-size: 1rem; }
+.breakdown-row.total-row strong { font-size: 1.15rem; color: #186FAF; }
+
+/* ═══════════════════════════════════════════════
+   ITEMISED DISCOUNT ROW
+═══════════════════════════════════════════════ */
+.discount-row { display: flex; align-items: center; gap: 12px; padding: 10px 0 4px; }
+.discount-row .field-label { white-space: nowrap; margin: 0; }

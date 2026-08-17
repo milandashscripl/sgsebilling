@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Link, NavLink, useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import api from './api';
@@ -511,11 +511,11 @@ function ContactsPage() {
                         <div className="contact-name-row">
                           <strong>{c.name || 'Unknown'}</strong>
                           {recent && <span className="recent-badge">Recent</span>}
-                          <span className="contact-time">{getTimeAgo(c.lastContacted)} • {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span>
+                          <span className="contact-time">{getTimeAgo(c.lastContacted)} â€¢ {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span>
                         </div>
                         <div className="contact-meta">
-                          <span>{c.contactNumber || '—'}</span>
-                          <span>{c.consumerNumber || '—'}</span>
+                          <span>{c.contactNumber || 'â€”'}</span>
+                          <span>{c.consumerNumber || 'â€”'}</span>
                           <span>Calls: {c.callHistory ? c.callHistory.length : 0}</span>
                         </div>
                         <div className="status-row">
@@ -622,7 +622,7 @@ function Dashboard({ user }) {
       <div className="dashboard-summary-band">
         <div className="summary-highlight">
           <span>Net sales</span>
-          <strong>₹{netSales.toLocaleString()}</strong>
+          <strong>â‚¹{netSales.toLocaleString()}</strong>
         </div>
         <div className="summary-highlight muted-highlight">
           <span>Invoices</span>
@@ -640,7 +640,7 @@ function Dashboard({ user }) {
             <h4>Sales</h4>
             <span className="stat-trend up">Live</span>
           </div>
-          <p>₹{(summary.totalSales || 0).toLocaleString()}</p>
+          <p>â‚¹{(summary.totalSales || 0).toLocaleString()}</p>
           <span>Current period</span>
         </div>
         <div className="stat-card stat-purchases">
@@ -648,7 +648,7 @@ function Dashboard({ user }) {
             <h4>Purchases</h4>
             <span className="stat-trend neutral">Stock</span>
           </div>
-          <p>₹{(summary.totalPurchases || 0).toLocaleString()}</p>
+          <p>â‚¹{(summary.totalPurchases || 0).toLocaleString()}</p>
           <span>Inbound stock</span>
         </div>
         <div className="stat-card stat-returns">
@@ -656,7 +656,7 @@ function Dashboard({ user }) {
             <h4>Returns</h4>
             <span className="stat-trend down">Watch</span>
           </div>
-          <p>₹{(summary.totalReturns || 0).toLocaleString()}</p>
+          <p>â‚¹{(summary.totalReturns || 0).toLocaleString()}</p>
           <span>Returned value</span>
         </div>
         <div className="stat-card stat-invoices">
@@ -664,7 +664,7 @@ function Dashboard({ user }) {
             <h4>Inventory</h4>
             <span className="stat-trend up">Value</span>
           </div>
-          <p>₹{inventoryValue.toLocaleString()}</p>
+          <p>â‚¹{inventoryValue.toLocaleString()}</p>
           <span>Stock holding</span>
         </div>
       </div>
@@ -983,7 +983,7 @@ function ItemsPage() {
           <div className="list-row" key={itemType._id}>
             <div>
               <strong>{itemType.name}</strong>
-              <div className="muted">Unit {itemType.unit} • SGST {itemType.sgstRate}% • CGST {itemType.cgstRate}% • IGST {itemType.igstRate}%</div>
+              <div className="muted">Unit {itemType.unit} â€¢ SGST {itemType.sgstRate}% â€¢ CGST {itemType.cgstRate}% â€¢ IGST {itemType.igstRate}%</div>
             </div>
             <div className="inline-actions">
               <button className="btn secondary" type="button" onClick={() => editItemType(itemType)}>Edit</button>
@@ -1070,12 +1070,12 @@ function ItemsPage() {
             <div className="item-card-main">
               <div>
                 <strong>{item.name}</strong>
-                <div className="muted">{item.itemType || 'General'} • {item.category || 'General'}</div>
+                <div className="muted">{item.itemType || 'General'} â€¢ {item.category || 'General'}</div>
                 <div className="muted">{item.specification || 'No specification added'}</div>
               </div>
               <div className="item-meta">
                 <span className="badge">Stock {item.stock}</span>
-                <span className="badge">₹{item.salePrice}</span>
+                <span className="badge">â‚¹{item.salePrice}</span>
               </div>
             </div>
             <div className="inline-actions">
@@ -1100,16 +1100,21 @@ function BillingPage({ user }) {
   const [type, setType] = useState('sale');
   const [itemSearch, setItemSearch] = useState('');
   const [billingMessage, setBillingMessage] = useState('');
+  const [billingMode, setBillingMode] = useState('itemised');
+  const [fsPayable, setFsPayable] = useState('');
+  const [fsGstRate, setFsGstRate] = useState('18');
+  const [fsDescription, setFsDescription] = useState('');
+  const [fsDiscount, setFsDiscount] = useState('0');
+  const [discount, setDiscount] = useState('0');
   const [vendorForm, setVendorForm] = useState({ name: user?.name || '', shopName: user?.shopName || '', shopAddress: user?.shopAddress || '', shopGSTIN: user?.shopGSTIN || '', phone: user?.phone || '', shopLogoUrl: user?.shopLogoUrl || '' });
   const [vendorMsg, setVendorMsg] = useState('');
   const [showVendorEdit, setShowVendorEdit] = useState(false);
-  const [logoFile, setLogoFile] = useState(null);
   const [currentUser, setCurrentUser] = useState(user);
 
   const vendor = {
     name: currentUser?.shopName || currentUser?.name || 'SGSE Billing',
-    phone: currentUser?.phone || currentUser?.mobile || '',
-    address: currentUser?.shopAddress || currentUser?.address || 'Your business address',
+    phone: currentUser?.phone || '',
+    address: currentUser?.shopAddress || currentUser?.address || '',
     logo: currentUser?.shopLogoUrl || ''
   };
 
@@ -1131,7 +1136,6 @@ function BillingPage({ user }) {
   const uploadLogo = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setLogoFile(file);
     const formData = new FormData();
     formData.append('logo', file);
     try {
@@ -1142,9 +1146,7 @@ function BillingPage({ user }) {
       setVendorForm(f => ({ ...f, shopLogoUrl: updated.shopLogoUrl }));
       setVendorMsg('Logo uploaded');
       setTimeout(() => setVendorMsg(''), 3000);
-    } catch (err) {
-      setVendorMsg('Logo upload failed');
-    }
+    } catch { setVendorMsg('Logo upload failed'); }
   };
 
   useEffect(() => { api.get('/items').then((res) => setItems(res.data || [])).catch(() => {}); }, []);
@@ -1161,76 +1163,87 @@ function BillingPage({ user }) {
     setSelectedItems((prev) => {
       const existing = prev.find((x) => x.item === item._id);
       if (existing) {
-        return prev.map((x) => x.item === item._id ? { ...x, quantity: x.quantity + 1, total: (x.price * (x.quantity + 1)) } : x);
+        return prev.map((x) => x.item === item._id ? { ...x, quantity: x.quantity + 1 } : x);
       }
-
       const price = type === 'purchase' ? item.purchasePrice : item.salePrice;
-      return [...prev, { item: item._id, name: item.name, quantity: 1, price, sgstRate: item.sgstRate || 0, cgstRate: item.cgstRate || 0, igstRate: item.igstRate || 0, total: price }];
+      return [...prev, { item: item._id, name: item.name, quantity: 1, price, sgstRate: item.sgstRate || 0, cgstRate: item.cgstRate || 0, igstRate: item.igstRate || 0 }];
     });
   };
 
   const updateQty = (id, delta) => {
-    setSelectedItems((prev) => prev.map((entry) => entry.item === id ? { ...entry, quantity: Math.max(1, entry.quantity + delta), total: (entry.price * Math.max(1, entry.quantity + delta)) } : entry));
+    setSelectedItems((prev) => prev
+      .map((e) => e.item === id ? { ...e, quantity: Math.max(1, e.quantity + delta) } : e)
+    );
   };
 
+  const removeItem = (id) => setSelectedItems((prev) => prev.filter((e) => e.item !== id));
+
+  // Itemised calculations
+  const discountPct = Math.min(100, Math.max(0, Number(discount) || 0));
+  const subtotalRaw = selectedItems.reduce((s, e) => s + e.quantity * e.price, 0);
+  const discountAmt = subtotalRaw * discountPct / 100;
+  const subtotal = subtotalRaw - discountAmt;
+  const gstAmount = selectedItems.reduce((s, e) => {
+    const base = e.quantity * e.price * (1 - discountPct / 100);
+    return s + base * ((e.sgstRate || 0) + (e.cgstRate || 0) + (e.igstRate || 0)) / 100;
+  }, 0);
+  const total = subtotal + gstAmount;
+
+  // Full-setup calculations
+  const fsPayableNum = Number(fsPayable) || 0;
+  const fsGstRateNum = Math.max(0, Number(fsGstRate) || 0);
+  const fsDiscountNum = Math.min(100, Math.max(0, Number(fsDiscount) || 0));
+  const fsTaxable = fsGstRateNum > 0 ? fsPayableNum / (1 + fsGstRateNum / 100) : fsPayableNum;
+  const fsGstAmt = fsPayableNum - fsTaxable;
+  const fsDiscountAmt = fsTaxable * fsDiscountNum / 100;
+  const fsFinalTaxable = fsTaxable - fsDiscountAmt;
+  const fsFinalTotal = fsFinalTaxable + fsGstAmt;
+
   const saveInvoice = async () => {
-    if (!selectedItems.length) {
-      setBillingMessage('Please add at least one item before creating a bill');
+    if (billingMode === 'itemised' && !selectedItems.length) {
+      setBillingMessage('Add at least one item before creating a bill');
       return;
     }
-
+    if (billingMode === 'fullsetup' && !fsPayableNum) {
+      setBillingMessage('Enter the payable amount');
+      return;
+    }
     try {
-      const payload = {
-        partyName: partyName || customerName,
-        partyPhone: partyPhone || customerPhone,
-        partyGSTIN,
-        customerName,
-        customerPhone,
-        type,
-        items: selectedItems.map((entry) => ({ ...entry, itemId: entry.item, total: entry.quantity * entry.price }))
-      };
+      let invoiceItems, invoiceSubtotal, invoiceGst, invoiceTotal;
+      if (billingMode === 'fullsetup') {
+        invoiceItems = [{ name: fsDescription || 'Service / Goods', quantity: 1, price: fsFinalTaxable, sgstRate: 0, cgstRate: 0, igstRate: 0, total: fsFinalTaxable }];
+        invoiceSubtotal = fsFinalTaxable;
+        invoiceGst = fsGstAmt;
+        invoiceTotal = fsFinalTotal;
+      } else {
+        invoiceItems = selectedItems.map((e) => ({ ...e, itemId: e.item, total: e.quantity * e.price * (1 - discountPct / 100) }));
+        invoiceSubtotal = subtotal;
+        invoiceGst = gstAmount;
+        invoiceTotal = total;
+      }
+      const payload = { partyName: partyName || customerName, partyPhone: partyPhone || customerPhone, partyGSTIN, customerName, customerPhone, type, billingMode, items: invoiceItems };
       const res = await api.post('/invoices', payload);
-      const savedInvoice = res.data || {};
-      const printableInvoice = {
-        ...savedInvoice,
+      const saved = res.data || {};
+      await downloadInvoicePdf({
+        ...saved,
         sellerName: vendor.name,
         sellerAddress: vendor.address,
         sellerPhone: vendor.phone,
         sellerGSTIN: currentUser?.shopGSTIN || '',
         sellerLogo: vendor.logo,
-        items: (savedInvoice.items || selectedItems.map((entry) => ({
-          item: entry.item,
-          name: entry.name,
-          quantity: entry.quantity,
-          price: entry.price,
-          sgstRate: entry.sgstRate || 0,
-          cgstRate: entry.cgstRate || 0,
-          igstRate: entry.igstRate || 0,
-          total: entry.quantity * entry.price
-        }))).map((entry) => ({
-          ...entry,
-          total: Number(entry.total || ((Number(entry.quantity || 0) * Number(entry.price || 0))))
-        }))
-      };
-      await downloadInvoicePdf(printableInvoice);
-      setBillingMessage('Invoice created successfully and PDF downloaded');
-      setSelectedItems([]);
-      setPartyName('');
-      setPartyPhone('');
-      setPartyGSTIN('');
-      setCustomerName('');
-      setCustomerPhone('');
-    } catch (error) {
-      setBillingMessage(error.response?.data?.message || 'Unable to create invoice');
+        subtotal: invoiceSubtotal,
+        gstAmount: invoiceGst,
+        grandTotal: invoiceTotal,
+        items: invoiceItems.map((e) => ({ ...e, total: Number(e.total || 0) }))
+      });
+      setBillingMessage('Invoice created and PDF downloaded');
+      setSelectedItems([]); setPartyName(''); setPartyPhone(''); setPartyGSTIN(''); setCustomerName(''); setCustomerPhone('');
+      setFsPayable(''); setFsDescription(''); setFsDiscount('0'); setDiscount('0');
+      setTimeout(() => setBillingMessage(''), 4000);
+    } catch (err) {
+      setBillingMessage(err.response?.data?.message || 'Unable to create invoice');
     }
   };
-
-  const subtotal = selectedItems.reduce((sum, entry) => sum + entry.quantity * entry.price, 0);
-  const gstAmount = selectedItems.reduce((sum, entry) => {
-    const base = entry.quantity * entry.price;
-    return sum + (base * (entry.sgstRate || 0) / 100) + (base * (entry.cgstRate || 0) / 100) + (base * (entry.igstRate || 0) / 100);
-  }, 0);
-  const total = subtotal + gstAmount;
 
   return (
     <div className="billing-page">
@@ -1239,13 +1252,13 @@ function BillingPage({ user }) {
         <h3>Invoice workspace</h3>
       </div>
 
+      {/* Vendor profile card */}
       <div className="vendor-profile-card panel">
         <div className="vendor-profile-head">
           <div className="vendor-logo-wrap">
             {vendor.logo
               ? <img src={vendor.logo} alt={vendor.name} className="vendor-logo" />
-              : <div className="vendor-logo placeholder">{(vendor.name || 'SG').slice(0, 2).toUpperCase()}</div>
-            }
+              : <div className="vendor-logo placeholder">{(vendor.name || 'SG').slice(0, 2).toUpperCase()}</div>}
           </div>
           <div className="vendor-profile-info">
             <strong className="vendor-name">{vendor.name}</strong>
@@ -1253,9 +1266,10 @@ function BillingPage({ user }) {
             {vendor.phone && <span className="muted">{vendor.phone}</span>}
             {currentUser?.shopGSTIN && <span className="muted">GSTIN: {currentUser.shopGSTIN}</span>}
           </div>
-          <button className="btn outline vendor-edit-btn" onClick={() => { setShowVendorEdit(v => !v); setVendorForm({ name: currentUser?.name || '', shopName: currentUser?.shopName || '', shopAddress: currentUser?.shopAddress || '', shopGSTIN: currentUser?.shopGSTIN || '', phone: currentUser?.phone || '', shopLogoUrl: currentUser?.shopLogoUrl || '' }); }}>
-            {showVendorEdit ? 'Cancel' : '✎ Edit profile'}
-          </button>
+          <button className="btn outline vendor-edit-btn" onClick={() => {
+            setShowVendorEdit((v) => !v);
+            setVendorForm({ name: currentUser?.name || '', shopName: currentUser?.shopName || '', shopAddress: currentUser?.shopAddress || '', shopGSTIN: currentUser?.shopGSTIN || '', phone: currentUser?.phone || '', shopLogoUrl: currentUser?.shopLogoUrl || '' });
+          }}>{showVendorEdit ? 'Cancel' : 'Edit profile'}</button>
         </div>
         {vendorMsg && <p className="status-message" style={{ marginTop: 8 }}>{vendorMsg}</p>}
         {showVendorEdit && (
@@ -1264,34 +1278,44 @@ function BillingPage({ user }) {
               <div className="vendor-logo-preview">
                 {vendorForm.shopLogoUrl
                   ? <img src={vendorForm.shopLogoUrl} alt="logo" className="vendor-logo" />
-                  : <div className="vendor-logo placeholder">{(vendorForm.shopName || 'SG').slice(0, 2).toUpperCase()}</div>
-                }
+                  : <div className="vendor-logo placeholder">{(vendorForm.shopName || 'SG').slice(0, 2).toUpperCase()}</div>}
               </div>
               <label className="logo-upload-label">
                 <input type="file" accept="image/*" onChange={uploadLogo} style={{ display: 'none' }} />
-                <span className="btn outline" style={{ cursor: 'pointer' }}>📷 Upload logo</span>
+                <span className="btn outline" style={{ cursor: 'pointer' }}>Upload logo</span>
               </label>
             </div>
             <div className="form-grid">
-              <label className="field-label-wrap">Your name<input value={vendorForm.name} onChange={e => setVendorForm({ ...vendorForm, name: e.target.value })} /></label>
-              <label className="field-label-wrap">Shop / business name<input value={vendorForm.shopName} onChange={e => setVendorForm({ ...vendorForm, shopName: e.target.value })} /></label>
-              <label className="field-label-wrap">Phone<input value={vendorForm.phone} onChange={e => setVendorForm({ ...vendorForm, phone: e.target.value })} /></label>
-              <label className="field-label-wrap">GSTIN<input value={vendorForm.shopGSTIN} onChange={e => setVendorForm({ ...vendorForm, shopGSTIN: e.target.value })} /></label>
-              <label className="field-label-wrap" style={{ gridColumn: '1/-1' }}>Address<input value={vendorForm.shopAddress} onChange={e => setVendorForm({ ...vendorForm, shopAddress: e.target.value })} /></label>
+              <label className="field-label-wrap">Your name<input value={vendorForm.name} onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })} /></label>
+              <label className="field-label-wrap">Shop / business name<input value={vendorForm.shopName} onChange={(e) => setVendorForm({ ...vendorForm, shopName: e.target.value })} /></label>
+              <label className="field-label-wrap">Phone<input value={vendorForm.phone} onChange={(e) => setVendorForm({ ...vendorForm, phone: e.target.value })} /></label>
+              <label className="field-label-wrap">GSTIN<input value={vendorForm.shopGSTIN} onChange={(e) => setVendorForm({ ...vendorForm, shopGSTIN: e.target.value })} /></label>
+              <label className="field-label-wrap" style={{ gridColumn: '1/-1' }}>Address<input value={vendorForm.shopAddress} onChange={(e) => setVendorForm({ ...vendorForm, shopAddress: e.target.value })} /></label>
             </div>
             <button className="btn primary" type="submit">Save profile</button>
           </form>
         )}
       </div>
 
+      {/* Billing mode toggle */}
+      <div className="billing-mode-bar">
+        <button className={billingMode === 'itemised' ? 'billing-mode-btn active' : 'billing-mode-btn'} onClick={() => setBillingMode('itemised')}>
+          <span className="mode-label"><strong>Itemised billing</strong><small>Add items &mdash; GST added on top</small></span>
+        </button>
+        <button className={billingMode === 'fullsetup' ? 'billing-mode-btn active' : 'billing-mode-btn'} onClick={() => setBillingMode('fullsetup')}>
+          <span className="mode-label"><strong>Full-setup billing</strong><small>Enter payable amount &mdash; GST back-calculated</small></span>
+        </button>
+      </div>
+
       <div className="billing-grid">
+        {/* LEFT: form panel */}
         <div className="panel billing-form-panel">
           <div className="billing-form-header">
             <div>
-              <h4>New invoice</h4>
-              <p className="muted">Create a clean, branded bill with vendor details included.</p>
+              <h4>{billingMode === 'itemised' ? 'Itemised invoice' : 'Full-setup invoice'}</h4>
+              <p className="muted">{billingMode === 'itemised' ? 'Pick items â€” totals and GST calculated automatically.' : 'Enter the final payable amount and GST % â€” taxable value is back-calculated.'}</p>
             </div>
-            <select value={type} onChange={(e) => setType(e.target.value)}>
+            <select value={type} onChange={(e) => setType(e.target.value)} style={{ maxWidth: 140 }}>
               <option value="sale">Sale</option>
               <option value="purchase">Purchase</option>
               <option value="return">Return</option>
@@ -1299,36 +1323,73 @@ function BillingPage({ user }) {
           </div>
 
           <div className="billing-customer-grid">
-            <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
+            <input placeholder="Party / company name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
             <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
             <input placeholder="Party GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
             <input placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-            <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+            <input placeholder="Customer phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
           </div>
 
-          <div className="item-search-block">
-            <label className="muted">Search items</label>
-            <input
-              placeholder="Search by item, type, category..."
-              value={itemSearch}
-              onChange={(e) => setItemSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="item-list">
-            {filteredItems.length === 0 ? (
-              <p className="muted empty-invoice-state">No matching items found.</p>
-            ) : (
-              filteredItems.map((item) => (
-                <button key={item._id} className="item-chip" onClick={() => addItem(item)}>
-                  <span>{item.name}</span>
-                  <small>₹{type === 'purchase' ? item.purchasePrice : item.salePrice}</small>
-                </button>
-              ))
-            )}
-          </div>
+          {billingMode === 'itemised' ? (
+            <>
+              <div className="item-search-block">
+                <label className="field-label">Search &amp; add items</label>
+                <input placeholder="Search by name, type, category..." value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} />
+              </div>
+              <div className="item-list">
+                {filteredItems.length === 0
+                  ? <p className="muted empty-invoice-state">No matching items found.</p>
+                  : filteredItems.map((item) => (
+                    <button key={item._id} className="item-chip" onClick={() => addItem(item)}>
+                      <span>{item.name}</span>
+                      <small>&#8377;{type === 'purchase' ? item.purchasePrice : item.salePrice}</small>
+                    </button>
+                  ))}
+              </div>
+              <div className="discount-row">
+                <label className="field-label">Discount %</label>
+                <input type="number" min="0" max="100" placeholder="0" value={discount} onChange={(e) => setDiscount(e.target.value)} style={{ maxWidth: 120 }} />
+              </div>
+            </>
+          ) : (
+            <div className="fullsetup-form">
+              <div className="fullsetup-grid">
+                <label className="field-label-wrap">
+                  Payable amount (&#8377;) &mdash; GST inclusive
+                  <input type="number" min="0" placeholder="e.g. 11800" value={fsPayable} onChange={(e) => setFsPayable(e.target.value)} />
+                </label>
+                <label className="field-label-wrap">
+                  GST rate (%)
+                  <div className="gst-rate-row">
+                    {['0', '5', '12', '18', '28'].map((r) => (
+                      <button key={r} type="button" className={fsGstRate === r ? 'gst-chip active' : 'gst-chip'} onClick={() => setFsGstRate(r)}>{r}%</button>
+                    ))}
+                    <input type="number" min="0" max="100" placeholder="custom" value={fsGstRate} onChange={(e) => setFsGstRate(e.target.value)} style={{ maxWidth: 80 }} />
+                  </div>
+                </label>
+                <label className="field-label-wrap">
+                  Discount on taxable (%)
+                  <input type="number" min="0" max="100" placeholder="0" value={fsDiscount} onChange={(e) => setFsDiscount(e.target.value)} />
+                </label>
+                <label className="field-label-wrap" style={{ gridColumn: '1/-1' }}>
+                  Description / item name
+                  <input placeholder="e.g. Solar panel installation, Consulting services..." value={fsDescription} onChange={(e) => setFsDescription(e.target.value)} />
+                </label>
+              </div>
+              {fsPayableNum > 0 && (
+                <div className="fullsetup-breakdown">
+                  <div className="breakdown-row"><span>Amount entered</span><strong>&#8377;{fsPayableNum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
+                  <div className="breakdown-row"><span>Taxable value (excl. GST)</span><strong>&#8377;{fsTaxable.toFixed(2)}</strong></div>
+                  {fsDiscountNum > 0 && <div className="breakdown-row"><span>Discount ({fsDiscountNum}%)</span><strong style={{ color: '#C23C3C' }}>- &#8377;{fsDiscountAmt.toFixed(2)}</strong></div>}
+                  <div className="breakdown-row"><span>GST ({fsGstRateNum}%)</span><strong>&#8377;{fsGstAmt.toFixed(2)}</strong></div>
+                  <div className="breakdown-row total-row"><span>Final payable</span><strong>&#8377;{fsFinalTotal.toFixed(2)}</strong></div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
+        {/* RIGHT: invoice preview */}
         <div className="panel invoice-preview-panel">
           <div className="invoice-header">
             <div className="invoice-brand">
@@ -1340,59 +1401,76 @@ function BillingPage({ user }) {
               </div>
             </div>
             <div className="invoice-meta">
-              <span>{type === 'sale' ? 'Sale Invoice' : type === 'purchase' ? 'Purchase Invoice' : 'Return Invoice'}</span>
+              <span>{type === 'sale' ? 'Sale' : type === 'purchase' ? 'Purchase' : 'Return'}</span>
             </div>
           </div>
 
           <div className="invoice-customer-box">
-            <div>
-              <span className="invoice-label">Bill to</span>
-              <strong>{partyName || customerName || 'Walk-in Customer'}</strong>
-            </div>
-            <div>
-              <span className="invoice-label">Phone</span>
-              <strong>{partyPhone || customerPhone || '—'}</strong>
-            </div>
-            <div>
-              <span className="invoice-label">GSTIN</span>
-              <strong>{partyGSTIN || '—'}</strong>
-            </div>
+            <div><span className="invoice-label">Bill to</span><strong>{partyName || customerName || 'Walk-in Customer'}</strong></div>
+            <div><span className="invoice-label">Phone</span><strong>{partyPhone || customerPhone || 'â€”'}</strong></div>
+            <div><span className="invoice-label">GSTIN</span><strong>{partyGSTIN || 'â€”'}</strong></div>
           </div>
 
           <div className="invoice-items">
-            {selectedItems.length === 0 ? (
-              <div className="muted empty-invoice-state">No items added yet.</div>
-            ) : (
-              selectedItems.map((entry) => (
-                <div className="invoice-item-row" key={entry.item}>
+            {billingMode === 'fullsetup' ? (
+              fsPayableNum > 0 ? (
+                <div className="invoice-item-row">
                   <div>
-                    <strong>{entry.name}</strong>
-                    <div className="muted">₹{entry.price} × {entry.quantity}</div>
+                    <strong>{fsDescription || 'Service / Goods'}</strong>
+                    <div className="muted">GST {fsGstRateNum}% incl.</div>
                   </div>
-                  <div className="invoice-item-actions">
-                    <button className="btn small" onClick={() => updateQty(entry.item, -1)}>-</button>
-                    <span>{entry.quantity}</span>
-                    <button className="btn small" onClick={() => updateQty(entry.item, 1)}>+</button>
-                  </div>
-                  <strong>₹{(entry.quantity * entry.price).toFixed(2)}</strong>
+                  <div className="invoice-item-actions"><span>Qty: 1</span></div>
+                  <strong>&#8377;{fsFinalTaxable.toFixed(2)}</strong>
                 </div>
-              ))
+              ) : <div className="muted empty-invoice-state">Enter payable amount to preview.</div>
+            ) : (
+              selectedItems.length === 0
+                ? <div className="muted empty-invoice-state">No items added yet.</div>
+                : selectedItems.map((entry) => (
+                  <div className="invoice-item-row" key={entry.item}>
+                    <div>
+                      <strong>{entry.name}</strong>
+                      <div className="muted">&#8377;{entry.price} &times; {entry.quantity}{discountPct > 0 ? ` âˆ’ ${discountPct}%` : ''}</div>
+                    </div>
+                    <div className="invoice-item-actions">
+                      <button className="btn small" onClick={() => updateQty(entry.item, -1)}>-</button>
+                      <span>{entry.quantity}</span>
+                      <button className="btn small" onClick={() => updateQty(entry.item, 1)}>+</button>
+                      <button className="btn small" style={{ color: '#C23C3C' }} onClick={() => removeItem(entry.item)}>x</button>
+                    </div>
+                    <strong>&#8377;{(entry.quantity * entry.price * (1 - discountPct / 100)).toFixed(2)}</strong>
+                  </div>
+                ))
             )}
           </div>
 
           <div className="invoice-totals">
-            <div><span>Subtotal</span><strong>₹{subtotal.toFixed(2)}</strong></div>
-            <div><span>GST</span><strong>₹{gstAmount.toFixed(2)}</strong></div>
-            <div className="grand-total"><span>Total</span><strong>₹{total.toFixed(2)}</strong></div>
+            {billingMode === 'itemised' ? (
+              <>
+                <div><span>Subtotal</span><strong>&#8377;{subtotalRaw.toFixed(2)}</strong></div>
+                {discountPct > 0 && <div><span>Discount ({discountPct}%)</span><strong style={{ color: '#C23C3C' }}>- &#8377;{discountAmt.toFixed(2)}</strong></div>}
+                <div><span>Taxable</span><strong>&#8377;{subtotal.toFixed(2)}</strong></div>
+                <div><span>GST</span><strong>&#8377;{gstAmount.toFixed(2)}</strong></div>
+                <div className="grand-total"><span>Total payable</span><strong>&#8377;{total.toFixed(2)}</strong></div>
+              </>
+            ) : (
+              <>
+                <div><span>Taxable value</span><strong>&#8377;{fsTaxable.toFixed(2)}</strong></div>
+                {fsDiscountNum > 0 && <div><span>Discount ({fsDiscountNum}%)</span><strong style={{ color: '#C23C3C' }}>- &#8377;{fsDiscountAmt.toFixed(2)}</strong></div>}
+                <div><span>GST ({fsGstRateNum}%)</span><strong>&#8377;{fsGstAmt.toFixed(2)}</strong></div>
+                <div className="grand-total"><span>Total payable</span><strong>&#8377;{fsFinalTotal.toFixed(2)}</strong></div>
+              </>
+            )}
           </div>
 
-          {billingMessage && <p className="muted billing-message">{billingMessage}</p>}
-          <button className="btn primary invoice-create-btn" onClick={saveInvoice}>Create bill & download PDF</button>
+          {billingMessage && <p className={billingMessage.includes('created') ? 'status-message' : 'error'} style={{ margin: '8px 0' }}>{billingMessage}</p>}
+          <button className="btn primary invoice-create-btn" onClick={saveInvoice}>Create bill &amp; download PDF</button>
         </div>
       </div>
     </div>
   );
 }
+
 
 function AccountingPage() {
   const [accounts, setAccounts] = useState([]);
@@ -1538,10 +1616,10 @@ function AccountingPage() {
         y = 20;
       }
       doc.text(exp.category || 'General', margin + 2, y);
-      doc.text(`₹${Number(exp.amount || 0).toLocaleString()}`, pageWidth - margin - 2, y, { align: 'right' });
+      doc.text(`â‚¹${Number(exp.amount || 0).toLocaleString()}`, pageWidth - margin - 2, y, { align: 'right' });
       y += lineHeight;
       doc.setFontSize(8);
-      doc.text(`${exp.date ? formatAbsoluteDate(exp.date) : '—'} • ${exp.paymentMethod || 'cash'}`, margin + 2, y);
+      doc.text(`${exp.date ? formatAbsoluteDate(exp.date) : 'â€”'} â€¢ ${exp.paymentMethod || 'cash'}`, margin + 2, y);
       y += 4;
       doc.setFontSize(10);
     });
@@ -1555,15 +1633,15 @@ function AccountingPage() {
       {message && <p className="muted">{message}</p>}
 
       <div className="stats-grid">
-        <div className="stat-card"><h4>Income total</h4><p>₹{(summary.incomeTotal || 0).toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Expense total</h4><p>₹{(summary.expenseTotal || 0).toLocaleString()}</p></div>
+        <div className="stat-card"><h4>Income total</h4><p>â‚¹{(summary.incomeTotal || 0).toLocaleString()}</p></div>
+        <div className="stat-card"><h4>Expense total</h4><p>â‚¹{(summary.expenseTotal || 0).toLocaleString()}</p></div>
       </div>
 
       <div className="panel acct-balances-panel">
         <div className="panel-header">
           <h4>Account balances</h4>
           <button className={`btn ${showTransfer ? 'primary' : 'outline'}`} onClick={() => setShowTransfer(v => !v)}>
-            {showTransfer ? '✕ Close transfer' : '⇄ Transfer funds'}
+            {showTransfer ? 'âœ• Close transfer' : 'â‡„ Transfer funds'}
           </button>
         </div>
 
@@ -1571,7 +1649,7 @@ function AccountingPage() {
           <div className="transfer-panel">
             <div className="transfer-panel-inner">
               <div className="transfer-header">
-                <span className="transfer-icon">⇄</span>
+                <span className="transfer-icon">â‡„</span>
                 <div>
                   <strong>Fund Transfer</strong>
                   <p className="muted">Move money between accounts. Withdrawn from source, credited to destination.</p>
@@ -1596,24 +1674,24 @@ function AccountingPage() {
                     <select value={transferForm.fromAccountId} onChange={e => setTransferForm({ ...transferForm, fromAccountId: e.target.value })} required>
                       <option value="">Select source</option>
                       {summary.accounts.map(a => (
-                        <option key={a._id} value={a._id}>{a.name} — ₹{Number(a.balance || 0).toLocaleString()}</option>
+                        <option key={a._id} value={a._id}>{a.name} â€” â‚¹{Number(a.balance || 0).toLocaleString()}</option>
                       ))}
                     </select>
                   </div>
-                  <div className="transfer-arrow">→</div>
+                  <div className="transfer-arrow">â†’</div>
                   <div className="transfer-field">
                     <label className="field-label">To account</label>
                     <select value={transferForm.toAccountId} onChange={e => setTransferForm({ ...transferForm, toAccountId: e.target.value })} required>
                       <option value="">Select destination</option>
                       {summary.accounts.filter(a => a._id !== transferForm.fromAccountId).map(a => (
-                        <option key={a._id} value={a._id}>{a.name} — ₹{Number(a.balance || 0).toLocaleString()}</option>
+                        <option key={a._id} value={a._id}>{a.name} â€” â‚¹{Number(a.balance || 0).toLocaleString()}</option>
                       ))}
                     </select>
                   </div>
                 </div>
                 <div className="transfer-row">
                   <div className="transfer-field">
-                    <label className="field-label">Amount (₹)</label>
+                    <label className="field-label">Amount (â‚¹)</label>
                     <input type="number" min="1" placeholder="0" value={transferForm.amount} onChange={e => setTransferForm({ ...transferForm, amount: e.target.value })} required />
                   </div>
                   <div className="transfer-field">
@@ -1629,11 +1707,11 @@ function AccountingPage() {
                     <div className="transfer-preview">
                       <div className="transfer-preview-item debit">
                         <span>{from?.name}</span>
-                        <strong>₹{Number(from?.balance || 0).toLocaleString()} → ₹{Math.max(0, Number(from?.balance || 0) - amt).toLocaleString()}</strong>
+                        <strong>â‚¹{Number(from?.balance || 0).toLocaleString()} â†’ â‚¹{Math.max(0, Number(from?.balance || 0) - amt).toLocaleString()}</strong>
                       </div>
                       <div className="transfer-preview-item credit">
                         <span>{to?.name}</span>
-                        <strong>₹{Number(to?.balance || 0).toLocaleString()} → ₹{(Number(to?.balance || 0) + amt).toLocaleString()}</strong>
+                        <strong>â‚¹{Number(to?.balance || 0).toLocaleString()} â†’ â‚¹{(Number(to?.balance || 0) + amt).toLocaleString()}</strong>
                       </div>
                     </div>
                   );
@@ -1649,13 +1727,13 @@ function AccountingPage() {
             <div className={`account-balance-card account-type-${account.type}`} key={account._id}>
               <div className="account-card-top">
                 <div className="account-type-icon">
-                  {account.type === 'cash' ? '💵' : account.type === 'bank' ? '🏦' : account.type === 'digital' ? '📱' : '💼'}
+                  {account.type === 'cash' ? 'ðŸ’µ' : account.type === 'bank' ? 'ðŸ¦' : account.type === 'digital' ? 'ðŸ“±' : 'ðŸ’¼'}
                 </div>
                 <div className="account-card-info">
                   <strong>{account.name}</strong>
                   <span className="account-type-label">{account.type}</span>
                 </div>
-                <div className="account-balance-amount">₹{Number(account.balance || 0).toLocaleString()}</div>
+                <div className="account-balance-amount">â‚¹{Number(account.balance || 0).toLocaleString()}</div>
               </div>
               <div className="account-card-actions">
                 <button className="btn outline acct-btn" onClick={() => setDepositTarget(depositTarget === account._id ? null : account._id)}>
@@ -1774,11 +1852,11 @@ function AccountingPage() {
             <div className="list-row" key={exp._id}>
               <div>
                 <strong>{exp.category || 'Expense'}</strong>
-                <div className="muted">{(accounts.find(a => a._id === exp.accountId)?.name) || exp.accountName || '—'} • {exp.paymentMethod} • {exp.date ? formatAbsoluteDate(exp.date) : (exp.createdAt ? formatAbsoluteDate(exp.createdAt) : '—')}</div>
+                <div className="muted">{(accounts.find(a => a._id === exp.accountId)?.name) || exp.accountName || 'â€”'} â€¢ {exp.paymentMethod} â€¢ {exp.date ? formatAbsoluteDate(exp.date) : (exp.createdAt ? formatAbsoluteDate(exp.createdAt) : 'â€”')}</div>
                 {exp.note && <div className="muted">{exp.note}</div>}
               </div>
               <div style={{textAlign:'right'}}>
-                <div style={{color:'#C23C3C'}}>- ₹{Number(exp.amount || 0).toLocaleString()}</div>
+                <div style={{color:'#C23C3C'}}>- â‚¹{Number(exp.amount || 0).toLocaleString()}</div>
                 <div style={{marginTop:8}}><button className="btn outline" onClick={() => deleteExpense(exp._id)}>Delete</button></div>
               </div>
             </div>
@@ -1791,7 +1869,7 @@ function AccountingPage() {
         {summary.paymentMethods.map((entry) => (
           <div className="list-row" key={entry.method}>
             <div><strong>{entry.method}</strong></div>
-            <div>₹{Number(entry.total || 0).toLocaleString()}</div>
+            <div>â‚¹{Number(entry.total || 0).toLocaleString()}</div>
           </div>
         ))}
       </div>
@@ -1802,9 +1880,9 @@ function AccountingPage() {
           <div className="list-row" key={entry._id}>
             <div>
               <strong>{entry.reference || entry.note || 'Ledger entry'}</strong>
-              <div className="muted">{entry.date} • {entry.paymentMethod}</div>
+              <div className="muted">{entry.date} â€¢ {entry.paymentMethod}</div>
             </div>
-            <div>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</div>
+            <div>{entry.type === 'income' ? '+' : '-'} â‚¹{Number(entry.amount || 0).toLocaleString()}</div>
           </div>
         ))}
       </div>
@@ -1853,7 +1931,7 @@ function StockPage() {
         </div>
         <div className="stat-card stat-invoices">
           <h4>Inventory value</h4>
-          <p>₹{inventoryValue.toLocaleString()}</p>
+          <p>â‚¹{inventoryValue.toLocaleString()}</p>
           <span>Current stock</span>
         </div>
       </div>
@@ -1890,7 +1968,7 @@ function StockPage() {
                       <td>{item.itemType || 'General'}</td>
                       <td>{item.category || 'General'}</td>
                       <td>{stockLevel}</td>
-                      <td>₹{Number(item.salePrice || 0).toLocaleString()}</td>
+                      <td>â‚¹{Number(item.salePrice || 0).toLocaleString()}</td>
                       <td><span className={`status-badge ${status === 'Critical' ? 'status-hot-lead' : status === 'Low' ? 'status-warm-lead' : 'status-may-convert'}`}>{status}</span></td>
                     </tr>
                   );
@@ -2001,9 +2079,9 @@ function ReportsPage() {
 
       if (reportType === 'summary' || reportType === 'all') {
         addSectionHeader('Financial Summary');
-        addLine('Total Sales', `₹${summary.totalSales.toLocaleString()}`);
-        addLine('Total Purchases', `₹${summary.totalPurchases.toLocaleString()}`);
-        addLine('Total Returns', `₹${summary.totalReturns.toLocaleString()}`);
+        addLine('Total Sales', `â‚¹${summary.totalSales.toLocaleString()}`);
+        addLine('Total Purchases', `â‚¹${summary.totalPurchases.toLocaleString()}`);
+        addLine('Total Returns', `â‚¹${summary.totalReturns.toLocaleString()}`);
         addLine('Invoice Count', `${summary.invoiceCount}`);
         yPos += 5;
       }
@@ -2017,7 +2095,7 @@ function ReportsPage() {
             item.itemType || '-',
             item.category || '-',
             item.stock || 0,
-            `₹${item.salePrice || 0}`
+            `â‚¹${item.salePrice || 0}`
           ]);
           addTable(stockHeaders, stockRows);
         } else {
@@ -2062,15 +2140,15 @@ function ReportsPage() {
       <div className="stats-grid">
         <div className="stat-card">
           <h4>Total sales</h4>
-          <p>₹{summary.totalSales.toLocaleString()}</p>
+          <p>â‚¹{summary.totalSales.toLocaleString()}</p>
         </div>
         <div className="stat-card">
           <h4>Total purchases</h4>
-          <p>₹{summary.totalPurchases.toLocaleString()}</p>
+          <p>â‚¹{summary.totalPurchases.toLocaleString()}</p>
         </div>
         <div className="stat-card">
           <h4>Total returns</h4>
-          <p>₹{summary.totalReturns.toLocaleString()}</p>
+          <p>â‚¹{summary.totalReturns.toLocaleString()}</p>
         </div>
         <div className="stat-card">
           <h4>Invoice count</h4>
@@ -2139,7 +2217,7 @@ function ReportsPage() {
                 <td>{item.category || 'General'}</td>
                 <td>{item.specification || '-'}</td>
                 <td>{item.stock}</td>
-                <td>₹{item.salePrice}</td>
+                <td>â‚¹{item.salePrice}</td>
               </tr>
             ))}
           </tbody>
@@ -2257,7 +2335,7 @@ function AssignedContactsPage({ user }) {
     <div className="contacts-page">
       <div className="page-header">
         <p className="eyebrow">Your assigned pipeline</p>
-        <h3>My Calls — {myName}</h3>
+        <h3>My Calls â€” {myName}</h3>
       </div>
       {message && <p className="status-message">{message}</p>}
       <div className="panel contact-stream-panel">
@@ -2286,11 +2364,11 @@ function AssignedContactsPage({ user }) {
                     <div className="contact-primary">
                       <div className="contact-name-row">
                         <strong>{c.name || 'Unknown'}</strong>
-                        <span className="contact-time">{getTimeAgo(c.lastContacted)} • {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span>
+                        <span className="contact-time">{getTimeAgo(c.lastContacted)} â€¢ {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span>
                       </div>
                       <div className="contact-meta">
-                        <span>{c.contactNumber || '—'}</span>
-                        <span>{c.consumerNumber || '—'}</span>
+                        <span>{c.contactNumber || 'â€”'}</span>
+                        <span>{c.consumerNumber || 'â€”'}</span>
                         <span>Calls: {c.callHistory ? c.callHistory.length : 0}</span>
                       </div>
                       <div className="status-row">
