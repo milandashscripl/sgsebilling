@@ -1100,12 +1100,51 @@ function BillingPage({ user }) {
   const [type, setType] = useState('sale');
   const [itemSearch, setItemSearch] = useState('');
   const [billingMessage, setBillingMessage] = useState('');
+  const [vendorForm, setVendorForm] = useState({ name: user?.name || '', shopName: user?.shopName || '', shopAddress: user?.shopAddress || '', shopGSTIN: user?.shopGSTIN || '', phone: user?.phone || '', shopLogoUrl: user?.shopLogoUrl || '' });
+  const [vendorMsg, setVendorMsg] = useState('');
+  const [showVendorEdit, setShowVendorEdit] = useState(false);
+  const [logoFile, setLogoFile] = useState(null);
+  const [currentUser, setCurrentUser] = useState(user);
 
   const vendor = {
-    name: user?.shopName || user?.name || 'SGSE Billing',
-    phone: user?.phone || user?.mobile || '',
-    address: user?.shopAddress || user?.address || 'Your business address',
-    logo: user?.shopLogoUrl || ''
+    name: currentUser?.shopName || currentUser?.name || 'SGSE Billing',
+    phone: currentUser?.phone || currentUser?.mobile || '',
+    address: currentUser?.shopAddress || currentUser?.address || 'Your business address',
+    logo: currentUser?.shopLogoUrl || ''
+  };
+
+  const saveVendorProfile = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.put('/auth/me', vendorForm);
+      const updated = res.data.user;
+      localStorage.setItem('user', JSON.stringify(updated));
+      setCurrentUser(updated);
+      setVendorMsg('Profile saved');
+      setShowVendorEdit(false);
+      setTimeout(() => setVendorMsg(''), 3000);
+    } catch (err) {
+      setVendorMsg(err.response?.data?.message || 'Unable to save profile');
+    }
+  };
+
+  const uploadLogo = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    const formData = new FormData();
+    formData.append('logo', file);
+    try {
+      const res = await api.post('/auth/me/logo', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const updated = res.data.user;
+      localStorage.setItem('user', JSON.stringify(updated));
+      setCurrentUser(updated);
+      setVendorForm(f => ({ ...f, shopLogoUrl: updated.shopLogoUrl }));
+      setVendorMsg('Logo uploaded');
+      setTimeout(() => setVendorMsg(''), 3000);
+    } catch (err) {
+      setVendorMsg('Logo upload failed');
+    }
   };
 
   useEffect(() => { api.get('/items').then((res) => setItems(res.data || [])).catch(() => {}); }, []);
@@ -1157,7 +1196,7 @@ function BillingPage({ user }) {
         sellerName: vendor.name,
         sellerAddress: vendor.address,
         sellerPhone: vendor.phone,
-        sellerGSTIN: user?.shopGSTIN || '',
+        sellerGSTIN: currentUser?.shopGSTIN || '',
         sellerLogo: vendor.logo,
         items: (savedInvoice.items || selectedItems.map((entry) => ({
           item: entry.item,
@@ -1198,6 +1237,51 @@ function BillingPage({ user }) {
       <div className="page-header">
         <p className="eyebrow">Professional billing</p>
         <h3>Invoice workspace</h3>
+      </div>
+
+      <div className="vendor-profile-card panel">
+        <div className="vendor-profile-head">
+          <div className="vendor-logo-wrap">
+            {vendor.logo
+              ? <img src={vendor.logo} alt={vendor.name} className="vendor-logo" />
+              : <div className="vendor-logo placeholder">{(vendor.name || 'SG').slice(0, 2).toUpperCase()}</div>
+            }
+          </div>
+          <div className="vendor-profile-info">
+            <strong className="vendor-name">{vendor.name}</strong>
+            <span className="muted">{vendor.address || 'No address set'}</span>
+            {vendor.phone && <span className="muted">{vendor.phone}</span>}
+            {currentUser?.shopGSTIN && <span className="muted">GSTIN: {currentUser.shopGSTIN}</span>}
+          </div>
+          <button className="btn outline vendor-edit-btn" onClick={() => { setShowVendorEdit(v => !v); setVendorForm({ name: currentUser?.name || '', shopName: currentUser?.shopName || '', shopAddress: currentUser?.shopAddress || '', shopGSTIN: currentUser?.shopGSTIN || '', phone: currentUser?.phone || '', shopLogoUrl: currentUser?.shopLogoUrl || '' }); }}>
+            {showVendorEdit ? 'Cancel' : '✎ Edit profile'}
+          </button>
+        </div>
+        {vendorMsg && <p className="status-message" style={{ marginTop: 8 }}>{vendorMsg}</p>}
+        {showVendorEdit && (
+          <form className="vendor-edit-form" onSubmit={saveVendorProfile}>
+            <div className="vendor-logo-upload">
+              <div className="vendor-logo-preview">
+                {vendorForm.shopLogoUrl
+                  ? <img src={vendorForm.shopLogoUrl} alt="logo" className="vendor-logo" />
+                  : <div className="vendor-logo placeholder">{(vendorForm.shopName || 'SG').slice(0, 2).toUpperCase()}</div>
+                }
+              </div>
+              <label className="logo-upload-label">
+                <input type="file" accept="image/*" onChange={uploadLogo} style={{ display: 'none' }} />
+                <span className="btn outline" style={{ cursor: 'pointer' }}>📷 Upload logo</span>
+              </label>
+            </div>
+            <div className="form-grid">
+              <label className="field-label-wrap">Your name<input value={vendorForm.name} onChange={e => setVendorForm({ ...vendorForm, name: e.target.value })} /></label>
+              <label className="field-label-wrap">Shop / business name<input value={vendorForm.shopName} onChange={e => setVendorForm({ ...vendorForm, shopName: e.target.value })} /></label>
+              <label className="field-label-wrap">Phone<input value={vendorForm.phone} onChange={e => setVendorForm({ ...vendorForm, phone: e.target.value })} /></label>
+              <label className="field-label-wrap">GSTIN<input value={vendorForm.shopGSTIN} onChange={e => setVendorForm({ ...vendorForm, shopGSTIN: e.target.value })} /></label>
+              <label className="field-label-wrap" style={{ gridColumn: '1/-1' }}>Address<input value={vendorForm.shopAddress} onChange={e => setVendorForm({ ...vendorForm, shopAddress: e.target.value })} /></label>
+            </div>
+            <button className="btn primary" type="submit">Save profile</button>
+          </form>
+        )}
       </div>
 
       <div className="billing-grid">
@@ -1321,6 +1405,8 @@ function AccountingPage() {
   const [message, setMessage] = useState('');
   const [depositTarget, setDepositTarget] = useState(null);
   const [depositForm, setDepositForm] = useState({ amount: '', paymentMethod: 'cash', note: '' });
+  const [transferForm, setTransferForm] = useState({ fromAccountId: '', toAccountId: '', amount: '', note: '' });
+  const [showTransfer, setShowTransfer] = useState(false);
 
   const load = async () => {
     try {
@@ -1473,24 +1559,111 @@ function AccountingPage() {
         <div className="stat-card"><h4>Expense total</h4><p>₹{(summary.expenseTotal || 0).toLocaleString()}</p></div>
       </div>
 
-      <div className="panel">
-        <h4>Account balances</h4>
-        {summary.accounts.map((account) => (
-          <div className="list-row" key={account._id}>
-            <div>
-              <strong>{account.name}</strong>
-              <div className="muted">{account.type} • {account.notes || 'No notes'}</div>
+      <div className="panel acct-balances-panel">
+        <div className="panel-header">
+          <h4>Account balances</h4>
+          <button className={`btn ${showTransfer ? 'primary' : 'outline'}`} onClick={() => setShowTransfer(v => !v)}>
+            {showTransfer ? '✕ Close transfer' : '⇄ Transfer funds'}
+          </button>
+        </div>
+
+        {showTransfer && (
+          <div className="transfer-panel">
+            <div className="transfer-panel-inner">
+              <div className="transfer-header">
+                <span className="transfer-icon">⇄</span>
+                <div>
+                  <strong>Fund Transfer</strong>
+                  <p className="muted">Move money between accounts. Withdrawn from source, credited to destination.</p>
+                </div>
+              </div>
+              <form className="transfer-form" onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  const res = await api.post('/accounting/transfer', transferForm);
+                  setMessage(res.data.message || 'Transfer successful');
+                  setTransferForm({ fromAccountId: '', toAccountId: '', amount: '', note: '' });
+                  setShowTransfer(false);
+                  await load();
+                  setTimeout(() => setMessage(''), 3000);
+                } catch (err) {
+                  setMessage(err.response?.data?.message || 'Transfer failed');
+                }
+              }}>
+                <div className="transfer-row">
+                  <div className="transfer-field">
+                    <label className="field-label">From account</label>
+                    <select value={transferForm.fromAccountId} onChange={e => setTransferForm({ ...transferForm, fromAccountId: e.target.value })} required>
+                      <option value="">Select source</option>
+                      {summary.accounts.map(a => (
+                        <option key={a._id} value={a._id}>{a.name} — ₹{Number(a.balance || 0).toLocaleString()}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="transfer-arrow">→</div>
+                  <div className="transfer-field">
+                    <label className="field-label">To account</label>
+                    <select value={transferForm.toAccountId} onChange={e => setTransferForm({ ...transferForm, toAccountId: e.target.value })} required>
+                      <option value="">Select destination</option>
+                      {summary.accounts.filter(a => a._id !== transferForm.fromAccountId).map(a => (
+                        <option key={a._id} value={a._id}>{a.name} — ₹{Number(a.balance || 0).toLocaleString()}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="transfer-row">
+                  <div className="transfer-field">
+                    <label className="field-label">Amount (₹)</label>
+                    <input type="number" min="1" placeholder="0" value={transferForm.amount} onChange={e => setTransferForm({ ...transferForm, amount: e.target.value })} required />
+                  </div>
+                  <div className="transfer-field">
+                    <label className="field-label">Note (optional)</label>
+                    <input type="text" placeholder="e.g. Bank withdrawal to cash" value={transferForm.note} onChange={e => setTransferForm({ ...transferForm, note: e.target.value })} />
+                  </div>
+                </div>
+                {transferForm.fromAccountId && transferForm.toAccountId && transferForm.amount && (() => {
+                  const from = summary.accounts.find(a => a._id === transferForm.fromAccountId);
+                  const to = summary.accounts.find(a => a._id === transferForm.toAccountId);
+                  const amt = Number(transferForm.amount || 0);
+                  return (
+                    <div className="transfer-preview">
+                      <div className="transfer-preview-item debit">
+                        <span>{from?.name}</span>
+                        <strong>₹{Number(from?.balance || 0).toLocaleString()} → ₹{Math.max(0, Number(from?.balance || 0) - amt).toLocaleString()}</strong>
+                      </div>
+                      <div className="transfer-preview-item credit">
+                        <span>{to?.name}</span>
+                        <strong>₹{Number(to?.balance || 0).toLocaleString()} → ₹{(Number(to?.balance || 0) + amt).toLocaleString()}</strong>
+                      </div>
+                    </div>
+                  );
+                })()}
+                <button className="btn primary transfer-submit" type="submit">Confirm transfer</button>
+              </form>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <strong>₹{Number(account.balance || 0).toLocaleString()}</strong>
-              <button className="btn outline" style={{ fontSize: '0.8rem', padding: '4px 10px' }}
-                onClick={() => setDepositTarget(depositTarget === account._id ? null : account._id)}>
-                + Add Balance
-              </button>
-            </div>
-            {depositTarget === account._id && (
-              <form className="form-grid" style={{ gridColumn: '1/-1', marginTop: 8 }}
-                onSubmit={async (e) => {
+          </div>
+        )}
+
+        <div className="account-cards-grid">
+          {summary.accounts.map((account) => (
+            <div className={`account-balance-card account-type-${account.type}`} key={account._id}>
+              <div className="account-card-top">
+                <div className="account-type-icon">
+                  {account.type === 'cash' ? '💵' : account.type === 'bank' ? '🏦' : account.type === 'digital' ? '📱' : '💼'}
+                </div>
+                <div className="account-card-info">
+                  <strong>{account.name}</strong>
+                  <span className="account-type-label">{account.type}</span>
+                </div>
+                <div className="account-balance-amount">₹{Number(account.balance || 0).toLocaleString()}</div>
+              </div>
+              <div className="account-card-actions">
+                <button className="btn outline acct-btn" onClick={() => setDepositTarget(depositTarget === account._id ? null : account._id)}>
+                  + Add Balance
+                </button>
+              </div>
+              {depositTarget === account._id && (
+                <form className="deposit-form" onSubmit={async (e) => {
                   e.preventDefault();
                   try {
                     await api.post(`/accounting/accounts/${account._id}/deposit`, depositForm);
@@ -1503,27 +1676,25 @@ function AccountingPage() {
                     setMessage(err.response?.data?.message || 'Unable to add balance');
                   }
                 }}>
-                <input placeholder="Amount" type="number" min="1" value={depositForm.amount}
-                  onChange={(e) => setDepositForm({ ...depositForm, amount: e.target.value })} />
-                <select value={depositForm.paymentMethod}
-                  onChange={(e) => setDepositForm({ ...depositForm, paymentMethod: e.target.value })}>
-                  <option value="cash">Cash</option>
-                  <option value="bank">Bank Transfer</option>
-                  <option value="phonepe">PhonePe</option>
-                  <option value="gpay">GPay</option>
-                  <option value="neft">NEFT</option>
-                  <option value="rtgs">RTGS</option>
-                </select>
-                <input placeholder="Note (optional)" value={depositForm.note}
-                  onChange={(e) => setDepositForm({ ...depositForm, note: e.target.value })} />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn primary" type="submit">Add</button>
-                  <button className="btn secondary" type="button" onClick={() => setDepositTarget(null)}>Cancel</button>
-                </div>
-              </form>
-            )}
-          </div>
-        ))}
+                  <input placeholder="Amount" type="number" min="1" value={depositForm.amount} onChange={e => setDepositForm({ ...depositForm, amount: e.target.value })} />
+                  <select value={depositForm.paymentMethod} onChange={e => setDepositForm({ ...depositForm, paymentMethod: e.target.value })}>
+                    <option value="cash">Cash</option>
+                    <option value="bank">Bank Transfer</option>
+                    <option value="phonepe">PhonePe</option>
+                    <option value="gpay">GPay</option>
+                    <option value="neft">NEFT</option>
+                    <option value="rtgs">RTGS</option>
+                  </select>
+                  <input placeholder="Note (optional)" value={depositForm.note} onChange={e => setDepositForm({ ...depositForm, note: e.target.value })} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn primary" type="submit">Add</button>
+                    <button className="btn secondary" type="button" onClick={() => setDepositTarget(null)}>Cancel</button>
+                  </div>
+                </form>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="panel">

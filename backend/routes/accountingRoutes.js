@@ -33,6 +33,42 @@ router.get('/accounts', auth, async (req, res) => {
   }
 });
 
+router.post('/transfer', auth, async (req, res) => {
+  try {
+    const { fromAccountId, toAccountId, amount, note } = req.body;
+    const amt = Number(amount || 0);
+    if (!amt || amt <= 0) return res.status(400).json({ message: 'Enter a valid amount' });
+    if (!fromAccountId || !toAccountId) return res.status(400).json({ message: 'Select both accounts' });
+    if (fromAccountId === toAccountId) return res.status(400).json({ message: 'Source and destination must differ' });
+
+    const [fromAcc, toAcc] = await Promise.all([
+      Account.findById(fromAccountId),
+      Account.findById(toAccountId)
+    ]);
+    if (!fromAcc || !toAcc) return res.status(404).json({ message: 'Account not found' });
+
+    const fromBalance = await getAccountBalance(fromAcc._id, Number(fromAcc.openingBalance || 0));
+    if (fromBalance < amt) return res.status(400).json({ message: `Insufficient balance in ${fromAcc.name}` });
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const transferNote = note || `Transfer: ${fromAcc.name} → ${toAcc.name}`;
+
+    await Promise.all([
+      Transaction.create({ date: dateStr, accountId: fromAcc._id, type: 'expense', amount: amt, paymentMethod: 'transfer', reference: 'Fund Transfer', note: transferNote, createdBy: req.user._id }),
+      Transaction.create({ date: dateStr, accountId: toAcc._id, type: 'income', amount: amt, paymentMethod: 'transfer', reference: 'Fund Transfer', note: transferNote, createdBy: req.user._id })
+    ]);
+
+    const [fromBal, toBal] = await Promise.all([
+      getAccountBalance(fromAcc._id, Number(fromAcc.openingBalance || 0)),
+      getAccountBalance(toAcc._id, Number(toAcc.openingBalance || 0))
+    ]);
+
+    res.json({ message: 'Transfer successful', fromBalance: fromBal, toBalance: toBal });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.post('/accounts/:id/deposit', auth, async (req, res) => {
   try {
     const account = await Account.findById(req.params.id);

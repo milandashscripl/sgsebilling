@@ -2,17 +2,20 @@
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #1B2A3B;
   line-height: 1.5;
-  --panel-bg: rgba(255,255,255,0.96);
-  --panel-border: rgba(31, 58, 85, 0.12);
-  --panel-shadow: 0 18px 45px rgba(25, 42, 76, 0.08);
-  --button-primary: linear-gradient(135deg, #186FAF, #3F9AE8);
+  --panel-bg: rgba(255,255,255,0.97);
+  --panel-border: rgba(31, 58, 85, 0.10);
+  --panel-shadow: 0 4px 24px rgba(25, 42, 76, 0.07), 0 1px 4px rgba(25,42,76,0.04);
+  --button-primary: linear-gradient(135deg, #1a6faf, #3a9ae8);
   --button-secondary: rgba(24, 111, 175, 0.08);
   --text-muted: #5E6F83;
-  --input-bg: #FFFFFF;
+  --input-bg: #FAFCFF;
   --input-border: rgba(94, 111, 131, 0.18);
   --success-color: #2E6E42;
   --error-color: #C23C3C;
   --warning-color: #9C5E11;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
 }
 
 * { box-sizing: border-box; }
@@ -562,3 +565,92 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
   .app-shell { padding: 0; }
   .panel, .contact-card, .calling-list-item { page-break-inside: avoid; box-shadow: none; }
 }
+
+/* ═══════════════════════════════════════════════
+   ACCOUNT BALANCE CARDS
+═══════════════════════════════════════════════ */
+.acct-balances-panel { display: grid; gap: 20px; }
+.account-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.account-balance-card { border-radius: var(--radius-lg); padding: 18px; display: grid; gap: 12px; border: 1px solid var(--panel-border); background: var(--panel-bg); box-shadow: var(--panel-shadow); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.account-balance-card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(25,42,76,0.10); }
+.account-type-cash { background: linear-gradient(135deg, rgba(34,197,94,0.08) 0%, rgba(255,255,255,0.97) 100%); border-color: rgba(34,197,94,0.18); }
+.account-type-bank { background: linear-gradient(135deg, rgba(24,111,175,0.09) 0%, rgba(255,255,255,0.97) 100%); border-color: rgba(24,111,175,0.18); }
+.account-type-digital { background: linear-gradient(135deg, rgba(139,92,246,0.09) 0%, rgba(255,255,255,0.97) 100%); border-color: rgba(139,92,246,0.18); }
+.account-type-other { background: linear-gradient(135deg, rgba(245,158,11,0.09) 0%, rgba(255,255,255,0.97) 100%); border-color: rgba(245,158,11,0.18); }
+.account-card-top { display: flex; align-items: center; gap: 12px; }
+.account-type-icon { font-size: 1.6rem; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: rgba(255,255,255,0.7); box-shadow: 0 2px 8px rgba(25,42,76,0.08); flex-shrink: 0; }
+.account-card-info { flex: 1; display: grid; gap: 2px; }
+.account-card-info strong { font-size: 0.95rem; color: #1B2A3B; }
+.account-type-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #5E6F83; }
+.account-balance-amount { font-size: 1.25rem; font-weight: 800; color: #1B2A3B; white-space: nowrap; }
+.account-card-actions { display: flex; gap: 8px; }
+.acct-btn { font-size: 0.82rem !important; padding: 7px 14px !important; border-radius: 999px !important; border: 1px solid rgba(24,111,175,0.2) !important; color: #186FAF !important; background: rgba(24,111,175,0.06) !important; }
+.acct-btn:hover { background: rgba(24,111,175,0.12) !important; }
+.deposit-form { display: grid; gap: 10px; padding: 14px; background: rgba(24,111,175,0.04); border-radius: var(--radius-md); border: 1px dashed rgba(24,111,175,0.18); }
+
+/* ═══════════════════════════════════════════════
+   FUND TRANSFER PANEL
+═══════════════════════════════════════════════ */
+.transfer-panel { margin-top: 4px; }
+.transfer-panel-inner { background: linear-gradient(135deg, rgba(24,111,175,0.06), rgba(139,92,246,0.04)); border: 1px solid rgba(24,111,175,0.14); border-radius: var(--radius-lg); padding: 20px; display: grid; gap: 16px; }
+.transfer-header { display: flex; align-items: flex-start; gap: 14px; }
+.transfer-icon { font-size: 1.5rem; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #186FAF, #3F9AE8); color: white; border-radius: 12px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(24,111,175,0.3); }
+.transfer-header strong { font-size: 1rem; color: #1B2A3B; display: block; margin-bottom: 2px; }
+.transfer-form { display: grid; gap: 14px; }
+.transfer-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: end; }
+.transfer-field { display: grid; gap: 6px; }
+.field-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #5E6F83; }
+.transfer-arrow { font-size: 1.4rem; color: #186FAF; padding-bottom: 12px; font-weight: 700; }
+.transfer-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.transfer-preview-item { padding: 12px 14px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.transfer-preview-item.debit { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.15); }
+.transfer-preview-item.credit { background: rgba(34,197,94,0.07); border: 1px solid rgba(34,197,94,0.15); }
+.transfer-preview-item span { font-size: 0.85rem; color: #5E6F83; }
+.transfer-preview-item strong { font-size: 0.9rem; color: #1B2A3B; }
+.transfer-submit { width: 100%; }
+@media (max-width: 640px) {
+  .transfer-row { grid-template-columns: 1fr; }
+  .transfer-arrow { display: none; }
+  .transfer-preview { grid-template-columns: 1fr; }
+  .account-cards-grid { grid-template-columns: 1fr; }
+}
+
+/* ═══════════════════════════════════════════════
+   VENDOR PROFILE CARD
+═══════════════════════════════════════════════ */
+.vendor-profile-card { margin-bottom: 4px; }
+.vendor-profile-head { display: flex; align-items: center; gap: 16px; }
+.vendor-logo-wrap { flex-shrink: 0; }
+.vendor-profile-info { flex: 1; display: grid; gap: 3px; }
+.vendor-name { font-size: 1.1rem; font-weight: 700; color: #1B2A3B; }
+.vendor-edit-btn { white-space: nowrap; font-size: 0.85rem !important; padding: 8px 16px !important; }
+.vendor-edit-form { margin-top: 16px; display: grid; gap: 16px; padding-top: 16px; border-top: 1px solid var(--panel-border); }
+.vendor-logo-upload { display: flex; align-items: center; gap: 14px; }
+.vendor-logo-preview .vendor-logo { width: 64px; height: 64px; border-radius: 14px; }
+.logo-upload-label { cursor: pointer; }
+.field-label-wrap { display: grid; gap: 6px; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #5E6F83; }
+.field-label-wrap input { margin-top: 2px; }
+@media (max-width: 640px) {
+  .vendor-profile-head { flex-wrap: wrap; }
+  .vendor-edit-btn { width: 100%; }
+}
+
+/* ═══════════════════════════════════════════════
+   GENERAL PRO UI IMPROVEMENTS
+═══════════════════════════════════════════════ */
+.panel { background: var(--panel-bg); border: 1px solid var(--panel-border); box-shadow: var(--panel-shadow); }
+.panel h4 { font-size: 1rem; font-weight: 700; color: #1B2A3B; margin: 0 0 14px; letter-spacing: -0.01em; }
+input, select, textarea { background: var(--input-bg); border: 1.5px solid var(--input-border); border-radius: var(--radius-sm); padding: 11px 14px; color: #1B2A3B; transition: border-color 0.18s, box-shadow 0.18s; width: 100%; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8; box-shadow: 0 0 0 3px rgba(63,154,232,0.12); background: #fff; }
+.btn { border-radius: 999px; font-weight: 600; letter-spacing: 0.01em; }
+.btn.outline { background: transparent; border: 1.5px solid rgba(24,111,175,0.22); color: #186FAF; }
+.btn.outline:hover { background: rgba(24,111,175,0.07); border-color: rgba(24,111,175,0.38); }
+.topbar { background: linear-gradient(135deg, #ffffff 0%, #eef6ff 100%); border-bottom: 1px solid rgba(24,111,175,0.08); border-radius: 20px; }
+.topbar h2 { font-size: 1.25rem; font-weight: 800; color: #16406E; margin: 0; letter-spacing: -0.02em; }
+.topbar p { font-size: 0.82rem; color: #5E6F83; margin: 2px 0 0; }
+.chip { background: linear-gradient(135deg, rgba(24,111,175,0.12), rgba(63,154,232,0.08)); color: #16406E; font-weight: 700; border: 1px solid rgba(24,111,175,0.14); }
+.list-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(31,58,85,0.07); gap: 12px; }
+.list-row:last-child { border-bottom: none; }
+.status-message { padding: 11px 16px; border-radius: var(--radius-md); background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(24,111,175,0.06)); border: 1px solid rgba(34,197,94,0.2); color: #166534; font-weight: 600; font-size: 0.9rem; }
+.page-header h3 { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; color: #16406E; }
+.eyebrow { color: #3E6A9E; text-transform: uppercase; letter-spacing: 0.22em; font-size: 0.75rem; font-weight: 600; }
