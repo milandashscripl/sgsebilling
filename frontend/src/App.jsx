@@ -622,7 +622,7 @@ function Dashboard({ user }) {
       <div className="dashboard-summary-band">
         <div className="summary-highlight">
           <span>Net sales</span>
-          <strong>â‚¹{netSales.toLocaleString()}</strong>
+          <strong>₹{netSales.toLocaleString()}</strong>
         </div>
         <div className="summary-highlight muted-highlight">
           <span>Invoices</span>
@@ -640,7 +640,7 @@ function Dashboard({ user }) {
             <h4>Sales</h4>
             <span className="stat-trend up">Live</span>
           </div>
-          <p>â‚¹{(summary.totalSales || 0).toLocaleString()}</p>
+          <p>₹{(summary.totalSales || 0).toLocaleString()}</p>
           <span>Current period</span>
         </div>
         <div className="stat-card stat-purchases">
@@ -648,7 +648,7 @@ function Dashboard({ user }) {
             <h4>Purchases</h4>
             <span className="stat-trend neutral">Stock</span>
           </div>
-          <p>â‚¹{(summary.totalPurchases || 0).toLocaleString()}</p>
+          <p>₹{(summary.totalPurchases || 0).toLocaleString()}</p>
           <span>Inbound stock</span>
         </div>
         <div className="stat-card stat-returns">
@@ -656,7 +656,7 @@ function Dashboard({ user }) {
             <h4>Returns</h4>
             <span className="stat-trend down">Watch</span>
           </div>
-          <p>â‚¹{(summary.totalReturns || 0).toLocaleString()}</p>
+          <p>₹{(summary.totalReturns || 0).toLocaleString()}</p>
           <span>Returned value</span>
         </div>
         <div className="stat-card stat-invoices">
@@ -664,7 +664,7 @@ function Dashboard({ user }) {
             <h4>Inventory</h4>
             <span className="stat-trend up">Value</span>
           </div>
-          <p>â‚¹{inventoryValue.toLocaleString()}</p>
+          <p>₹{inventoryValue.toLocaleString()}</p>
           <span>Stock holding</span>
         </div>
       </div>
@@ -1075,7 +1075,7 @@ function ItemsPage() {
               </div>
               <div className="item-meta">
                 <span className="badge">Stock {item.stock}</span>
-                <span className="badge">â‚¹{item.salePrice}</span>
+                <span className="badge">₹{item.salePrice}</span>
               </div>
             </div>
             <div className="inline-actions">
@@ -1660,7 +1660,7 @@ function AccountingPage() {
         y = 20;
       }
       doc.text(exp.category || 'General', margin + 2, y);
-      doc.text(`â‚¹${Number(exp.amount || 0).toLocaleString()}`, pageWidth - margin - 2, y, { align: 'right' });
+      doc.text(`₹${Number(exp.amount || 0).toLocaleString()}`, pageWidth - margin - 2, y, { align: 'right' });
       y += lineHeight;
       doc.setFontSize(8);
       doc.text(`${exp.date ? formatAbsoluteDate(exp.date) : 'â€”'} â€¢ ${exp.paymentMethod || 'cash'}`, margin + 2, y);
@@ -1677,8 +1677,8 @@ function AccountingPage() {
       {message && <p className="muted">{message}</p>}
 
       <div className="stats-grid">
-        <div className="stat-card"><h4>Income total</h4><p>â‚¹{(summary.incomeTotal || 0).toLocaleString()}</p></div>
-        <div className="stat-card"><h4>Expense total</h4><p>â‚¹{(summary.expenseTotal || 0).toLocaleString()}</p></div>
+        <div className="stat-card"><h4>Income total</h4><p>₹{(summary.incomeTotal || 0).toLocaleString()}</p></div>
+        <div className="stat-card"><h4>Expense total</h4><p>₹{(summary.expenseTotal || 0).toLocaleString()}</p></div>
       </div>
 
       <div className="panel acct-balances-panel">
@@ -1718,7 +1718,7 @@ function AccountingPage() {
                     <select value={transferForm.fromAccountId} onChange={e => setTransferForm({ ...transferForm, fromAccountId: e.target.value })} required>
                       <option value="">Select source</option>
                       {summary.accounts.map(a => (
-                        <option key={a._id} value={a._id}>{a.name} â€” â‚¹{Number(a.balance || 0).toLocaleString()}</option>
+                        <option key={a._id} value={a._id}>{a.name} â€” ₹{Number(a.balance || 0).toLocaleString()}</option>
                       ))}
                     </select>
                   </div>
@@ -1728,14 +1728,14 @@ function AccountingPage() {
                     <select value={transferForm.toAccountId} onChange={e => setTransferForm({ ...transferForm, toAccountId: e.target.value })} required>
                       <option value="">Select destination</option>
                       {summary.accounts.filter(a => a._id !== transferForm.fromAccountId).map(a => (
-                        <option key={a._id} value={a._id}>{a.name} â€” â‚¹{Number(a.balance || 0).toLocaleString()}</option>
+                        <option key={a._id} value={a._id}>{a.name} â€” ₹{Number(a.balance || 0).toLocaleString()}</option>
                       ))}
                     </select>
                   </div>
                 </div>
                 <div className="transfer-row">
                   <div className="transfer-field">
-                    <label className="field-label">Amount (â‚¹)</label>
+                    <label className="field-label">Amount (₹)</label>
                     <input type="number" min="1" placeholder="0" value={transferForm.amount} onChange={e => setTransferForm({ ...transferForm, amount: e.target.value })} required />
                   </div>
                   <div className="transfer-field">
@@ -1751,11 +1751,11 @@ function AccountingPage() {
                     <div className="transfer-preview">
                       <div className="transfer-preview-item debit">
                         <span>{from?.name}</span>
-                        <strong>â‚¹{Number(from?.balance || 0).toLocaleString()} â†’ â‚¹{Math.max(0, Number(from?.balance || 0) - amt).toLocaleString()}</strong>
+                        <strong>₹{Number(from?.balance || 0).toLocaleString()} â†’ ₹{Math.max(0, Number(from?.balance || 0) - amt).toLocaleString()}</strong>
                       </div>
                       <div className="transfer-preview-item credit">
                         <span>{to?.name}</span>
-                        <strong>â‚¹{Number(to?.balance || 0).toLocaleString()} â†’ â‚¹{(Number(to?.balance || 0) + amt).toLocaleString()}</strong>
+                        <strong>₹{Number(to?.balance || 0).toLocaleString()} â†’ ₹{(Number(to?.balance || 0) + amt).toLocaleString()}</strong>
                       </div>
                     </div>
                   );
@@ -1777,7 +1777,7 @@ function AccountingPage() {
                   <strong>{account.name}</strong>
                   <span className="account-type-label">{account.type}</span>
                 </div>
-                <div className="account-balance-amount">â‚¹{Number(account.balance || 0).toLocaleString()}</div>
+                <div className="account-balance-amount">₹{Number(account.balance || 0).toLocaleString()}</div>
               </div>
               <div className="account-card-actions">
                 <button className="btn outline acct-btn" onClick={() => setDepositTarget(depositTarget === account._id ? null : account._id)}>
@@ -1900,7 +1900,7 @@ function AccountingPage() {
                 {exp.note && <div className="muted">{exp.note}</div>}
               </div>
               <div style={{textAlign:'right'}}>
-                <div style={{color:'#C23C3C'}}>- â‚¹{Number(exp.amount || 0).toLocaleString()}</div>
+                <div style={{color:'#C23C3C'}}>- ₹{Number(exp.amount || 0).toLocaleString()}</div>
                 <div style={{marginTop:8}}><button className="btn outline" onClick={() => deleteExpense(exp._id)}>Delete</button></div>
               </div>
             </div>
@@ -1913,7 +1913,7 @@ function AccountingPage() {
         {summary.paymentMethods.map((entry) => (
           <div className="list-row" key={entry.method}>
             <div><strong>{entry.method}</strong></div>
-            <div>â‚¹{Number(entry.total || 0).toLocaleString()}</div>
+            <div>₹{Number(entry.total || 0).toLocaleString()}</div>
           </div>
         ))}
       </div>
@@ -1926,7 +1926,7 @@ function AccountingPage() {
               <strong>{entry.reference || entry.note || 'Ledger entry'}</strong>
               <div className="muted">{entry.date} â€¢ {entry.paymentMethod}</div>
             </div>
-            <div>{entry.type === 'income' ? '+' : '-'} â‚¹{Number(entry.amount || 0).toLocaleString()}</div>
+            <div>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</div>
           </div>
         ))}
       </div>
@@ -1975,7 +1975,7 @@ function StockPage() {
         </div>
         <div className="stat-card stat-invoices">
           <h4>Inventory value</h4>
-          <p>â‚¹{inventoryValue.toLocaleString()}</p>
+          <p>₹{inventoryValue.toLocaleString()}</p>
           <span>Current stock</span>
         </div>
       </div>
@@ -2012,7 +2012,7 @@ function StockPage() {
                       <td>{item.itemType || 'General'}</td>
                       <td>{item.category || 'General'}</td>
                       <td>{stockLevel}</td>
-                      <td>â‚¹{Number(item.salePrice || 0).toLocaleString()}</td>
+                      <td>₹{Number(item.salePrice || 0).toLocaleString()}</td>
                       <td><span className={`status-badge ${status === 'Critical' ? 'status-hot-lead' : status === 'Low' ? 'status-warm-lead' : 'status-may-convert'}`}>{status}</span></td>
                     </tr>
                   );
@@ -2123,9 +2123,9 @@ function ReportsPage() {
 
       if (reportType === 'summary' || reportType === 'all') {
         addSectionHeader('Financial Summary');
-        addLine('Total Sales', `â‚¹${summary.totalSales.toLocaleString()}`);
-        addLine('Total Purchases', `â‚¹${summary.totalPurchases.toLocaleString()}`);
-        addLine('Total Returns', `â‚¹${summary.totalReturns.toLocaleString()}`);
+        addLine('Total Sales', `₹${summary.totalSales.toLocaleString()}`);
+        addLine('Total Purchases', `₹${summary.totalPurchases.toLocaleString()}`);
+        addLine('Total Returns', `₹${summary.totalReturns.toLocaleString()}`);
         addLine('Invoice Count', `${summary.invoiceCount}`);
         yPos += 5;
       }
@@ -2139,7 +2139,7 @@ function ReportsPage() {
             item.itemType || '-',
             item.category || '-',
             item.stock || 0,
-            `â‚¹${item.salePrice || 0}`
+            `₹${item.salePrice || 0}`
           ]);
           addTable(stockHeaders, stockRows);
         } else {
@@ -2184,15 +2184,15 @@ function ReportsPage() {
       <div className="stats-grid">
         <div className="stat-card">
           <h4>Total sales</h4>
-          <p>â‚¹{summary.totalSales.toLocaleString()}</p>
+          <p>₹{summary.totalSales.toLocaleString()}</p>
         </div>
         <div className="stat-card">
           <h4>Total purchases</h4>
-          <p>â‚¹{summary.totalPurchases.toLocaleString()}</p>
+          <p>₹{summary.totalPurchases.toLocaleString()}</p>
         </div>
         <div className="stat-card">
           <h4>Total returns</h4>
-          <p>â‚¹{summary.totalReturns.toLocaleString()}</p>
+          <p>₹{summary.totalReturns.toLocaleString()}</p>
         </div>
         <div className="stat-card">
           <h4>Invoice count</h4>
@@ -2261,7 +2261,7 @@ function ReportsPage() {
                 <td>{item.category || 'General'}</td>
                 <td>{item.specification || '-'}</td>
                 <td>{item.stock}</td>
-                <td>â‚¹{item.salePrice}</td>
+                <td>₹{item.salePrice}</td>
               </tr>
             ))}
           </tbody>
