@@ -1511,11 +1511,12 @@ function AccountingPage() {
 
   const downloadExpenseCsv = async () => {
     try {
-      const res = await api.get('/accounting/expenses/export', { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const rows = transactionHistory.map((entry) => [entry.date, entry.accountName, entry.kind, entry.reference, entry.type === 'income' ? entry.amount : -entry.amount, entry.balanceAfter].map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
+      const csv = ['date,account,entry,reference,change,balanceAfter', ...rows].join('\n');
+      const url = window.URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', 'expenses.csv');
+      link.setAttribute('download', 'account-transaction-history.csv');
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -1526,8 +1527,8 @@ function AccountingPage() {
   };
 
   const downloadExpensePdf = () => {
-    if (!expenses.length) {
-      setMessage('No expenses to export');
+    if (!transactionHistory.length) {
+      setMessage('No account history to export');
       return;
     }
 
@@ -1539,7 +1540,7 @@ function AccountingPage() {
 
     doc.setFontSize(18);
     doc.setFont(undefined, 'bold');
-    doc.text('Expense Report', margin, y);
+    doc.text('Account Transaction History', margin, y);
     y += 10;
 
     doc.setFontSize(10);
@@ -1549,26 +1550,41 @@ function AccountingPage() {
 
     doc.setFillColor(238, 243, 255);
     doc.rect(margin, y - 4, pageWidth - margin * 2, 8, 'F');
-    doc.text('Category', margin + 2, y);
-    doc.text('Amount', pageWidth - margin - 22, y, { align: 'right' });
+    doc.text('Date / account / entry', margin + 2, y);
+    doc.text('Balance', pageWidth - margin - 22, y, { align: 'right' });
     y += 10;
 
-    expenses.slice(0, 20).forEach((exp) => {
+    transactionHistory.slice(0, 40).forEach((entry) => {
       if (y > 260) {
         doc.addPage();
         y = 20;
       }
-      doc.text(exp.category || 'General', margin + 2, y);
-      doc.text(`₹${Number(exp.amount || 0).toLocaleString()}`, pageWidth - margin - 2, y, { align: 'right' });
+      doc.text(`${entry.date} • ${entry.accountName}`, margin + 2, y);
+      doc.text(`₹${Number(entry.balanceAfter || 0).toLocaleString()}`, pageWidth - margin - 2, y, { align: 'right' });
       y += lineHeight;
       doc.setFontSize(8);
-      doc.text(`${exp.date ? formatAbsoluteDate(exp.date) : '—'} • ${exp.paymentMethod || 'cash'}`, margin + 2, y);
+      doc.text(`${entry.kind} • ${entry.reference || entry.note || 'No reference'} • ${entry.type === 'income' ? '+' : '-'}₹${Number(entry.amount || 0).toLocaleString()}`, margin + 2, y);
       y += 4;
       doc.setFontSize(10);
     });
 
-    doc.save('expenses.pdf');
+    doc.save('account-transaction-history.pdf');
   };
+
+  const transactionHistory = (() => {
+    const openingBalances = Object.fromEntries(accounts.map((account) => [account._id, Number(account.openingBalance || 0)]));
+    const runningBalances = { ...openingBalances };
+    const entries = [
+      ...transactions.map((entry) => ({ ...entry, kind: 'Ledger entry', accountKey: String(entry.accountId || '') })),
+      ...expenses.map((entry) => ({ ...entry, kind: 'Expense', type: 'expense', accountKey: String(entry.accountId || '') }))
+    ].sort((a, b) => new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
+    return entries.map((entry) => {
+      const amount = Number(entry.amount || 0);
+      const account = accounts.find((item) => String(item._id) === entry.accountKey);
+      runningBalances[entry.accountKey] = (runningBalances[entry.accountKey] || 0) + (entry.type === 'income' ? amount : -amount);
+      return { ...entry, accountName: account?.name || 'Unassigned account', balanceAfter: runningBalances[entry.accountKey] || 0 };
+    }).reverse();
+  })();
 
   return (
     <div>
@@ -1701,8 +1717,8 @@ function AccountingPage() {
         <div className="panel-header">
           <h4>Recent expenses</h4>
           <div className="inline-actions">
-            <button className="btn secondary" type="button" onClick={downloadExpenseCsv}>Download CSV</button>
-            <button className="btn secondary" type="button" onClick={downloadExpensePdf}>Download PDF</button>
+            <button className="btn secondary" type="button" onClick={downloadExpenseCsv}>Export Excel / CSV</button>
+            <button className="btn secondary" type="button" onClick={downloadExpensePdf}>Export PDF</button>
           </div>
         </div>
         {expenses.length === 0 ? <p className="muted">No expenses recorded</p> : (
@@ -1732,15 +1748,18 @@ function AccountingPage() {
         ))}
       </div>
 
-      <div className="panel">
-        <h4>Recent ledger entries</h4>
-        {transactions.map((entry) => (
-          <div className="list-row" key={entry._id}>
+      <div className="panel transaction-history-panel">
+        <div className="panel-header">
+          <div><h4>Complete account history</h4><p className="muted">Every income, expense, and transfer in date order. Balance is shown after each entry.</p></div>
+          <strong>{transactionHistory.length} entries</strong>
+        </div>
+        {transactionHistory.map((entry) => (
+          <div className="list-row transaction-history-row" key={`${entry.kind}-${entry._id}`}>
             <div>
-              <strong>{entry.reference || entry.note || 'Ledger entry'}</strong>
-              <div className="muted">{entry.date} • {entry.paymentMethod}</div>
+              <strong>{entry.reference || entry.note || entry.kind}</strong>
+              <div className="muted">{entry.date} • {entry.accountName} • {entry.kind} • {entry.paymentMethod || 'cash'}</div>
             </div>
-            <div>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</div>
+            <div className="transaction-values"><strong className={entry.type === 'income' ? 'money-in' : 'money-out'}>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</strong><span>Balance ₹{Number(entry.balanceAfter || 0).toLocaleString()}</span></div>
           </div>
         ))}
       </div>

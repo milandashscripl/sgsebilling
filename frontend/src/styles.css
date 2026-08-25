@@ -664,6 +664,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
 .topbar { background: linear-gradient(135deg, #ffffff 0%, #eef6ff 100%); border-bottom: 1px solid rgba(24,111,175,0.08); border-radius: 20px; }
 .topbar h2 { font-size: 1.25rem; font-weight: 800; color: #16406E; margin: 0; letter-spacing: -0.02em; }
 .topbar p { font-size: 0.82rem; color: #5E6F83; margin: 2px 0 0; }
+.transaction-history-panel { background: linear-gradient(145deg, rgba(255,255,255,0.98), rgba(235,246,255,0.92)); border-color: rgba(24,111,175,0.16); }
+.transaction-history-row { padding: 14px 4px; border-bottom-color: rgba(24,111,175,0.1); }
+.transaction-values { display: grid; justify-items: end; gap: 3px; min-width: 150px; }
+.transaction-values span { color: #5E6F83; font-size: 0.78rem; }
+.money-in { color: #19704a; }
+.money-out { color: #b4433a; }
+
+/* Keep the workspace chrome in place while the active view scrolls. */
+@media (min-width: 901px) {
+  .app-shell { padding-top: 112px; }
+  .topbar { position: fixed; top: 22px; left: 22px; right: 22px; margin-bottom: 0; }
+  .sidebar { position: fixed; top: 112px; bottom: 22px; left: 22px; height: auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .content { margin-left: 278px; min-width: 0; }
+}
 .chip { background: linear-gradient(135deg, rgba(24,111,175,0.12), rgba(63,154,232,0.08)); color: #16406E; font-weight: 700; border: 1px solid rgba(24,111,175,0.14); }
 .list-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(31,58,85,0.07); gap: 12px; }
 .list-row:last-child { border-bottom: none; }
