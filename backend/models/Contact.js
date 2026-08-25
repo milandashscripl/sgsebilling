@@ -16,6 +16,7 @@ const contactSchema = new mongoose.Schema({
   lastContacted: { type: Date, default: null },
   nextFollowUp: { type: Date, default: null },
   callHistory: [{
+    callerName: { type: String, trim: true, default: '' },
     timestamp: { type: Date, default: Date.now },
     note: { type: String, trim: true, default: '' },
     outcome: { type: String, trim: true, default: 'Contacted' },

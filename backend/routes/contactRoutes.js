@@ -97,6 +97,7 @@ router.post('/:contactId/calls', auth, async (req, res) => {
 
     contact.callHistory = contact.callHistory || [];
     contact.callHistory.push({
+      callerName: req.body.callerName || contact.callerName || 'Not assigned',
       timestamp,
       note: req.body.note || '',
       outcome,

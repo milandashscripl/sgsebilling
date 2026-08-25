@@ -183,9 +183,12 @@ function PublicApp({ setUser }) {
 }
 
 function AuthenticatedApp({ user, setUser, logout }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeSidebar = () => setSidebarOpen(false);
   return (
     <div>
       <nav className="topbar">
+        <button className="mobile-menu-button" type="button" aria-label="Open navigation" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen((open) => !open)}><span></span><span></span><span></span></button>
         <div>
           <h2>SGSE Billing</h2>
           <p>{user.role === 'admin' ? 'Admin control center' : 'Sales and inventory workspace'}</p>
@@ -196,7 +199,8 @@ function AuthenticatedApp({ user, setUser, logout }) {
         </div>
       </nav>
       <div className="dashboard-shell">
-        <aside className="sidebar">
+        {sidebarOpen && <button className="sidebar-backdrop" type="button" aria-label="Close navigation" onClick={closeSidebar} />}
+        <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
           <div className="sidebar-brand">
             <span className="sidebar-brand-mark">SG</span>
             <div>
@@ -204,15 +208,16 @@ function AuthenticatedApp({ user, setUser, logout }) {
               <small>Business hub</small>
             </div>
           </div>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/dashboard">Dashboard</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/profile">Shop profile</NavLink>
-          {user.role === 'admin' && <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/users">Users</NavLink>}
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/dashboard">Dashboard</NavLink>
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink>
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink>
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink>
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/setups">Setup library</NavLink>
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink>
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink>
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/profile">Shop profile</NavLink>
+          {user.role === 'admin' && <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/users">Users</NavLink>}
         </aside>
         <main className="content">
           <Routes>
@@ -220,6 +225,7 @@ function AuthenticatedApp({ user, setUser, logout }) {
             <Route path="/items" element={<ItemsPage />} />
             <Route path="/stock" element={<StockPage />} />
             <Route path="/billing" element={<BillingPage user={user} />} />
+            <Route path="/setups" element={<SetupLibraryPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/reports" element={<ReportsPage />} />
@@ -315,6 +321,7 @@ function ContactsPage() {
   const [callForm, setCallForm] = useState({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: toLocalDateTimeValue() });
   const [selectedCaller, setSelectedCaller] = useState(null);
   const [visibleContacts, setVisibleContacts] = useState(20);
+  const [expandedContactId, setExpandedContactId] = useState(null);
 
   const loadContacts = async () => {
     setLoading(true);
@@ -369,6 +376,7 @@ function ContactsPage() {
         timestamp: callForm.timestamp ? new Date(callForm.timestamp).toISOString() : new Date().toISOString(),
         note: callForm.note || '',
         outcome: callForm.outcome || 'Contacted',
+        callerName: contact?.callerName || 'Not assigned',
         statusOnCall: callForm.outcome === 'Not Interested' ? 'Not Interested' : selectedLead,
         leadStage: selectedLead
       };
@@ -566,6 +574,14 @@ function ContactsPage() {
                         </div>
                       )}
                     </div>
+                    {c.callHistory?.length > 0 && <div className="history-toggle-row"><button className="btn outline" type="button" onClick={() => setExpandedContactId(expandedContactId === id ? null : id)}>{expandedContactId === id ? 'Hide call history' : `View call history (${c.callHistory.length})`}</button></div>}
+                    {expandedContactId === id && <div className="call-history" aria-label={`Call history for ${c.name}`}>
+                      {[...(c.callHistory || [])].reverse().map((call, index) => <div className="call-history-entry" key={`${call.timestamp}-${index}`}>
+                        <div className="history-entry-head"><strong>{call.callerName || callerName}</strong><span className={`status-badge ${getStageClass(call.status)}`}>{call.status || 'Unknown'}</span></div>
+                        <div className="muted">{call.timestamp ? formatAbsoluteDate(call.timestamp) : 'Unknown time'} • {call.outcome || 'Contacted'}</div>
+                        <div className="history-review">{call.note || 'No review recorded'}</div>
+                      </div>)}
+                    </div>}
                   </div>
                 );
               })}
@@ -1106,6 +1122,45 @@ function ItemsPage() {
       </div>
     </div>
   );
+}
+
+function SetupLibraryPage() {
+  const [items, setItems] = useState([]);
+  const [setups, setSetups] = useState([]);
+  const [form, setForm] = useState({ name: '', description: '', itemId: '', quantity: '1', price: '' });
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [message, setMessage] = useState('');
+
+  const load = async () => {
+    const [itemsResponse, setupsResponse] = await Promise.all([api.get('/items'), api.get('/setups')]);
+    setItems(itemsResponse.data || []);
+    setSetups(setupsResponse.data || []);
+  };
+  useEffect(() => { load().catch(() => setMessage('Unable to load setup library')); }, []);
+
+  const addItem = () => {
+    const item = items.find((entry) => entry._id === form.itemId);
+    if (!item) return;
+    setSelectedItems((current) => [...current.filter((entry) => entry.item !== item._id), { item: item._id, name: item.name, quantity: Math.max(1, Number(form.quantity || 1)), price: Number(form.price || item.salePrice || 0) }]);
+    setForm({ ...form, itemId: '', quantity: '1', price: '' });
+  };
+  const save = async (event) => {
+    event.preventDefault();
+    try {
+      await api.post('/setups', { name: form.name, description: form.description, items: selectedItems });
+      setForm({ name: '', description: '', itemId: '', quantity: '1', price: '' });
+      setSelectedItems([]);
+      setMessage('Standard setup saved');
+      await load();
+    } catch (error) { setMessage(error.response?.data?.message || 'Unable to save setup'); }
+  };
+  const remove = async (id) => { if (!window.confirm('Delete this setup?')) return; await api.delete(`/setups/${id}`); await load(); };
+
+  return <div className="setup-library-page">
+    <div className="page-header"><p className="eyebrow">Reusable billing templates</p><h3>Setup library</h3><p className="muted">Create standard solar installation packages once and load them into any setup bill.</p></div>
+    <form className="panel setup-library-form" onSubmit={save}><h4>Create standard setup</h4><div className="form-grid"><input required placeholder="Setup name (e.g. 3KW On-grid)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /><select value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}><option value="">Choose item</option>{items.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select><input type="number" min="1" placeholder="Quantity" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /><input type="number" min="0" placeholder="Price override (optional)" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /><button className="btn secondary" type="button" onClick={addItem}>Add item</button></div>{selectedItems.length > 0 && <div className="setup-item-summary">{selectedItems.map((item) => <span key={item.item}>{item.name} × {item.quantity} at ₹{item.price}</span>)}</div>}<button className="btn primary" type="submit">Save standard setup</button>{message && <p className="status-message">{message}</p>}</form>
+    <div className="setup-library-grid">{setups.map((setup) => <article className="panel setup-card" key={setup._id}><div className="panel-header"><div><h4>{setup.name}</h4><p className="muted">{setup.description || 'Standard installation package'}</p></div><button className="btn outline" type="button" onClick={() => remove(setup._id)}>Delete</button></div><ul>{(setup.items || []).map((item) => <li key={item.item}>{item.name} <span>× {item.quantity} • ₹{Number(item.price || 0).toLocaleString()}</span></li>)}</ul></article>)}</div>
+  </div>;
 }
 
 function BillingPage({ user }) {
