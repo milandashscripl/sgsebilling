@@ -245,4 +245,30 @@ router.get('/calling', auth, async (req, res) => {
   }
 });
 
+router.get('/daily-progress', auth, async (req, res) => {
+  try {
+    const requestedDate = req.query.date ? new Date(req.query.date) : new Date();
+    const start = new Date(requestedDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    const contacts = await Contact.find({ createdBy: req.user._id }).lean();
+    const callsToday = contacts.flatMap((contact) => (contact.callHistory || []).map((call) => ({ contact, call })))
+      .filter(({ call }) => new Date(call.timestamp) >= start && new Date(call.timestamp) < end);
+    const statusCounts = {};
+    callsToday.forEach(({ call }) => { statusCounts[call.status || 'Unknown'] = (statusCounts[call.status || 'Unknown'] || 0) + 1; });
+    res.json({
+      date: start.toISOString().slice(0, 10),
+      totalContacts: contacts.length,
+      callsToday: callsToday.length,
+      contactedToday: callsToday.filter(({ call }) => call.outcome === 'Contacted').length,
+      followUpsToday: callsToday.filter(({ call }) => call.outcome === 'Follow-up').length,
+      newLeadsToday: contacts.filter((contact) => contact.createdAt >= start && contact.createdAt < end).length,
+      statusCounts
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;

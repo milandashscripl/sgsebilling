@@ -1,9 +1,14 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Link, NavLink, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { jsPDF } from 'jspdf';
-import api from './api';
+import { API_BASE_URL } from './config';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import { downloadInvoicePdf } from './utils/invoicePdf';
+
+const API = API_BASE_URL;
+
+const api = axios.create({ baseURL: API });
 
 const emptyItemForm = {
   name: '',
@@ -36,7 +41,7 @@ const emptyCategoryForm = {
   description: ''
 };
 
-const LEAD_STATUS_OPTIONS = ['Not Yet Called', 'Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Following Up', 'Not Interested', 'No Response'];
+const LEAD_STATUS_OPTIONS = ['Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Following Up', 'Not Interested'];
 
 const toLocalDateTimeValue = (date = new Date()) => {
   const pad = (value) => String(value).padStart(2, '0');
@@ -69,7 +74,6 @@ const getStageClass = (status) => {
   if (label.includes('cool')) return 'status-cool-lead';
   if (label.includes('convert')) return 'status-may-convert';
   if (label.includes('following')) return 'status-following-up';
-  if (label.includes('not yet') || label.includes('no response')) return 'status-cool-lead';
   if (label.includes('not')) return 'status-not-interested';
   return 'status-following-up';
 };
@@ -90,6 +94,7 @@ function App() {
       return;
     }
 
+    api.defaults.headers.common.Authorization = `Bearer ${token}`;
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
@@ -201,8 +206,7 @@ function AuthenticatedApp({ user, logout }) {
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/assigned">My Calls</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink>
           {user.role === 'admin' && <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/users">Users</NavLink>}
@@ -214,7 +218,6 @@ function AuthenticatedApp({ user, logout }) {
             <Route path="/stock" element={<StockPage />} />
             <Route path="/billing" element={<BillingPage user={user} />} />
             <Route path="/contacts" element={<ContactsPage />} />
-            <Route path="/assigned" element={<AssignedContactsPage user={user} />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
@@ -241,6 +244,7 @@ function Login({ setUser }) {
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
+      api.defaults.headers.common.Authorization = `Bearer ${token}`;
       setUser(res.data.user);
       navigate('/dashboard');
     } catch (err) {
@@ -275,6 +279,7 @@ function Register({ setUser }) {
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
+      api.defaults.headers.common.Authorization = `Bearer ${token}`;
       setUser(res.data.user);
       navigate('/dashboard');
     } catch (err) {
@@ -298,7 +303,7 @@ function Register({ setUser }) {
 function ContactsPage() {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Not Yet Called', review: '', nextFollowUp: '', markContacted: false });
+  const [form, setForm] = useState({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Warm Lead', review: '', nextFollowUp: '', markContacted: false });
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState('');
   const [statusTab, setStatusTab] = useState('all');
@@ -318,7 +323,7 @@ function ContactsPage() {
 
   useEffect(() => { loadContacts(); }, []);
 
-  const reset = () => { setForm({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Not Yet Called', review: '', nextFollowUp: '', markContacted: false }); setEditingId(null); };
+  const reset = () => { setForm({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Warm Lead', review: '', nextFollowUp: '', markContacted: false }); setEditingId(null); };
 
   const save = async (e) => {
     e && e.preventDefault();
@@ -333,7 +338,6 @@ function ContactsPage() {
       }
       reset();
       await loadContacts();
-      setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage(err?.response?.data?.message || 'Unable to save contact');
     }
@@ -367,7 +371,6 @@ function ContactsPage() {
       setMessage('Call logged');
       setCallForm({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' });
       await loadContacts();
-      setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage('Unable to log call');
     }
@@ -381,8 +384,7 @@ function ContactsPage() {
     warm: contacts.filter(c => c.status === 'Warm Lead').length,
     cool: contacts.filter(c => c.status === 'Cool Lead').length,
     notinterested: contacts.filter(c => c.status === 'Not Interested').length,
-    no_response: contacts.filter(c => c.status === 'No Response').length,
-    not_yet_called: contacts.filter(c => c.status === 'Not Yet Called' || (!c.callHistory || c.callHistory.length === 0)).length
+    no_response: contacts.filter(c => !c.callHistory || c.callHistory.length === 0).length
   };
 
   const filtered = contacts.filter(c => {
@@ -397,18 +399,17 @@ function ContactsPage() {
     if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
     if (statusTab === 'cool' && c.status !== 'Cool Lead') return false;
     if (statusTab === 'notinterested' && c.status !== 'Not Interested') return false;
-    if (statusTab === 'no_response' && c.status !== 'No Response') return false;
-    if (statusTab === 'not_yet_called' && !(c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0)) return false;
-    if (statusTab === 'not_yet_called' && selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
+    if (statusTab === 'no_response' && c.callHistory && c.callHistory.length) return false;
+    if (statusTab === 'no_response' && selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
     return true;
   });
 
-  const notYetCalledContacts = contacts.filter(c => c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0);
-  const callerList = [...new Set(notYetCalledContacts.map(c => c.callerName || 'Not assigned'))].sort();
-
+  const noResponseContacts = contacts.filter(c => !c.callHistory || c.callHistory.length === 0);
+  const callerList = [...new Set(noResponseContacts.map(c => c.callerName || 'Not assigned'))].sort();
+  
   const handleStatusTabChange = (tab) => {
     setStatusTab(tab);
-    if (tab !== 'not_yet_called') {
+    if (tab !== 'no_response') {
       setSelectedCaller(null);
     } else if (callerList.length > 0 && !selectedCaller) {
       setSelectedCaller(callerList[0]);
@@ -464,23 +465,15 @@ function ContactsPage() {
           <button className={statusTab==='cool'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('cool')}>Cool ({counts.cool})</button>
           <button className={statusTab==='notinterested'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('notinterested')}>Not interested ({counts.notinterested})</button>
           <button className={statusTab==='no_response'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('no_response')}>No response ({counts.no_response})</button>
-          <button className={statusTab==='not_yet_called'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('not_yet_called')}>Not yet called ({counts.not_yet_called})</button>
           <input className="search-field" placeholder="Search caller, customer or number" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
         </div>
 
-        {statusTab === 'not_yet_called' && callerList.length > 0 && (
+        {statusTab === 'no_response' && callerList.length > 0 && (
           <div className="caller-tabs">
-            <button
-              className={selectedCaller === null ? 'btn primary' : 'btn outline'}
-              onClick={() => setSelectedCaller(null)}
-              style={{ fontSize: '0.9rem', padding: '8px 12px' }}
-            >
-              All callers ({notYetCalledContacts.length})
-            </button>
             {callerList.map((caller) => {
-              const callerCount = notYetCalledContacts.filter(c => (c.callerName || 'Not assigned') === caller).length;
+              const callerCount = noResponseContacts.filter(c => (c.callerName || 'Not assigned') === caller).length;
               return (
-                <button
+                <button 
                   key={caller}
                   className={selectedCaller === caller ? 'btn primary' : 'btn outline'}
                   onClick={() => setSelectedCaller(caller)}
@@ -511,11 +504,11 @@ function ContactsPage() {
                         <div className="contact-name-row">
                           <strong>{c.name || 'Unknown'}</strong>
                           {recent && <span className="recent-badge">Recent</span>}
-                          <span className="contact-time">{getTimeAgo(c.lastContacted)} â€¢ {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span>
+                          <span className="contact-time">{getTimeAgo(c.lastContacted)} • {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span>
                         </div>
                         <div className="contact-meta">
-                          <span>{c.contactNumber || 'â€”'}</span>
-                          <span>{c.consumerNumber || 'â€”'}</span>
+                          <span>{c.contactNumber || '—'}</span>
+                          <span>{c.consumerNumber || '—'}</span>
                           <span>Calls: {c.callHistory ? c.callHistory.length : 0}</span>
                         </div>
                         <div className="status-row">
@@ -576,16 +569,19 @@ function Dashboard({ user }) {
   const [summary, setSummary] = useState({ totalSales: 0, totalPurchases: 0, totalReturns: 0, invoiceCount: 0 });
   const [items, setItems] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [dailyProgress, setDailyProgress] = useState({ callsToday: 0, contactedToday: 0, followUpsToday: 0, newLeadsToday: 0 });
 
   useEffect(() => {
     Promise.all([
       api.get('/reports/summary'),
       api.get('/items'),
-      api.get('/contacts')
-    ]).then(([summaryRes, itemsRes, contactsRes]) => {
+      api.get('/contacts'),
+      api.get('/reports/daily-progress')
+    ]).then(([summaryRes, itemsRes, contactsRes, dailyRes]) => {
       setSummary(summaryRes.data || {});
       setItems(itemsRes.data || []);
       setContacts(contactsRes.data || []);
+      setDailyProgress(dailyRes.data || {});
     });
   }, []);
 
@@ -699,6 +695,16 @@ function Dashboard({ user }) {
             <span style={{ width: `${Math.min(100, Math.max(0, marginRate))}%` }} />
           </div>
           <p className="muted">Healthy sales momentum and stock discipline this cycle.</p>
+        </div>
+      </div>
+
+      <div className="panel daily-progress-panel">
+        <div className="panel-header"><div><p className="eyebrow">Today at a glance</p><h4>Calling progress</h4></div><span className="chip">{dailyProgress.date || 'Today'}</span></div>
+        <div className="daily-progress-grid">
+          <div><strong>{dailyProgress.callsToday || 0}</strong><span>Calls logged</span></div>
+          <div><strong>{dailyProgress.contactedToday || 0}</strong><span>Contacts reached</span></div>
+          <div><strong>{dailyProgress.followUpsToday || 0}</strong><span>Follow-ups</span></div>
+          <div><strong>{dailyProgress.newLeadsToday || 0}</strong><span>New leads</span></div>
         </div>
       </div>
 
@@ -983,7 +989,7 @@ function ItemsPage() {
           <div className="list-row" key={itemType._id}>
             <div>
               <strong>{itemType.name}</strong>
-              <div className="muted">Unit {itemType.unit} â€¢ SGST {itemType.sgstRate}% â€¢ CGST {itemType.cgstRate}% â€¢ IGST {itemType.igstRate}%</div>
+              <div className="muted">Unit {itemType.unit} • SGST {itemType.sgstRate}% • CGST {itemType.cgstRate}% • IGST {itemType.igstRate}%</div>
             </div>
             <div className="inline-actions">
               <button className="btn secondary" type="button" onClick={() => editItemType(itemType)}>Edit</button>
@@ -1070,7 +1076,7 @@ function ItemsPage() {
             <div className="item-card-main">
               <div>
                 <strong>{item.name}</strong>
-                <div className="muted">{item.itemType || 'General'} â€¢ {item.category || 'General'}</div>
+                <div className="muted">{item.itemType || 'General'} • {item.category || 'General'}</div>
                 <div className="muted">{item.specification || 'No specification added'}</div>
               </div>
               <div className="item-meta">
@@ -1091,7 +1097,13 @@ function ItemsPage() {
 
 function BillingPage({ user }) {
   const [items, setItems] = useState([]);
+  const [setups, setSetups] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
+  const [setupItems, setSetupItems] = useState([]);
+  const [setupName, setSetupName] = useState('');
+  const [setupDescription, setSetupDescription] = useState('');
+  const [setupItemId, setSetupItemId] = useState('');
+  const [setupItemQuantity, setSetupItemQuantity] = useState('1');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [partyName, setPartyName] = useState('');
@@ -1100,58 +1112,20 @@ function BillingPage({ user }) {
   const [type, setType] = useState('sale');
   const [itemSearch, setItemSearch] = useState('');
   const [billingMessage, setBillingMessage] = useState('');
-  const [billingMode, setBillingMode] = useState('itemised');
-  const [fsPayable, setFsPayable] = useState('');
-  const [fsGstRate, setFsGstRate] = useState('18');
-  const [fsDescription, setFsDescription] = useState('');
-  const [fsDiscount, setFsDiscount] = useState('0');
-  const [fsSelectedItem, setFsSelectedItem] = useState(null);
-  const [fsItemSearch, setFsItemSearch] = useState('');
-  const [discount, setDiscount] = useState('0');
-  const [vendorForm, setVendorForm] = useState({ name: user?.name || '', shopName: user?.shopName || '', shopAddress: user?.shopAddress || '', shopGSTIN: user?.shopGSTIN || '', phone: user?.phone || '', shopLogoUrl: user?.shopLogoUrl || '' });
-  const [vendorMsg, setVendorMsg] = useState('');
-  const [showVendorEdit, setShowVendorEdit] = useState(false);
-  const [currentUser, setCurrentUser] = useState(user);
 
   const vendor = {
-    name: currentUser?.shopName || currentUser?.name || 'SGSE Billing',
-    phone: currentUser?.phone || '',
-    address: currentUser?.shopAddress || currentUser?.address || '',
-    logo: currentUser?.shopLogoUrl || ''
+    name: user?.shopName || user?.name || 'SGSE Billing',
+    phone: user?.phone || user?.mobile || '',
+    address: user?.shopAddress || user?.address || 'Your business address',
+    logo: user?.shopLogoUrl || ''
   };
 
-  const saveVendorProfile = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await api.put('/auth/me', vendorForm);
-      const updated = res.data.user;
-      localStorage.setItem('user', JSON.stringify(updated));
-      setCurrentUser(updated);
-      setVendorMsg('Profile saved');
-      setShowVendorEdit(false);
-      setTimeout(() => setVendorMsg(''), 3000);
-    } catch (err) {
-      setVendorMsg(err.response?.data?.message || 'Unable to save profile');
-    }
-  };
-
-  const uploadLogo = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('logo', file);
-    try {
-      const res = await api.post('/auth/me/logo', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      const updated = res.data.user;
-      localStorage.setItem('user', JSON.stringify(updated));
-      setCurrentUser(updated);
-      setVendorForm(f => ({ ...f, shopLogoUrl: updated.shopLogoUrl }));
-      setVendorMsg('Logo uploaded');
-      setTimeout(() => setVendorMsg(''), 3000);
-    } catch { setVendorMsg('Logo upload failed'); }
-  };
-
-  useEffect(() => { api.get('/items').then((res) => setItems(res.data || [])).catch(() => {}); }, []);
+  useEffect(() => {
+    Promise.all([api.get('/items'), api.get('/setups')]).then(([itemsRes, setupsRes]) => {
+      setItems(itemsRes.data || []);
+      setSetups(setupsRes.data || []);
+    });
+  }, []);
 
   const filteredItems = items.filter((item) => {
     const query = itemSearch.trim().toLowerCase();
@@ -1165,87 +1139,116 @@ function BillingPage({ user }) {
     setSelectedItems((prev) => {
       const existing = prev.find((x) => x.item === item._id);
       if (existing) {
-        return prev.map((x) => x.item === item._id ? { ...x, quantity: x.quantity + 1 } : x);
+        return prev.map((x) => x.item === item._id ? { ...x, quantity: x.quantity + 1, total: (x.price * (x.quantity + 1)) } : x);
       }
+
       const price = type === 'purchase' ? item.purchasePrice : item.salePrice;
-      return [...prev, { item: item._id, name: item.name, quantity: 1, price, sgstRate: item.sgstRate || 0, cgstRate: item.cgstRate || 0, igstRate: item.igstRate || 0 }];
+      return [...prev, { item: item._id, name: item.name, quantity: 1, price, sgstRate: item.sgstRate || 0, cgstRate: item.cgstRate || 0, igstRate: item.igstRate || 0, total: price }];
     });
   };
 
-  const updateQty = (id, delta) => {
-    setSelectedItems((prev) => prev
-      .map((e) => e.item === id ? { ...e, quantity: Math.max(1, e.quantity + delta) } : e)
-    );
+  const selectSetup = (setupId) => {
+    const setup = setups.find((entry) => entry._id === setupId);
+    if (!setup) return;
+    setType('setup');
+    setSelectedItems((setup.items || []).map((entry) => ({
+      item: entry.item,
+      name: entry.name,
+      quantity: Number(entry.quantity || 1),
+      price: Number(entry.price || 0),
+      sgstRate: 0,
+      cgstRate: 0,
+      igstRate: 0,
+      total: Number(entry.quantity || 1) * Number(entry.price || 0)
+    })));
   };
 
-  const removeItem = (id) => setSelectedItems((prev) => prev.filter((e) => e.item !== id));
+  const addSetupItem = () => {
+    const item = items.find((entry) => entry._id === setupItemId);
+    if (!item) return;
+    setSetupItems((previous) => [...previous.filter((entry) => entry.item !== item._id), {
+      item: item._id, name: item.name, quantity: Math.max(1, Number(setupItemQuantity || 1)), price: Number(item.salePrice || 0)
+    }]);
+    setSetupItemId('');
+    setSetupItemQuantity('1');
+  };
 
-  // Itemised calculations
-  const discountPct = Math.min(100, Math.max(0, Number(discount) || 0));
-  const subtotalRaw = selectedItems.reduce((s, e) => s + e.quantity * e.price, 0);
-  const discountAmt = subtotalRaw * discountPct / 100;
-  const subtotal = subtotalRaw - discountAmt;
-  const gstAmount = selectedItems.reduce((s, e) => {
-    const base = e.quantity * e.price * (1 - discountPct / 100);
-    return s + base * ((e.sgstRate || 0) + (e.cgstRate || 0) + (e.igstRate || 0)) / 100;
-  }, 0);
-  const total = subtotal + gstAmount;
+  const saveSetup = async () => {
+    if (!setupName.trim() || !setupItems.length) return setBillingMessage('Add a name and at least one item to save a setup');
+    try {
+      const response = await api.post('/setups', { name: setupName, description: setupDescription, items: setupItems });
+      setSetups((previous) => [...previous, response.data].sort((a, b) => a.name.localeCompare(b.name)));
+      setSetupName('');
+      setSetupDescription('');
+      setSetupItems([]);
+      setBillingMessage('Setup saved and ready for billing');
+    } catch (error) {
+      setBillingMessage(error.response?.data?.message || 'Unable to save setup');
+    }
+  };
 
-  // Full-setup calculations
-  const fsPayableNum = Number(fsPayable) || 0;
-  const fsGstRateNum = Math.max(0, Number(fsGstRate) || 0);
-  const fsDiscountNum = Math.min(100, Math.max(0, Number(fsDiscount) || 0));
-  const fsTaxable = fsGstRateNum > 0 ? fsPayableNum / (1 + fsGstRateNum / 100) : fsPayableNum;
-  const fsGstAmt = fsPayableNum - fsTaxable;
-  const fsDiscountAmt = fsTaxable * fsDiscountNum / 100;
-  const fsFinalTaxable = fsTaxable - fsDiscountAmt;
-  const fsFinalTotal = fsFinalTaxable + fsGstAmt;
+  const updateQty = (id, delta) => {
+    setSelectedItems((prev) => prev.map((entry) => entry.item === id ? { ...entry, quantity: Math.max(1, entry.quantity + delta), total: (entry.price * Math.max(1, entry.quantity + delta)) } : entry));
+  };
 
   const saveInvoice = async () => {
-    if (billingMode === 'itemised' && !selectedItems.length) {
-      setBillingMessage('Add at least one item before creating a bill');
+    if (!selectedItems.length) {
+      setBillingMessage('Please add at least one item before creating a bill');
       return;
     }
-    if (billingMode === 'fullsetup' && !fsPayableNum) {
-      setBillingMessage('Enter the payable amount');
-      return;
-    }
+
     try {
-      let invoiceItems, invoiceSubtotal, invoiceGst, invoiceTotal;
-      if (billingMode === 'fullsetup') {
-        invoiceItems = [{ name: fsSelectedItem?.name || fsDescription || 'Service / Goods', quantity: 1, price: fsFinalTaxable, sgstRate: 0, cgstRate: 0, igstRate: 0, total: fsFinalTaxable }];
-        invoiceSubtotal = fsFinalTaxable;
-        invoiceGst = fsGstAmt;
-        invoiceTotal = fsFinalTotal;
-      } else {
-        invoiceItems = selectedItems.map((e) => ({ ...e, itemId: e.item, total: e.quantity * e.price * (1 - discountPct / 100) }));
-        invoiceSubtotal = subtotal;
-        invoiceGst = gstAmount;
-        invoiceTotal = total;
-      }
-      const payload = { partyName: partyName || customerName, partyPhone: partyPhone || customerPhone, partyGSTIN, customerName, customerPhone, type, billingMode, items: invoiceItems };
+      const payload = {
+        partyName: partyName || customerName,
+        partyPhone: partyPhone || customerPhone,
+        partyGSTIN,
+        customerName,
+        customerPhone,
+        type,
+        items: selectedItems.map((entry) => ({ ...entry, itemId: entry.item, total: entry.quantity * entry.price }))
+      };
       const res = await api.post('/invoices', payload);
-      const saved = res.data || {};
-      await downloadInvoicePdf({
-        ...saved,
+      const savedInvoice = res.data || {};
+      const printableInvoice = {
+        ...savedInvoice,
         sellerName: vendor.name,
         sellerAddress: vendor.address,
         sellerPhone: vendor.phone,
-        sellerGSTIN: currentUser?.shopGSTIN || '',
+        sellerGSTIN: user?.shopGSTIN || '',
         sellerLogo: vendor.logo,
-        subtotal: invoiceSubtotal,
-        gstAmount: invoiceGst,
-        grandTotal: invoiceTotal,
-        items: invoiceItems.map((e) => ({ ...e, total: Number(e.total || 0) }))
-      });
-      setBillingMessage('Invoice created and PDF downloaded');
-      setSelectedItems([]); setPartyName(''); setPartyPhone(''); setPartyGSTIN(''); setCustomerName(''); setCustomerPhone('');
-      setFsPayable(''); setFsDescription(''); setFsDiscount('0'); setDiscount('0'); setFsSelectedItem(null); setFsItemSearch('');
-      setTimeout(() => setBillingMessage(''), 4000);
-    } catch (err) {
-      setBillingMessage(err.response?.data?.message || 'Unable to create invoice');
+        items: (savedInvoice.items || selectedItems.map((entry) => ({
+          item: entry.item,
+          name: entry.name,
+          quantity: entry.quantity,
+          price: entry.price,
+          sgstRate: entry.sgstRate || 0,
+          cgstRate: entry.cgstRate || 0,
+          igstRate: entry.igstRate || 0,
+          total: entry.quantity * entry.price
+        }))).map((entry) => ({
+          ...entry,
+          total: Number(entry.total || ((Number(entry.quantity || 0) * Number(entry.price || 0))))
+        }))
+      };
+      await downloadInvoicePdf(printableInvoice);
+      setBillingMessage('Invoice created successfully and PDF downloaded');
+      setSelectedItems([]);
+      setPartyName('');
+      setPartyPhone('');
+      setPartyGSTIN('');
+      setCustomerName('');
+      setCustomerPhone('');
+    } catch (error) {
+      setBillingMessage(error.response?.data?.message || 'Unable to create invoice');
     }
   };
+
+  const subtotal = selectedItems.reduce((sum, entry) => sum + entry.quantity * entry.price, 0);
+  const gstAmount = selectedItems.reduce((sum, entry) => {
+    const base = entry.quantity * entry.price;
+    return sum + (base * (entry.sgstRate || 0) / 100) + (base * (entry.cgstRate || 0) / 100) + (base * (entry.igstRate || 0) / 100);
+  }, 0);
+  const total = subtotal + gstAmount;
 
   return (
     <div className="billing-page">
@@ -1254,186 +1257,72 @@ function BillingPage({ user }) {
         <h3>Invoice workspace</h3>
       </div>
 
-      {/* Vendor profile card */}
-      <div className="vendor-profile-card panel">
-        <div className="vendor-profile-head">
-          <div className="vendor-logo-wrap">
-            {vendor.logo
-              ? <img src={vendor.logo} alt={vendor.name} className="vendor-logo" />
-              : <div className="vendor-logo placeholder">{(vendor.name || 'SG').slice(0, 2).toUpperCase()}</div>}
-          </div>
-          <div className="vendor-profile-info">
-            <strong className="vendor-name">{vendor.name}</strong>
-            <span className="muted">{vendor.address || 'No address set'}</span>
-            {vendor.phone && <span className="muted">{vendor.phone}</span>}
-            {currentUser?.shopGSTIN && <span className="muted">GSTIN: {currentUser.shopGSTIN}</span>}
-          </div>
-          <button className="btn outline vendor-edit-btn" onClick={() => {
-            setShowVendorEdit((v) => !v);
-            setVendorForm({ name: currentUser?.name || '', shopName: currentUser?.shopName || '', shopAddress: currentUser?.shopAddress || '', shopGSTIN: currentUser?.shopGSTIN || '', phone: currentUser?.phone || '', shopLogoUrl: currentUser?.shopLogoUrl || '' });
-          }}>{showVendorEdit ? 'Cancel' : 'Edit profile'}</button>
-        </div>
-        {vendorMsg && <p className="status-message" style={{ marginTop: 8 }}>{vendorMsg}</p>}
-        {showVendorEdit && (
-          <form className="vendor-edit-form" onSubmit={saveVendorProfile}>
-            <div className="vendor-logo-upload">
-              <div className="vendor-logo-preview">
-                {vendorForm.shopLogoUrl
-                  ? <img src={vendorForm.shopLogoUrl} alt="logo" className="vendor-logo" />
-                  : <div className="vendor-logo placeholder">{(vendorForm.shopName || 'SG').slice(0, 2).toUpperCase()}</div>}
-              </div>
-              <label className="logo-upload-label">
-                <input type="file" accept="image/*" onChange={uploadLogo} style={{ display: 'none' }} />
-                <span className="btn outline" style={{ cursor: 'pointer' }}>Upload logo</span>
-              </label>
-            </div>
-            <div className="form-grid">
-              <label className="field-label-wrap">Your name<input value={vendorForm.name} onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })} /></label>
-              <label className="field-label-wrap">Shop / business name<input value={vendorForm.shopName} onChange={(e) => setVendorForm({ ...vendorForm, shopName: e.target.value })} /></label>
-              <label className="field-label-wrap">Phone<input value={vendorForm.phone} onChange={(e) => setVendorForm({ ...vendorForm, phone: e.target.value })} /></label>
-              <label className="field-label-wrap">GSTIN<input value={vendorForm.shopGSTIN} onChange={(e) => setVendorForm({ ...vendorForm, shopGSTIN: e.target.value })} /></label>
-              <label className="field-label-wrap" style={{ gridColumn: '1/-1' }}>Address<input value={vendorForm.shopAddress} onChange={(e) => setVendorForm({ ...vendorForm, shopAddress: e.target.value })} /></label>
-            </div>
-            <button className="btn primary" type="submit">Save profile</button>
-          </form>
-        )}
-      </div>
-
-      {/* Billing mode toggle */}
-      <div className="billing-mode-bar">
-        <button className={billingMode === 'itemised' ? 'billing-mode-btn active' : 'billing-mode-btn'} onClick={() => setBillingMode('itemised')}>
-          <span className="mode-label"><strong>Itemised billing</strong><small>Add items &mdash; GST added on top</small></span>
-        </button>
-        <button className={billingMode === 'fullsetup' ? 'billing-mode-btn active' : 'billing-mode-btn'} onClick={() => setBillingMode('fullsetup')}>
-          <span className="mode-label"><strong>Full-setup billing</strong><small>Enter payable amount &mdash; GST back-calculated</small></span>
-        </button>
-      </div>
-
       <div className="billing-grid">
-        {/* LEFT: form panel */}
         <div className="panel billing-form-panel">
           <div className="billing-form-header">
             <div>
-              <h4>{billingMode === 'itemised' ? 'Itemised invoice' : 'Full-setup invoice'}</h4>
-              <p className="muted">{billingMode === 'itemised' ? 'Pick items â€” totals and GST calculated automatically.' : 'Enter the final payable amount and GST % â€” taxable value is back-calculated.'}</p>
+              <h4>New invoice</h4>
+              <p className="muted">Create a clean, branded bill with vendor details included.</p>
             </div>
-            <select value={type} onChange={(e) => setType(e.target.value)} style={{ maxWidth: 140 }}>
+            <select value={type} onChange={(e) => setType(e.target.value)}>
               <option value="sale">Sale</option>
               <option value="purchase">Purchase</option>
-              <option value="return">Return</option>
+                  <option value="return">Return</option>
+                  <option value="setup">Setup billing</option>
             </select>
           </div>
 
+          <div className="setup-tools">
+            <div className="panel-header"><div><h4>Reusable setups</h4><p className="muted">Save a standard installation package once, then load it into a bill.</p></div></div>
+            <div className="form-grid">
+              <select value="" onChange={(e) => selectSetup(e.target.value)}>
+                <option value="">Select saved setup</option>
+                {setups.map((setup) => <option key={setup._id} value={setup._id}>{setup.name}</option>)}
+              </select>
+              <input placeholder="Setup name" value={setupName} onChange={(e) => setSetupName(e.target.value)} />
+              <input placeholder="Description (optional)" value={setupDescription} onChange={(e) => setSetupDescription(e.target.value)} />
+              <select value={setupItemId} onChange={(e) => setSetupItemId(e.target.value)}>
+                <option value="">Add item to setup</option>
+                {items.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+              </select>
+              <input type="number" min="1" placeholder="Qty" value={setupItemQuantity} onChange={(e) => setSetupItemQuantity(e.target.value)} />
+              <button className="btn secondary" type="button" onClick={addSetupItem}>Add setup item</button>
+              <button className="btn primary" type="button" onClick={saveSetup}>Save setup</button>
+            </div>
+            {setupItems.length > 0 && <p className="muted">Template: {setupItems.map((entry) => `${entry.name} × ${entry.quantity}`).join(', ')}</p>}
+          </div>
+
           <div className="billing-customer-grid">
-            <input placeholder="Party / company name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
+            <input placeholder="Party name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
             <input placeholder="Party phone" value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} />
             <input placeholder="Party GSTIN (optional)" value={partyGSTIN} onChange={(e) => setPartyGSTIN(e.target.value)} />
             <input placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-            <input placeholder="Customer phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+            <input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
           </div>
 
-          {billingMode === 'itemised' ? (
-            <>
-              <div className="item-search-block">
-                <label className="field-label">Search &amp; add items</label>
-                <input placeholder="Search by name, type, category..." value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} />
-              </div>
-              <div className="item-list">
-                {filteredItems.length === 0
-                  ? <p className="muted empty-invoice-state">No matching items found.</p>
-                  : filteredItems.map((item) => (
-                    <button key={item._id} className="item-chip" onClick={() => addItem(item)}>
-                      <span>{item.name}</span>
-                      <small>&#8377;{type === 'purchase' ? item.purchasePrice : item.salePrice}</small>
-                    </button>
-                  ))}
-              </div>
-              <div className="discount-row">
-                <label className="field-label">Discount %</label>
-                <input type="number" min="0" max="100" placeholder="0" value={discount} onChange={(e) => setDiscount(e.target.value)} style={{ maxWidth: 120 }} />
-              </div>
-            </>
-          ) : (
-            <div className="fullsetup-form">
-              {/* Step 1: pick item */}
-              <div className="fs-step">
-                <span className="fs-step-label">1. Select item</span>
-                {fsSelectedItem ? (
-                  <div className="fs-selected-item">
-                    <div>
-                      <strong>{fsSelectedItem.name}</strong>
-                      <span className="muted" style={{ marginLeft: 8 }}>{fsSelectedItem.itemType || ''}{fsSelectedItem.category ? ` · ${fsSelectedItem.category}` : ''}</span>
-                    </div>
-                    <button className="btn outline" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => { setFsSelectedItem(null); setFsItemSearch(''); }}>Change</button>
-                  </div>
-                ) : (
-                  <>
-                    <input placeholder="Search item by name, type, category..." value={fsItemSearch} onChange={(e) => setFsItemSearch(e.target.value)} />
-                    {fsItemSearch.trim() && (
-                      <div className="fs-item-results">
-                        {items.filter((it) => {
-                          const q = fsItemSearch.toLowerCase();
-                          return [it.name, it.itemType, it.category, it.specification].filter(Boolean).some((f) => f.toLowerCase().includes(q));
-                        }).slice(0, 8).map((it) => (
-                          <button key={it._id} className="fs-item-result-row" onClick={() => {
-                            setFsSelectedItem(it);
-                            setFsItemSearch('');
-                            if (!fsGstRate || fsGstRate === '18') {
-                              const rate = (it.sgstRate || 0) + (it.cgstRate || 0) + (it.igstRate || 0);
-                              if (rate > 0) setFsGstRate(String(rate));
-                            }
-                          }}>
-                            <span>{it.name}</span>
-                            <span className="muted">{it.itemType || ''}{it.category ? ` · ${it.category}` : ''}</span>
-                          </button>
-                        ))}
-                        {items.filter((it) => {
-                          const q = fsItemSearch.toLowerCase();
-                          return [it.name, it.itemType, it.category, it.specification].filter(Boolean).some((f) => f.toLowerCase().includes(q));
-                        }).length === 0 && <p className="muted" style={{ padding: '8px 12px' }}>No items found</p>}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+          <div className="item-search-block">
+            <label className="muted">Search items</label>
+            <input
+              placeholder="Search by item, type, category..."
+              value={itemSearch}
+              onChange={(e) => setItemSearch(e.target.value)}
+            />
+          </div>
 
-              {/* Step 2: pricing */}
-              <div className="fs-step">
-                <span className="fs-step-label">2. Enter final payable amount &amp; GST</span>
-                <div className="fullsetup-grid">
-                  <label className="field-label-wrap">
-                    Final payable (&#8377;) &mdash; GST inclusive
-                    <input type="number" min="0" placeholder="e.g. 11800" value={fsPayable} onChange={(e) => setFsPayable(e.target.value)} />
-                  </label>
-                  <label className="field-label-wrap">
-                    GST rate (%)
-                    <div className="gst-rate-row">
-                      {['0', '5', '12', '18', '28'].map((r) => (
-                        <button key={r} type="button" className={fsGstRate === r ? 'gst-chip active' : 'gst-chip'} onClick={() => setFsGstRate(r)}>{r}%</button>
-                      ))}
-                      <input type="number" min="0" max="100" placeholder="custom" value={fsGstRate} onChange={(e) => setFsGstRate(e.target.value)} style={{ maxWidth: 80 }} />
-                    </div>
-                  </label>
-                  <label className="field-label-wrap">
-                    Discount on taxable (%)
-                    <input type="number" min="0" max="100" placeholder="0" value={fsDiscount} onChange={(e) => setFsDiscount(e.target.value)} />
-                  </label>
-                </div>
-              </div>
-              {fsPayableNum > 0 && (
-                <div className="fullsetup-breakdown">
-                  <div className="breakdown-row"><span>Amount entered</span><strong>&#8377;{fsPayableNum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                  <div className="breakdown-row"><span>Taxable value (excl. GST)</span><strong>&#8377;{fsTaxable.toFixed(2)}</strong></div>
-                  {fsDiscountNum > 0 && <div className="breakdown-row"><span>Discount ({fsDiscountNum}%)</span><strong style={{ color: '#C23C3C' }}>- &#8377;{fsDiscountAmt.toFixed(2)}</strong></div>}
-                  <div className="breakdown-row"><span>GST ({fsGstRateNum}%)</span><strong>&#8377;{fsGstAmt.toFixed(2)}</strong></div>
-                  <div className="breakdown-row total-row"><span>Final payable</span><strong>&#8377;{fsFinalTotal.toFixed(2)}</strong></div>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="item-list">
+            {filteredItems.length === 0 ? (
+              <p className="muted empty-invoice-state">No matching items found.</p>
+            ) : (
+              filteredItems.map((item) => (
+                <button key={item._id} className="item-chip" onClick={() => addItem(item)}>
+                  <span>{item.name}</span>
+                  <small>₹{type === 'purchase' ? item.purchasePrice : item.salePrice}</small>
+                </button>
+              ))
+            )}
+          </div>
         </div>
 
-        {/* RIGHT: invoice preview */}
         <div className="panel invoice-preview-panel">
           <div className="invoice-header">
             <div className="invoice-brand">
@@ -1445,90 +1334,70 @@ function BillingPage({ user }) {
               </div>
             </div>
             <div className="invoice-meta">
-              <span>{type === 'sale' ? 'Sale' : type === 'purchase' ? 'Purchase' : 'Return'}</span>
+              <span>{type === 'sale' ? 'Sale Invoice' : type === 'purchase' ? 'Purchase Invoice' : type === 'setup' ? 'Setup Billing' : 'Return Invoice'}</span>
             </div>
           </div>
 
           <div className="invoice-customer-box">
-            <div><span className="invoice-label">Bill to</span><strong>{partyName || customerName || 'Walk-in Customer'}</strong></div>
-            <div><span className="invoice-label">Phone</span><strong>{partyPhone || customerPhone || 'â€”'}</strong></div>
-            <div><span className="invoice-label">GSTIN</span><strong>{partyGSTIN || 'â€”'}</strong></div>
+            <div>
+              <span className="invoice-label">Bill to</span>
+              <strong>{partyName || customerName || 'Walk-in Customer'}</strong>
+            </div>
+            <div>
+              <span className="invoice-label">Phone</span>
+              <strong>{partyPhone || customerPhone || '—'}</strong>
+            </div>
+            <div>
+              <span className="invoice-label">GSTIN</span>
+              <strong>{partyGSTIN || '—'}</strong>
+            </div>
           </div>
 
           <div className="invoice-items">
-            {billingMode === 'fullsetup' ? (
-              fsPayableNum > 0 ? (
-                <div className="invoice-item-row">
-                  <div>
-                    <strong>{fsSelectedItem?.name || fsDescription || 'Service / Goods'}</strong>
-                    <div className="muted">{fsSelectedItem ? `${fsSelectedItem.itemType || ''}${fsSelectedItem.category ? ' · ' + fsSelectedItem.category : ''}` : ''} GST {fsGstRateNum}% incl.</div>
-                  </div>
-                  <div className="invoice-item-actions"><span>Qty: 1</span></div>
-                  <strong>&#8377;{fsFinalTaxable.toFixed(2)}</strong>
-                </div>
-              ) : <div className="muted empty-invoice-state">{fsSelectedItem ? 'Enter payable amount to preview.' : 'Select an item first.'}</div>
+            {selectedItems.length === 0 ? (
+              <div className="muted empty-invoice-state">No items added yet.</div>
             ) : (
-              selectedItems.length === 0
-                ? <div className="muted empty-invoice-state">No items added yet.</div>
-                : selectedItems.map((entry) => (
-                  <div className="invoice-item-row" key={entry.item}>
-                    <div>
-                      <strong>{entry.name}</strong>
-                      <div className="muted">&#8377;{entry.price} &times; {entry.quantity}{discountPct > 0 ? ` âˆ’ ${discountPct}%` : ''}</div>
-                    </div>
-                    <div className="invoice-item-actions">
-                      <button className="btn small" onClick={() => updateQty(entry.item, -1)}>-</button>
-                      <span>{entry.quantity}</span>
-                      <button className="btn small" onClick={() => updateQty(entry.item, 1)}>+</button>
-                      <button className="btn small" style={{ color: '#C23C3C' }} onClick={() => removeItem(entry.item)}>x</button>
-                    </div>
-                    <strong>&#8377;{(entry.quantity * entry.price * (1 - discountPct / 100)).toFixed(2)}</strong>
+              selectedItems.map((entry) => (
+                <div className="invoice-item-row" key={entry.item}>
+                  <div>
+                    <strong>{entry.name}</strong>
+                    <div className="muted">₹{entry.price} × {entry.quantity}</div>
                   </div>
-                ))
+                  <div className="invoice-item-actions">
+                    <button className="btn small" onClick={() => updateQty(entry.item, -1)}>-</button>
+                    <span>{entry.quantity}</span>
+                    <button className="btn small" onClick={() => updateQty(entry.item, 1)}>+</button>
+                  </div>
+                  <input className="line-price" type="number" min="0" value={entry.price} onChange={(e) => setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? { ...line, price: Number(e.target.value || 0) } : line))} aria-label={`Price for ${entry.name}`} />
+                  <strong>₹{(entry.quantity * entry.price).toFixed(2)}</strong>
+                </div>
+              ))
             )}
           </div>
 
           <div className="invoice-totals">
-            {billingMode === 'itemised' ? (
-              <>
-                <div><span>Subtotal</span><strong>&#8377;{subtotalRaw.toFixed(2)}</strong></div>
-                {discountPct > 0 && <div><span>Discount ({discountPct}%)</span><strong style={{ color: '#C23C3C' }}>- &#8377;{discountAmt.toFixed(2)}</strong></div>}
-                <div><span>Taxable</span><strong>&#8377;{subtotal.toFixed(2)}</strong></div>
-                <div><span>GST</span><strong>&#8377;{gstAmount.toFixed(2)}</strong></div>
-                <div className="grand-total"><span>Total payable</span><strong>&#8377;{total.toFixed(2)}</strong></div>
-              </>
-            ) : (
-              <>
-                <div><span>Taxable value</span><strong>&#8377;{fsTaxable.toFixed(2)}</strong></div>
-                {fsDiscountNum > 0 && <div><span>Discount ({fsDiscountNum}%)</span><strong style={{ color: '#C23C3C' }}>- &#8377;{fsDiscountAmt.toFixed(2)}</strong></div>}
-                <div><span>GST ({fsGstRateNum}%)</span><strong>&#8377;{fsGstAmt.toFixed(2)}</strong></div>
-                <div className="grand-total"><span>Total payable</span><strong>&#8377;{fsFinalTotal.toFixed(2)}</strong></div>
-              </>
-            )}
+            <div><span>Subtotal</span><strong>₹{subtotal.toFixed(2)}</strong></div>
+            <div><span>GST</span><strong>₹{gstAmount.toFixed(2)}</strong></div>
+            <div className="grand-total"><span>Total</span><strong>₹{total.toFixed(2)}</strong></div>
           </div>
 
-          {billingMessage && <p className={billingMessage.includes('created') ? 'status-message' : 'error'} style={{ margin: '8px 0' }}>{billingMessage}</p>}
-          <button className="btn primary invoice-create-btn" onClick={saveInvoice}>Create bill &amp; download PDF</button>
+          {billingMessage && <p className="muted billing-message">{billingMessage}</p>}
+          <button className="btn primary invoice-create-btn" onClick={saveInvoice}>Create bill & download PDF</button>
         </div>
       </div>
     </div>
   );
 }
 
-
 function AccountingPage() {
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [summary, setSummary] = useState({ accounts: [], paymentMethods: [], incomeTotal: 0, expenseTotal: 0 });
+  const [summary, setSummary] = useState({ accounts: [], paymentMethods: [], incomeTotal: 0, expenseTotal: 0, netCash: 0, receivables: 0 });
   const [accountForm, setAccountForm] = useState({ name: '', type: 'cash', openingBalance: '0', notes: '' });
   const [transactionForm, setTransactionForm] = useState({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
   const [expenseForm, setExpenseForm] = useState({ date: toLocalDateTimeValue(), category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
   const [message, setMessage] = useState('');
-  const [depositTarget, setDepositTarget] = useState(null);
-  const [depositForm, setDepositForm] = useState({ amount: '', paymentMethod: 'cash', note: '' });
-  const [transferForm, setTransferForm] = useState({ fromAccountId: '', toAccountId: '', amount: '', note: '' });
-  const [showTransfer, setShowTransfer] = useState(false);
 
   const load = async () => {
     try {
@@ -1559,7 +1428,6 @@ function AccountingPage() {
       setAccountForm({ name: '', type: 'cash', openingBalance: '0', notes: '' });
       setMessage('Account created');
       await load();
-      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Unable to create account');
     }
@@ -1575,7 +1443,6 @@ function AccountingPage() {
       setTransactionForm({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
       setMessage('Ledger entry saved');
       await load();
-      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Unable to save ledger');
     }
@@ -1592,7 +1459,6 @@ function AccountingPage() {
       setExpenseForm({ date: toLocalDateTimeValue(), category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
       setMessage('Expense saved');
       await load();
-      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Unable to save expense');
     }
@@ -1604,7 +1470,6 @@ function AccountingPage() {
       await api.delete(`/accounting/expenses/${id}`);
       setMessage('Expense deleted');
       await load();
-      setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage('Unable to delete expense');
     }
@@ -1663,7 +1528,7 @@ function AccountingPage() {
       doc.text(`₹${Number(exp.amount || 0).toLocaleString()}`, pageWidth - margin - 2, y, { align: 'right' });
       y += lineHeight;
       doc.setFontSize(8);
-      doc.text(`${exp.date ? formatAbsoluteDate(exp.date) : 'â€”'} â€¢ ${exp.paymentMethod || 'cash'}`, margin + 2, y);
+      doc.text(`${exp.date ? formatAbsoluteDate(exp.date) : '—'} • ${exp.paymentMethod || 'cash'}`, margin + 2, y);
       y += 4;
       doc.setFontSize(10);
     });
@@ -1679,144 +1544,21 @@ function AccountingPage() {
       <div className="stats-grid">
         <div className="stat-card"><h4>Income total</h4><p>₹{(summary.incomeTotal || 0).toLocaleString()}</p></div>
         <div className="stat-card"><h4>Expense total</h4><p>₹{(summary.expenseTotal || 0).toLocaleString()}</p></div>
+        <div className="stat-card stat-purchases"><h4>Net cash movement</h4><p>₹{(summary.netCash || 0).toLocaleString()}</p><span>Income less expenses</span></div>
+        <div className="stat-card stat-returns"><h4>Receivables</h4><p>₹{(summary.receivables || 0).toLocaleString()}</p><span>Outstanding invoices</span></div>
       </div>
 
-      <div className="panel acct-balances-panel">
-        <div className="panel-header">
-          <h4>Account balances</h4>
-          <button className={`btn ${showTransfer ? 'primary' : 'outline'}`} onClick={() => setShowTransfer(v => !v)}>
-            {showTransfer ? 'âœ• Close transfer' : 'â‡„ Transfer funds'}
-          </button>
-        </div>
-
-        {showTransfer && (
-          <div className="transfer-panel">
-            <div className="transfer-panel-inner">
-              <div className="transfer-header">
-                <span className="transfer-icon">â‡„</span>
-                <div>
-                  <strong>Fund Transfer</strong>
-                  <p className="muted">Move money between accounts. Withdrawn from source, credited to destination.</p>
-                </div>
-              </div>
-              <form className="transfer-form" onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  const res = await api.post('/accounting/transfer', transferForm);
-                  setMessage(res.data.message || 'Transfer successful');
-                  setTransferForm({ fromAccountId: '', toAccountId: '', amount: '', note: '' });
-                  setShowTransfer(false);
-                  await load();
-                  setTimeout(() => setMessage(''), 3000);
-                } catch (err) {
-                  setMessage(err.response?.data?.message || 'Transfer failed');
-                }
-              }}>
-                <div className="transfer-row">
-                  <div className="transfer-field">
-                    <label className="field-label">From account</label>
-                    <select value={transferForm.fromAccountId} onChange={e => setTransferForm({ ...transferForm, fromAccountId: e.target.value })} required>
-                      <option value="">Select source</option>
-                      {summary.accounts.map(a => (
-                        <option key={a._id} value={a._id}>{a.name} â€” ₹{Number(a.balance || 0).toLocaleString()}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="transfer-arrow">â†’</div>
-                  <div className="transfer-field">
-                    <label className="field-label">To account</label>
-                    <select value={transferForm.toAccountId} onChange={e => setTransferForm({ ...transferForm, toAccountId: e.target.value })} required>
-                      <option value="">Select destination</option>
-                      {summary.accounts.filter(a => a._id !== transferForm.fromAccountId).map(a => (
-                        <option key={a._id} value={a._id}>{a.name} â€” ₹{Number(a.balance || 0).toLocaleString()}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="transfer-row">
-                  <div className="transfer-field">
-                    <label className="field-label">Amount (₹)</label>
-                    <input type="number" min="1" placeholder="0" value={transferForm.amount} onChange={e => setTransferForm({ ...transferForm, amount: e.target.value })} required />
-                  </div>
-                  <div className="transfer-field">
-                    <label className="field-label">Note (optional)</label>
-                    <input type="text" placeholder="e.g. Bank withdrawal to cash" value={transferForm.note} onChange={e => setTransferForm({ ...transferForm, note: e.target.value })} />
-                  </div>
-                </div>
-                {transferForm.fromAccountId && transferForm.toAccountId && transferForm.amount && (() => {
-                  const from = summary.accounts.find(a => a._id === transferForm.fromAccountId);
-                  const to = summary.accounts.find(a => a._id === transferForm.toAccountId);
-                  const amt = Number(transferForm.amount || 0);
-                  return (
-                    <div className="transfer-preview">
-                      <div className="transfer-preview-item debit">
-                        <span>{from?.name}</span>
-                        <strong>₹{Number(from?.balance || 0).toLocaleString()} â†’ ₹{Math.max(0, Number(from?.balance || 0) - amt).toLocaleString()}</strong>
-                      </div>
-                      <div className="transfer-preview-item credit">
-                        <span>{to?.name}</span>
-                        <strong>₹{Number(to?.balance || 0).toLocaleString()} â†’ ₹{(Number(to?.balance || 0) + amt).toLocaleString()}</strong>
-                      </div>
-                    </div>
-                  );
-                })()}
-                <button className="btn primary transfer-submit" type="submit">Confirm transfer</button>
-              </form>
+      <div className="panel">
+        <h4>Account balances</h4>
+        {summary.accounts.map((account) => (
+          <div className="list-row" key={account._id}>
+            <div>
+              <strong>{account.name}</strong>
+              <div className="muted">{account.type} • {account.notes || 'No notes'}</div>
             </div>
+            <div><strong>₹{Number(account.balance || 0).toLocaleString()}</strong></div>
           </div>
-        )}
-
-        <div className="account-cards-grid">
-          {summary.accounts.map((account) => (
-            <div className={`account-balance-card account-type-${account.type}`} key={account._id}>
-              <div className="account-card-top">
-                <div className="account-type-icon">
-                  {account.type === 'cash' ? 'ðŸ’µ' : account.type === 'bank' ? 'ðŸ¦' : account.type === 'digital' ? 'ðŸ“±' : 'ðŸ’¼'}
-                </div>
-                <div className="account-card-info">
-                  <strong>{account.name}</strong>
-                  <span className="account-type-label">{account.type}</span>
-                </div>
-                <div className="account-balance-amount">₹{Number(account.balance || 0).toLocaleString()}</div>
-              </div>
-              <div className="account-card-actions">
-                <button className="btn outline acct-btn" onClick={() => setDepositTarget(depositTarget === account._id ? null : account._id)}>
-                  + Add Balance
-                </button>
-              </div>
-              {depositTarget === account._id && (
-                <form className="deposit-form" onSubmit={async (e) => {
-                  e.preventDefault();
-                  try {
-                    await api.post(`/accounting/accounts/${account._id}/deposit`, depositForm);
-                    setMessage('Balance added successfully');
-                    setDepositTarget(null);
-                    setDepositForm({ amount: '', paymentMethod: 'cash', note: '' });
-                    await load();
-                    setTimeout(() => setMessage(''), 3000);
-                  } catch (err) {
-                    setMessage(err.response?.data?.message || 'Unable to add balance');
-                  }
-                }}>
-                  <input placeholder="Amount" type="number" min="1" value={depositForm.amount} onChange={e => setDepositForm({ ...depositForm, amount: e.target.value })} />
-                  <select value={depositForm.paymentMethod} onChange={e => setDepositForm({ ...depositForm, paymentMethod: e.target.value })}>
-                    <option value="cash">Cash</option>
-                    <option value="bank">Bank Transfer</option>
-                    <option value="phonepe">PhonePe</option>
-                    <option value="gpay">GPay</option>
-                    <option value="neft">NEFT</option>
-                    <option value="rtgs">RTGS</option>
-                  </select>
-                  <input placeholder="Note (optional)" value={depositForm.note} onChange={e => setDepositForm({ ...depositForm, note: e.target.value })} />
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn primary" type="submit">Add</button>
-                    <button className="btn secondary" type="button" onClick={() => setDepositTarget(null)}>Cancel</button>
-                  </div>
-                </form>
-              )}
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
 
       <div className="panel">
@@ -1896,7 +1638,7 @@ function AccountingPage() {
             <div className="list-row" key={exp._id}>
               <div>
                 <strong>{exp.category || 'Expense'}</strong>
-                <div className="muted">{(accounts.find(a => a._id === exp.accountId)?.name) || exp.accountName || 'â€”'} â€¢ {exp.paymentMethod} â€¢ {exp.date ? formatAbsoluteDate(exp.date) : (exp.createdAt ? formatAbsoluteDate(exp.createdAt) : 'â€”')}</div>
+                <div className="muted">{(accounts.find(a => a._id === exp.accountId)?.name) || exp.accountName || '—'} • {exp.paymentMethod} • {exp.date ? formatAbsoluteDate(exp.date) : (exp.createdAt ? formatAbsoluteDate(exp.createdAt) : '—')}</div>
                 {exp.note && <div className="muted">{exp.note}</div>}
               </div>
               <div style={{textAlign:'right'}}>
@@ -1924,7 +1666,7 @@ function AccountingPage() {
           <div className="list-row" key={entry._id}>
             <div>
               <strong>{entry.reference || entry.note || 'Ledger entry'}</strong>
-              <div className="muted">{entry.date} â€¢ {entry.paymentMethod}</div>
+              <div className="muted">{entry.date} • {entry.paymentMethod}</div>
             </div>
             <div>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</div>
           </div>
@@ -2032,7 +1774,7 @@ function ReportsPage() {
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  useEffect(() => {     
     setLoading(true);
     Promise.all([
       api.get('/reports/summary').then((res) => setSummary(res.data)),
@@ -2119,7 +1861,7 @@ function ReportsPage() {
       const dateStr = new Date().toLocaleDateString('en-IN');
       addTitle('SGSE Billing System - Reports');
       addLine('Generated on', dateStr);
-      yPos += 5;
+      yPos += 5; 
 
       if (reportType === 'summary' || reportType === 'all') {
         addSectionHeader('Financial Summary');
@@ -2292,7 +2034,7 @@ function ReportsPage() {
 function UsersPage() {
   const [users, setUsers] = useState([]);
 
-  useEffect(() => { api.get('/users').then((res) => setUsers(res.data || [])).catch(() => {}); }, []);
+  useEffect(() => { api.get('/users').then((res) => setUsers(res.data)); }, []);
 
   return (
     <div>
@@ -2304,157 +2046,6 @@ function UsersPage() {
             <div>{user.role}</div>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function AssignedContactsPage({ user }) {
-  const [contacts, setContacts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [callForm, setCallForm] = useState({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: toLocalDateTimeValue() });
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [search, setSearch] = useState('');
-
-  const myName = user?.name || '';
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/contacts');
-      setContacts((res.data || []).filter(c => (c.callerName || '').trim().toLowerCase() === myName.trim().toLowerCase()));
-    } catch { setMessage('Unable to load contacts'); }
-    finally { setLoading(false); }
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const submitCall = async (e) => {
-    e && e.preventDefault();
-    const id = callForm.contactId;
-    if (!id) return;
-    try {
-      const contact = contacts.find(c => (c._id === id || c.id === id));
-      const selectedLead = callForm.leadStage || contact?.status || 'Warm Lead';
-      await api.post(`/contacts/${id}/calls`, {
-        timestamp: callForm.timestamp ? new Date(callForm.timestamp).toISOString() : new Date().toISOString(),
-        note: callForm.note || '',
-        outcome: callForm.outcome || 'Contacted',
-        statusOnCall: callForm.outcome === 'Not Interested' ? 'Not Interested' : selectedLead,
-        leadStage: selectedLead
-      });
-      setMessage('Call logged');
-      setCallForm({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' });
-      await load();
-      setTimeout(() => setMessage(''), 3000);
-    } catch { setMessage('Unable to log call'); }
-  };
-
-  const counts = {
-    all: contacts.length,
-    not_yet_called: contacts.filter(c => c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0).length,
-    hot: contacts.filter(c => c.status === 'Hot Lead').length,
-    warm: contacts.filter(c => c.status === 'Warm Lead').length,
-    cool: contacts.filter(c => c.status === 'Cool Lead').length,
-    notinterested: contacts.filter(c => c.status === 'Not Interested').length,
-    no_response: contacts.filter(c => c.status === 'No Response').length,
-  };
-
-  const filtered = contacts.filter(c => {
-    if (search) {
-      const s = search.toLowerCase();
-      if (!(c.name || '').toLowerCase().includes(s) && !(c.contactNumber || '').toLowerCase().includes(s)) return false;
-    }
-    if (statusFilter === 'not_yet_called') return c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0;
-    if (statusFilter === 'hot') return c.status === 'Hot Lead';
-    if (statusFilter === 'warm') return c.status === 'Warm Lead';
-    if (statusFilter === 'cool') return c.status === 'Cool Lead';
-    if (statusFilter === 'notinterested') return c.status === 'Not Interested';
-    if (statusFilter === 'no_response') return c.status === 'No Response';
-    return true;
-  });
-
-  return (
-    <div className="contacts-page">
-      <div className="page-header">
-        <p className="eyebrow">Your assigned pipeline</p>
-        <h3>My Calls â€” {myName}</h3>
-      </div>
-      {message && <p className="status-message">{message}</p>}
-      <div className="panel contact-stream-panel">
-        <div className="filter-bar">
-          <button className={statusFilter === 'all' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('all')}>All ({counts.all})</button>
-          <button className={statusFilter === 'not_yet_called' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('not_yet_called')}>Not yet called ({counts.not_yet_called})</button>
-          <button className={statusFilter === 'hot' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('hot')}>Hot ({counts.hot})</button>
-          <button className={statusFilter === 'warm' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('warm')}>Warm ({counts.warm})</button>
-          <button className={statusFilter === 'cool' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('cool')}>Cool ({counts.cool})</button>
-          <button className={statusFilter === 'notinterested' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('notinterested')}>Not interested ({counts.notinterested})</button>
-          <button className={statusFilter === 'no_response' ? 'btn primary' : 'btn outline'} onClick={() => setStatusFilter('no_response')}>No response ({counts.no_response})</button>
-          <input className="search-field" placeholder="Search name or number" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        {loading ? <p className="muted">Loading...</p> : filtered.length === 0 ? (
-          <p className="muted empty-state-inline">No contacts assigned to you in this category.</p>
-        ) : (
-          <div className="contacts-list">
-            {filtered.map((c) => {
-              const id = c.id || c._id;
-              const latestCall = Array.isArray(c.callHistory) && c.callHistory.length ? c.callHistory[c.callHistory.length - 1] : null;
-              const reviewText = (c.review || latestCall?.note || '').trim();
-              return (
-                <div key={id} className="panel contact-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div className="contact-card-head">
-                    <div className="contact-avatar">{(c.name || '--').split(' ').map(x => x[0]).slice(0, 2).join('')}</div>
-                    <div className="contact-primary">
-                      <div className="contact-name-row">
-                        <strong>{c.name || 'Unknown'}</strong>
-                        <span className="contact-time">{getTimeAgo(c.lastContacted)} â€¢ {c.lastContacted ? formatAbsoluteDate(c.lastContacted) : 'Never'}</span>
-                      </div>
-                      <div className="contact-meta">
-                        <span>{c.contactNumber || 'â€”'}</span>
-                        <span>{c.consumerNumber || 'â€”'}</span>
-                        <span>Calls: {c.callHistory ? c.callHistory.length : 0}</span>
-                      </div>
-                      <div className="status-row">
-                        <span className={`status-badge ${getStageClass(c.status)}`}>{c.status || 'Unknown'}</span>
-                      </div>
-                    </div>
-                  </div>
-                  {reviewText && (
-                    <div className="contact-detail-strip">
-                      <div className="detail-pill review-pill">
-                        <span className="detail-label">Review</span>
-                        <strong>{reviewText}</strong>
-                      </div>
-                    </div>
-                  )}
-                  <div className="call-log-row">
-                    {callForm.contactId === id ? (
-                      <form className="call-form" onSubmit={submitCall}>
-                        <select value={callForm.outcome} onChange={(e) => setCallForm({ ...callForm, outcome: e.target.value })}>
-                          <option>Contacted</option>
-                          <option>Follow-up</option>
-                          <option>Not Interested</option>
-                        </select>
-                        <select value={callForm.leadStage} onChange={(e) => setCallForm({ ...callForm, leadStage: e.target.value })}>
-                          {LEAD_STATUS_OPTIONS.map(o => <option key={o}>{o}</option>)}
-                        </select>
-                        <input type="datetime-local" value={callForm.timestamp} onChange={(e) => setCallForm({ ...callForm, timestamp: e.target.value || toLocalDateTimeValue() })} />
-                        <input type="text" placeholder="Call notes" value={callForm.note} onChange={(e) => setCallForm({ ...callForm, note: e.target.value })} />
-                        <button className="btn primary" type="submit">Save</button>
-                        <button className="btn outline" type="button" onClick={() => setCallForm({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' })}>Cancel</button>
-                      </form>
-                    ) : (
-                      <div className="inline-actions">
-                        <button className="btn primary" onClick={() => setCallForm({ contactId: id, note: '', outcome: 'Contacted', leadStage: c.status || 'Warm Lead', timestamp: toLocalDateTimeValue() })}>Log call</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
     </div>
   );

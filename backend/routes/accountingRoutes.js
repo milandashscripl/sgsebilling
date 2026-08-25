@@ -3,6 +3,7 @@ const auth = require('../middleware/auth');
 const Account = require('../models/Account');
 const Transaction = require('../models/Transaction');
 const Expense = require('../models/Expense');
+const Invoice = require('../models/Invoice');
 
 const router = express.Router();
 
@@ -200,12 +201,13 @@ router.delete('/expenses/:id', auth, async (req, res) => {
 
 router.get('/summary', auth, async (req, res) => {
   try {
-    const [incomeTotalAgg, expenseTotalAgg, accountsData, paymentMethodIncome, paymentMethodExpense] = await Promise.all([
+    const [incomeTotalAgg, expenseTotalAgg, accountsData, paymentMethodIncome, paymentMethodExpense, receivablesAgg] = await Promise.all([
       Transaction.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
       Expense.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
       Account.find().sort({ name: 1 }).lean(),
       Transaction.aggregate([{ $group: { _id: '$paymentMethod', total: { $sum: '$amount' } } }]),
-      Expense.aggregate([{ $group: { _id: '$paymentMethod', total: { $sum: '$amount' } } }])
+      Expense.aggregate([{ $group: { _id: '$paymentMethod', total: { $sum: '$amount' } } }]),
+      Invoice.aggregate([{ $match: { balance: { $gt: 0 } } }, { $group: { _id: null, total: { $sum: '$balance' } } }])
     ]);
 
     const accounts = await Promise.all(accountsData.map(async (account) => ({
@@ -230,6 +232,8 @@ router.get('/summary', auth, async (req, res) => {
       accounts,
       incomeTotal: incomeTotalAgg[0]?.total || 0,
       expenseTotal: expenseTotalAgg[0]?.total || 0,
+      netCash: (incomeTotalAgg[0]?.total || 0) - (expenseTotalAgg[0]?.total || 0),
+      receivables: receivablesAgg[0]?.total || 0,
       paymentMethods
     });
   } catch (error) {

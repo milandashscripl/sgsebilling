@@ -1,0 +1,50 @@
+const express = require('express');
+const auth = require('../middleware/auth');
+const Setup = require('../models/Setup');
+const Item = require('../models/Item');
+
+const router = express.Router();
+
+router.get('/', auth, async (req, res) => {
+  try {
+    const setups = await Setup.find({ createdBy: req.user._id }).sort({ name: 1 }).lean();
+    res.json(setups.map((setup) => ({ ...setup, id: String(setup._id) })));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post('/', auth, async (req, res) => {
+  try {
+    const requestedItems = Array.isArray(req.body.items) ? req.body.items : [];
+    if (!req.body.name?.trim() || !requestedItems.length) {
+      return res.status(400).json({ message: 'Setup name and at least one item are required' });
+    }
+    const items = await Promise.all(requestedItems.map(async (entry) => {
+      const item = await Item.findById(entry.item || entry.itemId).lean();
+      if (!item) throw new Error('One of the selected items was not found');
+      return {
+        item: item._id,
+        name: item.name,
+        quantity: Math.max(1, Number(entry.quantity || 1)),
+        price: Math.max(0, Number(entry.price ?? item.salePrice ?? 0))
+      };
+    }));
+    const setup = await Setup.create({ name: req.body.name.trim(), description: req.body.description || '', items, createdBy: req.user._id });
+    res.status(201).json({ ...setup.toObject(), id: String(setup._id) });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const deleted = await Setup.findOneAndDelete({ _id: req.params.id, createdBy: req.user._id });
+    if (!deleted) return res.status(404).json({ message: 'Setup not found' });
+    res.json({ message: 'Setup deleted' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+module.exports = router;

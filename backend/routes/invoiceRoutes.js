@@ -94,7 +94,7 @@ router.post('/', auth, async (req, res) => {
     });
 
     if (paid > 0 && req.body.accountId) {
-      const transactionType = type === 'sale' ? 'income' : 'expense';
+      const transactionType = type === 'purchase' ? 'expense' : 'income';
       await Transaction.create({
         date: new Date().toISOString().slice(0, 10),
         accountId: req.body.accountId,
@@ -114,7 +114,7 @@ router.post('/', auth, async (req, res) => {
       const quantity = Number(entry.quantity || 0);
       if (!quantity) continue;
 
-      if (type === 'sale') {
+      if (type === 'sale' || type === 'setup') {
         item.stock = Math.max(0, Number(item.stock || 0) - quantity);
       } else if (type === 'purchase' || type === 'return') {
         item.stock = Number(item.stock || 0) + quantity;

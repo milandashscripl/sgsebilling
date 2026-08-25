@@ -7,7 +7,7 @@ const invoiceSchema = new mongoose.Schema({
   partyGSTIN: { type: String, default: '' },
   customerName: { type: String, default: 'Walk-in Customer' },
   customerPhone: { type: String, default: '' },
-  type: { type: String, enum: ['sale', 'purchase', 'return'], default: 'sale' },
+  type: { type: String, enum: ['sale', 'purchase', 'return', 'setup'], default: 'sale' },
   accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', default: null },
   paymentMethod: { type: String, default: 'cash' },
   items: [{
