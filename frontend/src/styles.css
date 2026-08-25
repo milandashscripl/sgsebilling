@@ -734,3 +734,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
 .fs-item-result-row:last-child { border-bottom: none; }
 .fs-item-result-row:hover { background: rgba(24,111,175,0.06); }
 .fs-item-result-row span:first-child { font-weight: 600; color: #1B2A3B; font-size: 0.92rem; }
+
+/* Final workspace shell: edge anchored chrome and a calmer content canvas. */
+@media (min-width: 901px) {
+  .app-shell { padding: 112px 28px 28px 308px; }
+  .topbar { position: fixed; top: 0; left: 0; right: 0; height: 82px; border-radius: 0; margin: 0; padding: 16px 30px; background: rgba(255,255,255,0.94); border: 0; border-bottom: 1px solid rgba(24,111,175,0.12); box-shadow: 0 8px 28px rgba(18,39,64,0.1); }
+  .sidebar { position: fixed; top: 82px; left: 0; bottom: 0; width: 268px; height: auto; min-height: 0; border-radius: 0; padding: 22px 16px; overflow-y: auto; background: linear-gradient(180deg, #122740 0%, #0b192a 100%); box-shadow: 8px 0 28px rgba(15,37,62,0.13); }
+  .content { margin-left: 0; max-width: 1480px; width: 100%; }
+}
+.list-expander { display: block; width: 100%; margin-top: 14px; }
+.profile-page { display: grid; gap: 18px; max-width: 980px; }
+.profile-form { display: grid; gap: 18px; }
+.profile-form-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.profile-form-heading h4 { margin: 0; }
+.profile-form-heading p { margin: 4px 0 0; }
+.profile-mark { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 16px; background: linear-gradient(135deg, #e8f3ff, #ffe7a6); color: #16406E; font-size: 1.25rem; font-weight: 800; }
+@media (max-width: 900px) {
+  .profile-form-heading { align-items: flex-start; }
+}

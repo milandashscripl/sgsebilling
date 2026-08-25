@@ -127,7 +127,7 @@ function App() {
   return (
     <div className="app-shell">
       <ErrorBoundary>
-        {user ? <AuthenticatedApp user={user} logout={logout} /> : <PublicApp setUser={setUser} />}
+        {user ? <AuthenticatedApp user={user} setUser={setUser} logout={logout} /> : <PublicApp setUser={setUser} />}
       </ErrorBoundary>
     </div>
   );
@@ -182,7 +182,7 @@ function PublicApp({ setUser }) {
   );
 }
 
-function AuthenticatedApp({ user, logout }) {
+function AuthenticatedApp({ user, setUser, logout }) {
   return (
     <div>
       <nav className="topbar">
@@ -204,13 +204,14 @@ function AuthenticatedApp({ user, logout }) {
               <small>Business hub</small>
             </div>
           </div>
-          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/dashboard">Overview</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/dashboard">Dashboard</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/profile">Shop profile</NavLink>
           {user.role === 'admin' && <NavLink className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/users">Users</NavLink>}
         </aside>
         <main className="content">
@@ -222,6 +223,7 @@ function AuthenticatedApp({ user, logout }) {
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/profile" element={<ShopProfilePage user={user} setUser={setUser} />} />
             {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
@@ -312,6 +314,7 @@ function ContactsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [callForm, setCallForm] = useState({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: toLocalDateTimeValue() });
   const [selectedCaller, setSelectedCaller] = useState(null);
+  const [visibleContacts, setVisibleContacts] = useState(20);
 
   const loadContacts = async () => {
     setLoading(true);
@@ -419,6 +422,7 @@ function ContactsPage() {
   const handleStatusTabChange = (tab) => {
     setStatusTab(tab);
     setSelectedCaller(null);
+    setVisibleContacts(20);
   };
 
   return (
@@ -497,7 +501,7 @@ function ContactsPage() {
         {loading ? <p className="muted">Loading...</p> : (
           filtered.length === 0 ? <p className="muted empty-state-inline">No contacts in this pipeline.</p> : (
             <div className="contacts-list">
-              {filtered.map((c) => {
+              {filtered.slice(0, visibleContacts).map((c) => {
                 const id = c.id || c._id;
                 const recent = c.lastContacted && (Date.now() - new Date(c.lastContacted).getTime()) < 24*60*60*1000;
                 const latestCall = Array.isArray(c.callHistory) && c.callHistory.length ? c.callHistory[c.callHistory.length - 1] : null;
@@ -568,6 +572,7 @@ function ContactsPage() {
             </div>
           )
         )}
+        {!loading && filtered.length > visibleContacts && <button className="btn outline list-expander" onClick={() => setVisibleContacts((count) => count + 20)}>Show more contacts ({filtered.length - visibleContacts} remaining)</button>}
       </div>
     </div>
   );
@@ -1408,6 +1413,7 @@ function AccountingPage() {
   const [transferForm, setTransferForm] = useState({ fromAccountId: '', toAccountId: '', amount: '', note: '' });
   const [depositForm, setDepositForm] = useState({ accountId: '', amount: '', paymentMethod: 'cash', reference: '', note: '' });
   const [message, setMessage] = useState('');
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
 
   const load = async () => {
     try {
@@ -1753,7 +1759,7 @@ function AccountingPage() {
           <div><h4>Complete account history</h4><p className="muted">Every income, expense, and transfer in date order. Balance is shown after each entry.</p></div>
           <strong>{transactionHistory.length} entries</strong>
         </div>
-        {transactionHistory.map((entry) => (
+        {transactionHistory.slice(0, showAllTransactions ? transactionHistory.length : 20).map((entry) => (
           <div className="list-row transaction-history-row" key={`${entry.kind}-${entry._id}`}>
             <div>
               <strong>{entry.reference || entry.note || entry.kind}</strong>
@@ -1762,6 +1768,7 @@ function AccountingPage() {
             <div className="transaction-values"><strong className={entry.type === 'income' ? 'money-in' : 'money-out'}>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</strong><span>Balance ₹{Number(entry.balanceAfter || 0).toLocaleString()}</span></div>
           </div>
         ))}
+        {transactionHistory.length > 20 && <button className="btn outline list-expander" onClick={() => setShowAllTransactions((value) => !value)}>{showAllTransactions ? 'Show less' : `Show all ${transactionHistory.length} entries`}</button>}
       </div>
     </div>
   );
@@ -1864,6 +1871,8 @@ function ReportsPage() {
   const [stock, setStock] = useState([]);
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showAllCalls, setShowAllCalls] = useState(false);
+  const [showAllStock, setShowAllStock] = useState(false);
 
   useEffect(() => {     
     setLoading(true);
@@ -2005,6 +2014,20 @@ function ReportsPage() {
     }
   };
 
+  const downloadDailyCalls = (section) => {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const daily = calls.flatMap((contact) => (contact.callHistory || []).filter((call) => new Date(call.timestamp) >= start).map((call) => ({ contact, call })));
+    const filteredDaily = section === 'all' ? daily : daily.filter(({ call }) => section === 'contacted' ? call.outcome === 'Contacted' : section === 'follow-ups' ? call.outcome === 'Follow-up' : call.status === section);
+    const csv = ['contact,caller,phone,outcome,status,timestamp,note', ...filteredDaily.map(({ contact, call }) => [contact.name, contact.callerName || 'Unassigned', contact.contactNumber, call.outcome, call.status, call.timestamp, call.note].map((value) => `"${String(value || '').replace(/"/g, '""')}"`).join(','))].join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `daily-calling-${section}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="reports-page">
       <div className="page-header">
@@ -2051,7 +2074,7 @@ function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {calls.map((c) => (
+              {calls.slice(0, showAllCalls ? calls.length : 20).map((c) => (
                 <tr key={c._id || c.id}>
                   <td>{c.name}</td>
                   <td>{c.callerName || 'Not assigned'}</td>
@@ -2066,9 +2089,14 @@ function ReportsPage() {
         ) : (
           <p className="muted empty-state-inline">No calling data available</p>
         )}
+        {calls.length > 20 && <button className="btn outline list-expander" onClick={() => setShowAllCalls((value) => !value)}>{showAllCalls ? 'Show less' : `Show all ${calls.length} contacts`}</button>}
         <div className="inline-actions">
           <button className="btn primary" onClick={() => downloadPdfReport('calling')}>Download Calling PDF</button>
           <button className="btn secondary" onClick={() => downloadReport('/reports/calling/export', 'calling-report.csv')}>Download Calling CSV</button>
+          <button className="btn outline" onClick={() => downloadDailyCalls('all')}>Today: all calls</button>
+          <button className="btn outline" onClick={() => downloadDailyCalls('contacted')}>Today: contacted</button>
+          <button className="btn outline" onClick={() => downloadDailyCalls('follow-ups')}>Today: follow-ups</button>
+          <button className="btn outline" onClick={() => downloadDailyCalls('Hot Lead')}>Today: hot leads</button>
         </div>
       </div>
 
@@ -2087,7 +2115,7 @@ function ReportsPage() {
             </tr>
           </thead>
           <tbody>
-            {stock.map((item) => (
+            {stock.slice(0, showAllStock ? stock.length : 25).map((item) => (
               <tr key={item._id}>
                 <td>{item.name}</td>
                 <td>{item.itemType}</td>
@@ -2099,6 +2127,7 @@ function ReportsPage() {
             ))}
           </tbody>
         </table>
+        {stock.length > 25 && <button className="btn outline list-expander" onClick={() => setShowAllStock((value) => !value)}>{showAllStock ? 'Show less' : `Show all ${stock.length} items`}</button>}
         <div className="inline-actions">
           <button className="btn primary" onClick={() => downloadPdfReport('stock')}>Download Stock PDF</button>
           <button className="btn secondary" onClick={() => downloadReport('/reports/stock/export', 'stock.csv')}>Download Stock CSV</button>
@@ -2120,6 +2149,41 @@ function ReportsPage() {
       </div>
     </div>
   );
+}
+
+function ShopProfilePage({ user, setUser }) {
+  const [form, setForm] = useState({ name: user.name || '', shopName: user.shopName || '', shopAddress: user.shopAddress || '', shopGSTIN: user.shopGSTIN || '', phone: user.phone || '', address: user.address || '', shopLogoUrl: user.shopLogoUrl || '' });
+  const [message, setMessage] = useState('');
+
+  const save = async (event) => {
+    event.preventDefault();
+    try {
+      const response = await api.put('/auth/me', form);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      setUser(response.data.user);
+      setMessage('Shop profile updated. New invoice headers will use these details.');
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to update shop profile');
+    }
+  };
+
+  return <div className="profile-page">
+    <div className="page-header"><p className="eyebrow">Business identity</p><h3>Shop profile</h3><p className="muted">Keep the details on your invoices, receipts, and customer-facing documents accurate.</p></div>
+    <form className="panel profile-form" onSubmit={save}>
+      <div className="profile-form-heading"><div><h4>Business details</h4><p className="muted">These details are saved to your account.</p></div><div className="profile-mark">{(form.shopName || 'SG').slice(0, 2).toUpperCase()}</div></div>
+      <div className="form-grid">
+        <label>Your name<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+        <label>Shop name<input value={form.shopName} onChange={(e) => setForm({ ...form, shopName: e.target.value })} /></label>
+        <label>Business phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
+        <label>GSTIN<input value={form.shopGSTIN} onChange={(e) => setForm({ ...form, shopGSTIN: e.target.value })} /></label>
+        <label>Invoice address<textarea value={form.shopAddress} onChange={(e) => setForm({ ...form, shopAddress: e.target.value })} /></label>
+        <label>Personal address<textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+        <label>Logo URL<input value={form.shopLogoUrl} onChange={(e) => setForm({ ...form, shopLogoUrl: e.target.value })} /></label>
+      </div>
+      {message && <p className="status-message">{message}</p>}
+      <button className="btn primary" type="submit">Save shop profile</button>
+    </form>
+  </div>;
 }
 
 function UsersPage() {
