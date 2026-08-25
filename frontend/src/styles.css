@@ -749,6 +749,35 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
 .profile-form-heading h4 { margin: 0; }
 .profile-form-heading p { margin: 4px 0 0; }
 .profile-mark { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 16px; background: linear-gradient(135deg, #e8f3ff, #ffe7a6); color: #16406E; font-size: 1.25rem; font-weight: 800; }
+.table-controls { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(35, 77, 51, 0.12); }
+.table-controls label { display: inline-flex; align-items: center; gap: 8px; color: #31533d; font-size: 0.82rem; font-weight: 700; }
+.table-controls select { width: auto; min-width: 76px; padding: 8px 10px; }
+
+/* Solar-green and warm-gold brand direction. */
+:root { --brand-green: #1f5b43; --brand-green-deep: #123a2b; --brand-green-soft: #e7f1e8; --brand-gold: #f2bd45; --brand-ink: #173126; --panel-border: rgba(31, 91, 67, 0.14); --text-muted: #60756a; --button-primary: linear-gradient(135deg, #1f6549, #2e8b62); --button-secondary: #edf4e9; --input-bg: #fbfdf9; }
+body { background: radial-gradient(circle at 8% 0%, rgba(242,189,69,0.16), transparent 28%), radial-gradient(circle at 94% 20%, rgba(75,145,93,0.14), transparent 32%), #f5f8f1; color: var(--brand-ink); }
+.topbar { background: rgba(255, 253, 244, 0.96); border-bottom-color: rgba(31,91,67,0.18); }
+.topbar h2, .page-header h3, .hero-card h1 { color: var(--brand-green-deep); }
+.sidebar { background: linear-gradient(180deg, #123a2b 0%, #0d2c22 100%); }
+.sidebar-brand-mark { background: linear-gradient(135deg, #f7cf67, #e59d2d); color: #173126; }
+.sidebar-link.active { background: linear-gradient(135deg, #2d875f, #e0a936); color: #fffdf2; box-shadow: 0 10px 18px rgba(31,91,67,0.28); }
+.btn.primary { background: var(--button-primary); box-shadow: 0 4px 12px rgba(31,91,67,0.24); }
+.btn.secondary { background: var(--button-secondary); color: var(--brand-green-deep); border-color: rgba(31,91,67,0.16); }
+.stat-sales, .stat-purchases, .stat-returns, .stat-invoices { background: linear-gradient(145deg, rgba(255,255,255,0.94), rgba(231,241,232,0.9)); border-color: rgba(31,91,67,0.14); }
+.stat-card h4, .invoice-meta, .fs-step-label { color: var(--brand-green); }
+.stat-returns { background: linear-gradient(145deg, rgba(255,255,255,0.94), rgba(255,242,202,0.92)); }
+.table th { background: linear-gradient(135deg, #e4f0e4, #fff3c9); color: var(--brand-green-deep); }
+.item-chip { background: #e6f0df; color: var(--brand-green-deep); border-color: rgba(31,91,67,0.2); }
+.item-chip:hover { background: var(--brand-gold); color: var(--brand-green-deep); }
+@media (min-width: 901px) {
+  .app-shell { display: block; width: 100%; max-width: none; }
+  .dashboard-shell { display: block; min-width: 0; }
+  .content { display: block; width: 100%; min-width: 0; }
+  .dashboard-page, .reports-page, .stock-page, .billing-page, .contacts-page { width: 100%; min-width: 0; }
+  .stats-grid { width: 100%; grid-template-columns: repeat(4, minmax(180px, 1fr)); }
+  .dashboard-summary-band { width: 100%; }
+  .dashboard-panels-grid, .analytics-strip { width: 100%; }
+}
 @media (max-width: 900px) {
   .profile-form-heading { align-items: flex-start; }
 }

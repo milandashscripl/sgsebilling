@@ -1871,8 +1871,9 @@ function ReportsPage() {
   const [stock, setStock] = useState([]);
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showAllCalls, setShowAllCalls] = useState(false);
-  const [showAllStock, setShowAllStock] = useState(false);
+  const [pageSize, setPageSize] = useState(50);
+  const [callPage, setCallPage] = useState(0);
+  const [stockPage, setStockPage] = useState(0);
 
   useEffect(() => {     
     setLoading(true);
@@ -2074,7 +2075,7 @@ function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {calls.slice(0, showAllCalls ? calls.length : 20).map((c) => (
+              {calls.slice(callPage * pageSize, (callPage + 1) * pageSize).map((c) => (
                 <tr key={c._id || c.id}>
                   <td>{c.name}</td>
                   <td>{c.callerName || 'Not assigned'}</td>
@@ -2089,7 +2090,12 @@ function ReportsPage() {
         ) : (
           <p className="muted empty-state-inline">No calling data available</p>
         )}
-        {calls.length > 20 && <button className="btn outline list-expander" onClick={() => setShowAllCalls((value) => !value)}>{showAllCalls ? 'Show less' : `Show all ${calls.length} contacts`}</button>}
+        <div className="table-controls">
+          <label>Rows per page<select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCallPage(0); setStockPage(0); }}><option value="50">50</option><option value="100">100</option></select></label>
+          <span className="muted">Showing {calls.length ? callPage * pageSize + 1 : 0}-{Math.min((callPage + 1) * pageSize, calls.length)} of {calls.length}</span>
+          <button className="btn outline" disabled={callPage === 0} onClick={() => setCallPage((page) => page - 1)}>Previous</button>
+          <button className="btn outline" disabled={(callPage + 1) * pageSize >= calls.length} onClick={() => setCallPage((page) => page + 1)}>Next</button>
+        </div>
         <div className="inline-actions">
           <button className="btn primary" onClick={() => downloadPdfReport('calling')}>Download Calling PDF</button>
           <button className="btn secondary" onClick={() => downloadReport('/reports/calling/export', 'calling-report.csv')}>Download Calling CSV</button>
@@ -2115,7 +2121,7 @@ function ReportsPage() {
             </tr>
           </thead>
           <tbody>
-            {stock.slice(0, showAllStock ? stock.length : 25).map((item) => (
+            {stock.slice(stockPage * pageSize, (stockPage + 1) * pageSize).map((item) => (
               <tr key={item._id}>
                 <td>{item.name}</td>
                 <td>{item.itemType}</td>
@@ -2127,7 +2133,11 @@ function ReportsPage() {
             ))}
           </tbody>
         </table>
-        {stock.length > 25 && <button className="btn outline list-expander" onClick={() => setShowAllStock((value) => !value)}>{showAllStock ? 'Show less' : `Show all ${stock.length} items`}</button>}
+        <div className="table-controls">
+          <span className="muted">Showing {stock.length ? stockPage * pageSize + 1 : 0}-{Math.min((stockPage + 1) * pageSize, stock.length)} of {stock.length}</span>
+          <button className="btn outline" disabled={stockPage === 0} onClick={() => setStockPage((page) => page - 1)}>Previous</button>
+          <button className="btn outline" disabled={(stockPage + 1) * pageSize >= stock.length} onClick={() => setStockPage((page) => page + 1)}>Next</button>
+        </div>
         <div className="inline-actions">
           <button className="btn primary" onClick={() => downloadPdfReport('stock')}>Download Stock PDF</button>
           <button className="btn secondary" onClick={() => downloadReport('/reports/stock/export', 'stock.csv')}>Download Stock CSV</button>
