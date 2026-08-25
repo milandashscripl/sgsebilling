@@ -41,7 +41,7 @@ const emptyCategoryForm = {
   description: ''
 };
 
-const LEAD_STATUS_OPTIONS = ['Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Following Up', 'Not Interested'];
+const LEAD_STATUS_OPTIONS = ['Not Yet Called', 'No Response', 'Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Following Up', 'Not Interested'];
 
 const toLocalDateTimeValue = (date = new Date()) => {
   const pad = (value) => String(value).padStart(2, '0');
@@ -72,6 +72,8 @@ const getStageClass = (status) => {
   if (label.includes('hot')) return 'status-hot-lead';
   if (label.includes('warm')) return 'status-warm-lead';
   if (label.includes('cool')) return 'status-cool-lead';
+  if (label.includes('no response')) return 'status-cool-lead';
+  if (label.includes('not yet')) return 'status-following-up';
   if (label.includes('convert')) return 'status-may-convert';
   if (label.includes('following')) return 'status-following-up';
   if (label.includes('not')) return 'status-not-interested';
@@ -303,7 +305,7 @@ function Register({ setUser }) {
 function ContactsPage() {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Warm Lead', review: '', nextFollowUp: '', markContacted: false });
+  const [form, setForm] = useState({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Not Yet Called', review: '', nextFollowUp: '', markContacted: false });
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState('');
   const [statusTab, setStatusTab] = useState('all');
@@ -323,7 +325,7 @@ function ContactsPage() {
 
   useEffect(() => { loadContacts(); }, []);
 
-  const reset = () => { setForm({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Warm Lead', review: '', nextFollowUp: '', markContacted: false }); setEditingId(null); };
+  const reset = () => { setForm({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Not Yet Called', review: '', nextFollowUp: '', markContacted: false }); setEditingId(null); };
 
   const save = async (e) => {
     e && e.preventDefault();
@@ -380,11 +382,12 @@ function ContactsPage() {
 
   const counts = {
     all: contacts.length,
+    not_yet_called: contacts.filter(c => c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0).length,
     hot: contacts.filter(c => c.status === 'Hot Lead').length,
     warm: contacts.filter(c => c.status === 'Warm Lead').length,
     cool: contacts.filter(c => c.status === 'Cool Lead').length,
     notinterested: contacts.filter(c => c.status === 'Not Interested').length,
-    no_response: contacts.filter(c => !c.callHistory || c.callHistory.length === 0).length
+    no_response: contacts.filter(c => c.status === 'No Response' || !c.callHistory || c.callHistory.length === 0).length
   };
 
   const filtered = contacts.filter(c => {
@@ -395,25 +398,27 @@ function ContactsPage() {
       const contactNumber = (c.contactNumber || '').toLowerCase();
       if (!callerName.includes(s) && !customerName.includes(s) && !contactNumber.includes(s)) return false;
     }
+    if (statusTab === 'not_yet_called' && c.status !== 'Not Yet Called' && c.callHistory && c.callHistory.length) return false;
     if (statusTab === 'hot' && c.status !== 'Hot Lead') return false;
     if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
     if (statusTab === 'cool' && c.status !== 'Cool Lead') return false;
     if (statusTab === 'notinterested' && c.status !== 'Not Interested') return false;
-    if (statusTab === 'no_response' && c.callHistory && c.callHistory.length) return false;
-    if (statusTab === 'no_response' && selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
+    if (statusTab === 'no_response' && c.status !== 'No Response' && c.callHistory && c.callHistory.length) return false;
+    if (selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
     return true;
   });
 
-  const noResponseContacts = contacts.filter(c => !c.callHistory || c.callHistory.length === 0);
-  const callerList = [...new Set(noResponseContacts.map(c => c.callerName || 'Not assigned'))].sort();
+  const tabContacts = statusTab === 'all' ? contacts : contacts.filter((contact) => {
+    if (statusTab === 'not_yet_called') return contact.status === 'Not Yet Called' || !contact.callHistory || contact.callHistory.length === 0;
+    if (statusTab === 'no_response') return contact.status === 'No Response' || !contact.callHistory || contact.callHistory.length === 0;
+    const status = { hot: 'Hot Lead', warm: 'Warm Lead', cool: 'Cool Lead', notinterested: 'Not Interested' }[statusTab];
+    return !status || contact.status === status;
+  });
+  const callerList = [...new Set(tabContacts.map(c => (c.callerName || 'Not assigned').trim() || 'Not assigned'))].sort();
   
   const handleStatusTabChange = (tab) => {
     setStatusTab(tab);
-    if (tab !== 'no_response') {
-      setSelectedCaller(null);
-    } else if (callerList.length > 0 && !selectedCaller) {
-      setSelectedCaller(callerList[0]);
-    }
+    setSelectedCaller(null);
   };
 
   return (
@@ -460,6 +465,7 @@ function ContactsPage() {
       <div className="panel contact-stream-panel">
         <div className="filter-bar">
           <button className={statusTab==='all'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('all')}>All ({counts.all})</button>
+          <button className={statusTab==='not_yet_called'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('not_yet_called')}>Not yet called ({counts.not_yet_called})</button>
           <button className={statusTab==='hot'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('hot')}>Hot ({counts.hot})</button>
           <button className={statusTab==='warm'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('warm')}>Warm ({counts.warm})</button>
           <button className={statusTab==='cool'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('cool')}>Cool ({counts.cool})</button>
@@ -468,10 +474,12 @@ function ContactsPage() {
           <input className="search-field" placeholder="Search caller, customer or number" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
         </div>
 
-        {statusTab === 'no_response' && callerList.length > 0 && (
+        {callerList.length > 0 && (
           <div className="caller-tabs">
+            <span className="caller-tabs-label">Caller</span>
+            <button className={!selectedCaller ? 'btn primary' : 'btn outline'} onClick={() => setSelectedCaller(null)}>All callers ({tabContacts.length})</button>
             {callerList.map((caller) => {
-              const callerCount = noResponseContacts.filter(c => (c.callerName || 'Not assigned') === caller).length;
+              const callerCount = tabContacts.filter(c => (c.callerName || 'Not assigned').trim() === caller).length;
               return (
                 <button 
                   key={caller}
@@ -1397,6 +1405,8 @@ function AccountingPage() {
   const [accountForm, setAccountForm] = useState({ name: '', type: 'cash', openingBalance: '0', notes: '' });
   const [transactionForm, setTransactionForm] = useState({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
   const [expenseForm, setExpenseForm] = useState({ date: toLocalDateTimeValue(), category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
+  const [transferForm, setTransferForm] = useState({ fromAccountId: '', toAccountId: '', amount: '', note: '' });
+  const [depositForm, setDepositForm] = useState({ accountId: '', amount: '', paymentMethod: 'cash', reference: '', note: '' });
   const [message, setMessage] = useState('');
 
   const load = async () => {
@@ -1445,6 +1455,30 @@ function AccountingPage() {
       await load();
     } catch (error) {
       setMessage(error.response?.data?.message || 'Unable to save ledger');
+    }
+  };
+
+  const transferMoney = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/accounting/transfer', { ...transferForm, amount: Number(transferForm.amount || 0) });
+      setTransferForm({ fromAccountId: '', toAccountId: '', amount: '', note: '' });
+      setMessage('Transfer posted: source debited and destination credited');
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to transfer money');
+    }
+  };
+
+  const addMoney = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post(`/accounting/accounts/${depositForm.accountId}/deposit`, { ...depositForm, amount: Number(depositForm.amount || 0) });
+      setDepositForm({ accountId: '', amount: '', paymentMethod: 'cash', reference: '', note: '' });
+      setMessage('Money added directly to the selected account');
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to add money');
     }
   };
 
@@ -1562,18 +1596,56 @@ function AccountingPage() {
       </div>
 
       <div className="panel">
-        <h4>Add account</h4>
+        <h4>Create an account</h4>
+        <p className="muted">Use a clear name such as Cash in hand, HDFC Bank, or PhonePe wallet. The type helps you scan balances.</p>
         <form className="form-grid" onSubmit={addAccount}>
           <input placeholder="Account name" value={accountForm.name} onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })} />
           <select value={accountForm.type} onChange={(e) => setAccountForm({ ...accountForm, type: e.target.value })}>
             <option value="cash">Cash</option>
             <option value="bank">Bank</option>
             <option value="digital">Digital</option>
+            <option value="other">Other</option>
           </select>
           <input placeholder="Opening balance" value={accountForm.openingBalance} onChange={(e) => setAccountForm({ ...accountForm, openingBalance: e.target.value })} />
           <input placeholder="Notes" value={accountForm.notes} onChange={(e) => setAccountForm({ ...accountForm, notes: e.target.value })} />
           <button className="btn primary" type="submit">Create account</button>
         </form>
+      </div>
+
+      <div className="accounting-action-grid">
+        <div className="panel">
+          <h4>Move money between accounts</h4>
+          <p className="muted">Example: withdraw from HDFC Bank to Cash in hand. Bank is debited; cash is credited.</p>
+          <form className="form-grid" onSubmit={transferMoney}>
+            <select value={transferForm.fromAccountId} onChange={(e) => setTransferForm({ ...transferForm, fromAccountId: e.target.value })}>
+              <option value="">From account</option>
+              {accounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}
+            </select>
+            <select value={transferForm.toAccountId} onChange={(e) => setTransferForm({ ...transferForm, toAccountId: e.target.value })}>
+              <option value="">To account</option>
+              {accounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}
+            </select>
+            <input type="number" min="0.01" step="0.01" placeholder="Amount" value={transferForm.amount} onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })} />
+            <input placeholder="Purpose / note" value={transferForm.note} onChange={(e) => setTransferForm({ ...transferForm, note: e.target.value })} />
+            <button className="btn primary" type="submit">Post transfer</button>
+          </form>
+        </div>
+        <div className="panel">
+          <h4>Add money directly</h4>
+          <p className="muted">Use this for opening cash, a bank deposit, or money received outside an invoice.</p>
+          <form className="form-grid" onSubmit={addMoney}>
+            <select value={depositForm.accountId} onChange={(e) => setDepositForm({ ...depositForm, accountId: e.target.value })}>
+              <option value="">Select account</option>
+              {accounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}
+            </select>
+            <input type="number" min="0.01" step="0.01" placeholder="Amount" value={depositForm.amount} onChange={(e) => setDepositForm({ ...depositForm, amount: e.target.value })} />
+            <select value={depositForm.paymentMethod} onChange={(e) => setDepositForm({ ...depositForm, paymentMethod: e.target.value })}>
+              <option value="cash">Cash</option><option value="bank">Bank deposit</option><option value="phonepe">PhonePe</option><option value="gpay">GPay</option><option value="neft">NEFT</option>
+            </select>
+            <input placeholder="Reference / note" value={depositForm.reference} onChange={(e) => setDepositForm({ ...depositForm, reference: e.target.value })} />
+            <button className="btn primary" type="submit">Add to account</button>
+          </form>
+        </div>
       </div>
 
       <div className="panel">
