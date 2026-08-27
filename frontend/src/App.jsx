@@ -80,6 +80,8 @@ const getStageClass = (status) => {
   return 'status-following-up';
 };
 
+const normalizeContactValue = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
 function App() {
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user');
@@ -400,8 +402,18 @@ function ContactsPage() {
     warm: contacts.filter(c => c.status === 'Warm Lead').length,
     cool: contacts.filter(c => c.status === 'Cool Lead').length,
     notinterested: contacts.filter(c => c.status === 'Not Interested').length,
-    no_response: contacts.filter(c => c.status === 'No Response' || !c.callHistory || c.callHistory.length === 0).length
+    no_response: contacts.filter(c => c.status === 'No Response' || !c.callHistory || c.callHistory.length === 0).length,
+    may_convert: contacts.filter(c => c.status === 'May Convert').length,
+    following_up: contacts.filter(c => c.status === 'Following Up').length
   };
+
+  const duplicateConsumerNumbers = new Set(contacts.map((contact) => normalizeContactValue(contact.consumerNumber)).filter(Boolean).filter((number, index, values) => values.indexOf(number) !== index));
+  const duplicateContacts = contacts.filter((contact) => duplicateConsumerNumbers.has(normalizeContactValue(contact.consumerNumber)));
+  const similarContacts = contacts.filter((contact, index, list) => {
+    const name = normalizeContactValue(contact.name);
+    const mobile = normalizeContactValue(contact.contactNumber);
+    return list.some((other, otherIndex) => otherIndex !== index && ((name && name === normalizeContactValue(other.name)) || (mobile && mobile === normalizeContactValue(other.contactNumber))));
+  });
 
   const filtered = contacts.filter(c => {
     if (searchTerm) {
@@ -409,14 +421,19 @@ function ContactsPage() {
       const callerName = (c.callerName || '').toLowerCase();
       const customerName = (c.name || '').toLowerCase();
       const contactNumber = (c.contactNumber || '').toLowerCase();
-      if (!callerName.includes(s) && !customerName.includes(s) && !contactNumber.includes(s)) return false;
+      const consumerNumber = (c.consumerNumber || '').toLowerCase();
+      if (!callerName.includes(s) && !customerName.includes(s) && !contactNumber.includes(s) && !consumerNumber.includes(s)) return false;
     }
+    if (statusTab === 'duplicates' && !duplicateContacts.includes(c)) return false;
+    if (statusTab === 'similars' && !similarContacts.includes(c)) return false;
     if (statusTab === 'not_yet_called' && c.status !== 'Not Yet Called' && c.callHistory && c.callHistory.length) return false;
     if (statusTab === 'hot' && c.status !== 'Hot Lead') return false;
     if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
     if (statusTab === 'cool' && c.status !== 'Cool Lead') return false;
     if (statusTab === 'notinterested' && c.status !== 'Not Interested') return false;
     if (statusTab === 'no_response' && c.status !== 'No Response' && c.callHistory && c.callHistory.length) return false;
+    if (statusTab === 'may_convert' && c.status !== 'May Convert') return false;
+    if (statusTab === 'following_up' && c.status !== 'Following Up') return false;
     if (selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
     return true;
   });
@@ -424,7 +441,11 @@ function ContactsPage() {
   const tabContacts = statusTab === 'all' ? contacts : contacts.filter((contact) => {
     if (statusTab === 'not_yet_called') return contact.status === 'Not Yet Called' || !contact.callHistory || contact.callHistory.length === 0;
     if (statusTab === 'no_response') return contact.status === 'No Response' || !contact.callHistory || contact.callHistory.length === 0;
+    if (statusTab === 'duplicates') return duplicateContacts.includes(contact);
+    if (statusTab === 'similars') return similarContacts.includes(contact);
     const status = { hot: 'Hot Lead', warm: 'Warm Lead', cool: 'Cool Lead', notinterested: 'Not Interested' }[statusTab];
+    if (statusTab === 'may_convert') return contact.status === 'May Convert';
+    if (statusTab === 'following_up') return contact.status === 'Following Up';
     return !status || contact.status === status;
   });
   const callerList = [...new Set(tabContacts.map(c => (c.callerName || 'Not assigned').trim() || 'Not assigned'))].sort();
@@ -485,6 +506,10 @@ function ContactsPage() {
           <button className={statusTab==='cool'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('cool')}>Cool ({counts.cool})</button>
           <button className={statusTab==='notinterested'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('notinterested')}>Not interested ({counts.notinterested})</button>
           <button className={statusTab==='no_response'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('no_response')}>No response ({counts.no_response})</button>
+          <button className={statusTab==='may_convert'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('may_convert')}>May convert ({counts.may_convert})</button>
+          <button className={statusTab==='following_up'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('following_up')}>Following up ({counts.following_up})</button>
+          <button className={statusTab==='duplicates'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('duplicates')}>Duplicate consumers ({duplicateContacts.length})</button>
+          <button className={statusTab==='similars'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('similars')}>Similar names / mobiles ({similarContacts.length})</button>
           <input className="search-field" placeholder="Search caller, customer or number" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
         </div>
 
@@ -1275,6 +1300,9 @@ function BillingPage({ user }) {
         customerName,
         customerPhone,
         type,
+        subtotal,
+        gstAmount,
+        grandTotal: total,
         items: selectedItems.map((entry) => ({ ...entry, itemId: entry.item, total: entry.quantity * entry.price }))
       };
       const res = await api.post('/invoices', payload);
@@ -1313,12 +1341,12 @@ function BillingPage({ user }) {
     }
   };
 
-  const subtotal = selectedItems.reduce((sum, entry) => sum + entry.quantity * entry.price, 0);
-  const gstAmount = selectedItems.reduce((sum, entry) => {
-    const base = entry.quantity * entry.price;
-    return sum + (base * (entry.sgstRate || 0) / 100) + (base * (entry.cgstRate || 0) / 100) + (base * (entry.igstRate || 0) / 100);
+  const total = selectedItems.reduce((sum, entry) => sum + entry.quantity * entry.price, 0);
+  const subtotal = selectedItems.reduce((sum, entry) => {
+    const taxRate = Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0);
+    return sum + ((entry.quantity * entry.price) / (1 + taxRate / 100));
   }, 0);
-  const total = subtotal + gstAmount;
+  const gstAmount = total - subtotal;
 
   return (
     <div className="billing-page">
@@ -1431,14 +1459,17 @@ function BillingPage({ user }) {
                 <div className="invoice-item-row" key={entry.item}>
                   <div>
                     <strong>{entry.name}</strong>
-                    <div className="muted">₹{entry.price} × {entry.quantity}</div>
+                    <div className="muted">₹{Number(entry.price).toFixed(2)} incl. GST × {entry.quantity}</div>
                   </div>
                   <div className="invoice-item-actions">
                     <button className="btn small" onClick={() => updateQty(entry.item, -1)}>-</button>
                     <span>{entry.quantity}</span>
                     <button className="btn small" onClick={() => updateQty(entry.item, 1)}>+</button>
                   </div>
-                  <input className="line-price" type="number" min="0" value={entry.price} onChange={(e) => setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? { ...line, price: Number(e.target.value || 0) } : line))} aria-label={`Price for ${entry.name}`} />
+                  <div className="price-box">
+                    <label>Price incl. GST<input className="line-price" type="number" min="0" step="0.01" value={entry.price} onChange={(e) => setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? { ...line, price: Number(e.target.value || 0) } : line))} aria-label={`Price including GST for ${entry.name}`} /></label>
+                    <small>Basic ₹{(Number(entry.price || 0) / (1 + (Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0)) / 100)).toFixed(2)}</small>
+                  </div>
                   <strong>₹{(entry.quantity * entry.price).toFixed(2)}</strong>
                 </div>
               ))
@@ -1470,7 +1501,8 @@ function AccountingPage() {
   const [transferForm, setTransferForm] = useState({ fromAccountId: '', toAccountId: '', amount: '', note: '' });
   const [depositForm, setDepositForm] = useState({ accountId: '', amount: '', paymentMethod: 'cash', reference: '', note: '' });
   const [message, setMessage] = useState('');
-  const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const [accountingPageSize, setAccountingPageSize] = useState(20);
+  const [accountingPage, setAccountingPage] = useState(0);
 
   const load = async () => {
     try {
@@ -1650,7 +1682,7 @@ function AccountingPage() {
   })();
 
   return (
-    <div>
+    <div className="accounting-page">
       <h3>Accounting and daily cash book</h3>
       {message && <p className="muted">{message}</p>}
 
@@ -1661,17 +1693,17 @@ function AccountingPage() {
         <div className="stat-card stat-returns"><h4>Receivables</h4><p>₹{(summary.receivables || 0).toLocaleString()}</p><span>Outstanding invoices</span></div>
       </div>
 
-      <div className="panel">
+      <div className="panel acct-balances-panel">
         <h4>Account balances</h4>
-        {summary.accounts.map((account) => (
-          <div className="list-row" key={account._id}>
-            <div>
-              <strong>{account.name}</strong>
-              <div className="muted">{account.type} • {account.notes || 'No notes'}</div>
+        <div className="account-cards-grid">
+          {summary.accounts.map((account) => (
+            <div className={`account-balance-card account-type-${account.type || 'other'}`} key={account._id}>
+              <div className="account-card-top"><span className="account-type-icon">{account.type === 'bank' ? 'B' : account.type === 'digital' ? 'D' : account.type === 'cash' ? 'C' : 'A'}</span><div className="account-card-info"><strong>{account.name}</strong><span className="account-type-label">{account.type}</span></div></div>
+              <strong className="account-balance-amount">₹{Number(account.balance || 0).toLocaleString()}</strong>
+              <span className="muted">{account.notes || 'No notes'}</span>
             </div>
-            <div><strong>₹{Number(account.balance || 0).toLocaleString()}</strong></div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       <div className="panel">
@@ -1816,7 +1848,7 @@ function AccountingPage() {
           <div><h4>Complete account history</h4><p className="muted">Every income, expense, and transfer in date order. Balance is shown after each entry.</p></div>
           <strong>{transactionHistory.length} entries</strong>
         </div>
-        {transactionHistory.slice(0, showAllTransactions ? transactionHistory.length : 20).map((entry) => (
+        {transactionHistory.slice(accountingPage * accountingPageSize, (accountingPage + 1) * accountingPageSize).map((entry) => (
           <div className="list-row transaction-history-row" key={`${entry.kind}-${entry._id}`}>
             <div>
               <strong>{entry.reference || entry.note || entry.kind}</strong>
@@ -1825,7 +1857,12 @@ function AccountingPage() {
             <div className="transaction-values"><strong className={entry.type === 'income' ? 'money-in' : 'money-out'}>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</strong><span>Balance ₹{Number(entry.balanceAfter || 0).toLocaleString()}</span></div>
           </div>
         ))}
-        {transactionHistory.length > 20 && <button className="btn outline list-expander" onClick={() => setShowAllTransactions((value) => !value)}>{showAllTransactions ? 'Show less' : `Show all ${transactionHistory.length} entries`}</button>}
+        <div className="table-controls">
+          <label>Rows per page<select value={accountingPageSize} onChange={(e) => { setAccountingPageSize(Number(e.target.value)); setAccountingPage(0); }}><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="100">100</option></select></label>
+          <span className="muted">Showing {transactionHistory.length ? accountingPage * accountingPageSize + 1 : 0}-{Math.min((accountingPage + 1) * accountingPageSize, transactionHistory.length)} of {transactionHistory.length}</span>
+          <button className="btn outline" disabled={accountingPage === 0} onClick={() => setAccountingPage((page) => page - 1)}>Previous</button>
+          <button className="btn outline" disabled={(accountingPage + 1) * accountingPageSize >= transactionHistory.length} onClick={() => setAccountingPage((page) => page + 1)}>Next</button>
+        </div>
       </div>
     </div>
   );
@@ -1835,6 +1872,8 @@ function StockPage() {
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [pageSize, setPageSize] = useState(20);
+  const [page, setPage] = useState(0);
 
   const load = async (query = '') => {
     try {
@@ -1900,7 +1939,7 @@ function StockPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
+                {items.slice(page * pageSize, (page + 1) * pageSize).map((item) => {
                   const stockLevel = Number(item.stock || 0);
                   const status = stockLevel <= 5 ? 'Critical' : stockLevel <= 15 ? 'Low' : 'Healthy';
                   return (
@@ -1918,6 +1957,12 @@ function StockPage() {
             </table>
           </div>
         )}
+        <div className="table-controls">
+          <label>Rows per page<select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="100">100</option></select></label>
+          <span className="muted">Showing {items.length ? page * pageSize + 1 : 0}-{Math.min((page + 1) * pageSize, items.length)} of {items.length}</span>
+          <button className="btn outline" disabled={page === 0} onClick={() => setPage((current) => current - 1)}>Previous</button>
+          <button className="btn outline" disabled={(page + 1) * pageSize >= items.length} onClick={() => setPage((current) => current + 1)}>Next</button>
+        </div>
       </div>
     </div>
   );
@@ -1928,7 +1973,7 @@ function ReportsPage() {
   const [stock, setStock] = useState([]);
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
   const [callPage, setCallPage] = useState(0);
   const [stockPage, setStockPage] = useState(0);
 
@@ -2148,7 +2193,7 @@ function ReportsPage() {
           <p className="muted empty-state-inline">No calling data available</p>
         )}
         <div className="table-controls">
-          <label>Rows per page<select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCallPage(0); setStockPage(0); }}><option value="50">50</option><option value="100">100</option></select></label>
+          <label>Rows per page<select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCallPage(0); setStockPage(0); }}><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="100">100</option></select></label>
           <span className="muted">Showing {calls.length ? callPage * pageSize + 1 : 0}-{Math.min((callPage + 1) * pageSize, calls.length)} of {calls.length}</span>
           <button className="btn outline" disabled={callPage === 0} onClick={() => setCallPage((page) => page - 1)}>Previous</button>
           <button className="btn outline" disabled={(callPage + 1) * pageSize >= calls.length} onClick={() => setCallPage((page) => page + 1)}>Next</button>
@@ -2191,6 +2236,7 @@ function ReportsPage() {
           </tbody>
         </table>
         <div className="table-controls">
+          <label>Rows per page<select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCallPage(0); setStockPage(0); }}><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="100">100</option></select></label>
           <span className="muted">Showing {stock.length ? stockPage * pageSize + 1 : 0}-{Math.min((stockPage + 1) * pageSize, stock.length)} of {stock.length}</span>
           <button className="btn outline" disabled={stockPage === 0} onClick={() => setStockPage((page) => page - 1)}>Previous</button>
           <button className="btn outline" disabled={(stockPage + 1) * pageSize >= stock.length} onClick={() => setStockPage((page) => page + 1)}>Next</button>
@@ -2220,14 +2266,21 @@ function ReportsPage() {
 
 function ShopProfilePage({ user, setUser }) {
   const [form, setForm] = useState({ name: user.name || '', shopName: user.shopName || '', shopAddress: user.shopAddress || '', shopGSTIN: user.shopGSTIN || '', phone: user.phone || '', address: user.address || '', shopLogoUrl: user.shopLogoUrl || '' });
+  const [logoFile, setLogoFile] = useState(null);
   const [message, setMessage] = useState('');
 
   const save = async (event) => {
     event.preventDefault();
     try {
-      const response = await api.put('/auth/me', form);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      setUser(response.data.user);
+      let nextUser = (await api.put('/auth/me', form)).data.user;
+      if (logoFile) {
+        const logoData = new FormData();
+        logoData.append('logo', logoFile);
+        nextUser = (await api.post('/auth/me/logo', logoData, { headers: { 'Content-Type': 'multipart/form-data' } })).data.user;
+      }
+      localStorage.setItem('user', JSON.stringify(nextUser));
+      setUser(nextUser);
+      setLogoFile(null);
       setMessage('Shop profile updated. New invoice headers will use these details.');
     } catch (error) {
       setMessage(error.response?.data?.message || 'Unable to update shop profile');
@@ -2245,7 +2298,7 @@ function ShopProfilePage({ user, setUser }) {
         <label>GSTIN<input value={form.shopGSTIN} onChange={(e) => setForm({ ...form, shopGSTIN: e.target.value })} /></label>
         <label>Invoice address<textarea value={form.shopAddress} onChange={(e) => setForm({ ...form, shopAddress: e.target.value })} /></label>
         <label>Personal address<textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
-        <label>Logo URL<input value={form.shopLogoUrl} onChange={(e) => setForm({ ...form, shopLogoUrl: e.target.value })} /></label>
+        <label className="logo-upload-field">Shop logo<input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />{logoFile && <small>{logoFile.name}</small>}</label>
       </div>
       {message && <p className="status-message">{message}</p>}
       <button className="btn primary" type="submit">Save shop profile</button>

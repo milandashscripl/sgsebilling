@@ -7,9 +7,9 @@ const Invoice = require('../models/Invoice');
 
 const router = express.Router();
 
-const getAccountBalance = async (accountId, openingBalance) => {
+const getAccountBalance = async (accountId, openingBalance, userId) => {
   const id = accountId.toString();
-  const matchStage = { $match: { $or: [{ accountId }, { accountId: id }] } };
+  const matchStage = { $match: { createdBy: userId, $or: [{ accountId }, { accountId: id }] } };
   const [incomeTotal, expenseTotal, expenseOutflow] = await Promise.all([
     Transaction.aggregate([matchStage, { $match: { type: 'income' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
     Transaction.aggregate([matchStage, { $match: { type: 'expense' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
@@ -21,11 +21,11 @@ const getAccountBalance = async (accountId, openingBalance) => {
 
 router.get('/accounts', auth, async (req, res) => {
   try {
-    const accounts = await Account.find().sort({ name: 1 }).lean();
+    const accounts = await Account.find({ createdBy: req.user._id }).sort({ name: 1 }).lean();
     const results = await Promise.all(accounts.map(async (account) => ({
       ...account,
       id: String(account._id),
-      balance: await getAccountBalance(account._id, Number(account.openingBalance || 0))
+      balance: await getAccountBalance(account._id, Number(account.openingBalance || 0), req.user._id)
     })));
 
     res.json(results);
@@ -43,12 +43,12 @@ router.post('/transfer', auth, async (req, res) => {
     if (fromAccountId === toAccountId) return res.status(400).json({ message: 'Source and destination must differ' });
 
     const [fromAcc, toAcc] = await Promise.all([
-      Account.findById(fromAccountId),
-      Account.findById(toAccountId)
+      Account.findOne({ _id: fromAccountId, createdBy: req.user._id }),
+      Account.findOne({ _id: toAccountId, createdBy: req.user._id })
     ]);
     if (!fromAcc || !toAcc) return res.status(404).json({ message: 'Account not found' });
 
-    const fromBalance = await getAccountBalance(fromAcc._id, Number(fromAcc.openingBalance || 0));
+    const fromBalance = await getAccountBalance(fromAcc._id, Number(fromAcc.openingBalance || 0), req.user._id);
     if (fromBalance < amt) return res.status(400).json({ message: `Insufficient balance in ${fromAcc.name}` });
 
     const dateStr = new Date().toISOString().slice(0, 10);
@@ -60,8 +60,8 @@ router.post('/transfer', auth, async (req, res) => {
     ]);
 
     const [fromBal, toBal] = await Promise.all([
-      getAccountBalance(fromAcc._id, Number(fromAcc.openingBalance || 0)),
-      getAccountBalance(toAcc._id, Number(toAcc.openingBalance || 0))
+      getAccountBalance(fromAcc._id, Number(fromAcc.openingBalance || 0), req.user._id),
+      getAccountBalance(toAcc._id, Number(toAcc.openingBalance || 0), req.user._id)
     ]);
 
     res.json({ message: 'Transfer successful', fromBalance: fromBal, toBalance: toBal });
@@ -72,7 +72,7 @@ router.post('/transfer', auth, async (req, res) => {
 
 router.post('/accounts/:id/deposit', auth, async (req, res) => {
   try {
-    const account = await Account.findById(req.params.id);
+    const account = await Account.findOne({ _id: req.params.id, createdBy: req.user._id });
     if (!account) return res.status(404).json({ message: 'Account not found' });
     const amount = Number(req.body.amount || 0);
     if (!amount || amount <= 0) return res.status(400).json({ message: 'Enter a valid amount' });
@@ -86,7 +86,7 @@ router.post('/accounts/:id/deposit', auth, async (req, res) => {
       note: req.body.note || 'Balance added directly',
       createdBy: req.user._id
     });
-    const balance = await getAccountBalance(account._id, Number(account.openingBalance || 0));
+    const balance = await getAccountBalance(account._id, Number(account.openingBalance || 0), req.user._id);
     res.json({ message: 'Balance added', balance });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -110,7 +110,7 @@ router.post('/accounts', auth, async (req, res) => {
 
 router.get('/transactions', auth, async (req, res) => {
   try {
-    const transactions = await Transaction.find().sort({ date: -1 }).lean();
+    const transactions = await Transaction.find({ createdBy: req.user._id }).sort({ date: -1 }).lean();
     res.json(transactions.map((transaction) => ({ ...transaction, id: String(transaction._id) })));
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -119,6 +119,8 @@ router.get('/transactions', auth, async (req, res) => {
 
 router.post('/transactions', auth, async (req, res) => {
   try {
+    const account = await Account.findOne({ _id: req.body.accountId, createdBy: req.user._id });
+    if (!account) return res.status(400).json({ message: 'Select an account belonging to this shop' });
     const transaction = await Transaction.create({
       date: req.body.date || new Date().toISOString().slice(0, 10),
       accountId: req.body.accountId,
@@ -137,7 +139,7 @@ router.post('/transactions', auth, async (req, res) => {
 
 router.get('/expenses', auth, async (req, res) => {
   try {
-    const expenses = await Expense.find().sort({ date: -1 }).lean();
+    const expenses = await Expense.find({ createdBy: req.user._id }).sort({ date: -1 }).lean();
     res.json(expenses.map((expense) => ({ ...expense, id: String(expense._id) })));
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -159,7 +161,7 @@ router.get('/expenses/export', auth, async (req, res) => {
       filter.date = { ...filter.date, $lte: endOfDay.toISOString() };
     }
 
-    const expenses = await Expense.find(filter).sort({ date: -1 }).lean();
+    const expenses = await Expense.find({ ...filter, createdBy: req.user._id }).sort({ date: -1 }).lean();
     const csv = ['date,category,amount,accountId,paymentMethod,note']
       .concat(expenses.map((expense) => `${expense.date || ''},${expense.category || 'General'},${expense.amount || 0},${expense.accountId || ''},${expense.paymentMethod || 'cash'},${String(expense.note || '').replace(/,/g, ' ')}`))
       .join('\n');
@@ -174,6 +176,8 @@ router.get('/expenses/export', auth, async (req, res) => {
 
 router.post('/expenses', auth, async (req, res) => {
   try {
+    const account = await Account.findOne({ _id: req.body.accountId, createdBy: req.user._id });
+    if (!account) return res.status(400).json({ message: 'Select an account belonging to this shop' });
     const expense = await Expense.create({
       date: req.body.date || new Date().toISOString().slice(0, 10),
       category: req.body.category || 'General',
@@ -191,7 +195,7 @@ router.post('/expenses', auth, async (req, res) => {
 
 router.delete('/expenses/:id', auth, async (req, res) => {
   try {
-    const deleted = await Expense.findByIdAndDelete(req.params.id);
+    const deleted = await Expense.findOneAndDelete({ _id: req.params.id, createdBy: req.user._id });
     if (!deleted) return res.status(404).json({ message: 'Expense not found' });
     res.json({ message: 'Expense deleted' });
   } catch (error) {
@@ -202,18 +206,18 @@ router.delete('/expenses/:id', auth, async (req, res) => {
 router.get('/summary', auth, async (req, res) => {
   try {
     const [incomeTotalAgg, expenseTotalAgg, accountsData, paymentMethodIncome, paymentMethodExpense, receivablesAgg] = await Promise.all([
-      Transaction.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
-      Expense.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
-      Account.find().sort({ name: 1 }).lean(),
-      Transaction.aggregate([{ $group: { _id: '$paymentMethod', total: { $sum: '$amount' } } }]),
-      Expense.aggregate([{ $group: { _id: '$paymentMethod', total: { $sum: '$amount' } } }]),
-      Invoice.aggregate([{ $match: { balance: { $gt: 0 } } }, { $group: { _id: null, total: { $sum: '$balance' } } }])
+      Transaction.aggregate([{ $match: { createdBy: req.user._id } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Expense.aggregate([{ $match: { createdBy: req.user._id } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Account.find({ createdBy: req.user._id }).sort({ name: 1 }).lean(),
+      Transaction.aggregate([{ $match: { createdBy: req.user._id } }, { $group: { _id: '$paymentMethod', total: { $sum: '$amount' } } }]),
+      Expense.aggregate([{ $match: { createdBy: req.user._id } }, { $group: { _id: '$paymentMethod', total: { $sum: '$amount' } } }]),
+      Invoice.aggregate([{ $match: { createdBy: req.user._id, balance: { $gt: 0 } } }, { $group: { _id: null, total: { $sum: '$balance' } } }])
     ]);
 
     const accounts = await Promise.all(accountsData.map(async (account) => ({
       ...account,
       id: String(account._id),
-      balance: await getAccountBalance(account._id, Number(account.openingBalance || 0))
+      balance: await getAccountBalance(account._id, Number(account.openingBalance || 0), req.user._id)
     })));
 
     const paymentMethodsMap = {};
