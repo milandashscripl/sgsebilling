@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const setupSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   description: { type: String, default: '', trim: true },
+  finalPrice: { type: Number, default: 0, min: 0 },
+  gstRate: { type: Number, default: 0, min: 0 },
   items: [{
     item: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
     name: { type: String, default: '' },

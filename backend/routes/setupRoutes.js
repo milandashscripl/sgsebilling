@@ -17,20 +17,40 @@ router.get('/', auth, async (req, res) => {
 router.post('/', auth, async (req, res) => {
   try {
     const requestedItems = Array.isArray(req.body.items) ? req.body.items : [];
-    if (!req.body.name?.trim() || !requestedItems.length) {
-      return res.status(400).json({ message: 'Setup name and at least one item are required' });
+    const finalPrice = Number(req.body.finalPrice ?? 0);
+    const gstRate = Number(req.body.gstRate ?? 0);
+    const hasPackageValue = Number.isFinite(finalPrice) && finalPrice > 0;
+
+    if (!req.body.name?.trim()) {
+      return res.status(400).json({ message: 'Setup name is required' });
     }
-    const items = await Promise.all(requestedItems.map(async (entry) => {
-      const item = await Item.findById(entry.item || entry.itemId).lean();
-      if (!item) throw new Error('One of the selected items was not found');
-      return {
-        item: item._id,
-        name: item.name,
-        quantity: Math.max(1, Number(entry.quantity || 1)),
-        price: Math.max(0, Number(entry.price ?? item.salePrice ?? 0))
-      };
-    }));
-    const setup = await Setup.create({ name: req.body.name.trim(), description: req.body.description || '', items, createdBy: req.user._id });
+
+    if (!requestedItems.length && !hasPackageValue) {
+      return res.status(400).json({ message: 'Provide either item rows or a final setup value' });
+    }
+
+    let items = [];
+    if (requestedItems.length) {
+      items = await Promise.all(requestedItems.map(async (entry) => {
+        const item = await Item.findById(entry.item || entry.itemId).lean();
+        if (!item) throw new Error('One of the selected items was not found');
+        return {
+          item: item._id,
+          name: item.name,
+          quantity: Math.max(1, Number(entry.quantity || 1)),
+          price: Math.max(0, Number(entry.price ?? item.salePrice ?? 0))
+        };
+      }));
+    }
+
+    const setup = await Setup.create({
+      name: req.body.name.trim(),
+      description: req.body.description || '',
+      finalPrice: hasPackageValue ? finalPrice : 0,
+      gstRate: hasPackageValue ? gstRate : 0,
+      items,
+      createdBy: req.user._id
+    });
     res.status(201).json({ ...setup.toObject(), id: String(setup._id) });
   } catch (error) {
     res.status(400).json({ message: error.message });

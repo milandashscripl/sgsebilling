@@ -1282,8 +1282,7 @@ function ItemsPage() {
 function SetupLibraryPage() {
   const [items, setItems] = useState([]);
   const [setups, setSetups] = useState([]);
-  const [form, setForm] = useState({ name: '', description: '', itemId: '', quantity: '1', price: '' });
-  const [selectedItems, setSelectedItems] = useState([]);
+  const [form, setForm] = useState({ name: '', description: '', finalPrice: '', gstRate: '18' });
   const [message, setMessage] = useState('');
 
   const load = async () => {
@@ -1293,27 +1292,18 @@ function SetupLibraryPage() {
   };
   useEffect(() => { load().catch(() => setMessage('Unable to load setup library')); }, []);
 
-  const addItem = () => {
-    const item = items.find((entry) => entry._id === form.itemId);
-    if (!item) return;
-    const finalPrice = Number(form.price || item.salePrice || 0);
-    setSelectedItems((current) => [...current.filter((entry) => entry.item !== item._id), {
-      item: item._id,
-      name: item.name,
-      quantity: Math.max(1, Number(form.quantity || 1)),
-      price: finalPrice,
-      sgstRate: Number(item.sgstRate || 0),
-      cgstRate: Number(item.cgstRate || 0),
-      igstRate: Number(item.igstRate || 0)
-    }]);
-    setForm({ ...form, itemId: '', quantity: '1', price: '' });
-  };
   const save = async (event) => {
     event.preventDefault();
     try {
-      await api.post('/setups', { name: form.name, description: form.description, items: selectedItems });
-      setForm({ name: '', description: '', itemId: '', quantity: '1', price: '' });
-      setSelectedItems([]);
+      const payload = {
+        name: form.name,
+        description: form.description,
+        finalPrice: Number(form.finalPrice || 0),
+        gstRate: Number(form.gstRate || 0),
+        items: []
+      };
+      await api.post('/setups', payload);
+      setForm({ name: '', description: '', finalPrice: '', gstRate: '18' });
       setMessage('Standard setup saved');
       await load();
     } catch (error) { setMessage(error.response?.data?.message || 'Unable to save setup'); }
@@ -1321,9 +1311,9 @@ function SetupLibraryPage() {
   const remove = async (id) => { if (!window.confirm('Delete this setup?')) return; await api.delete(`/setups/${id}`); await load(); };
 
   return <div className="setup-library-page">
-    <div className="page-header"><p className="eyebrow">Reusable billing templates</p><h3>Setup library</h3><p className="muted">Create standard solar installation packages once and load them into any setup bill.</p></div>
-    <form className="panel setup-library-form" onSubmit={save}><h4>Create standard setup</h4><div className="form-grid"><input required placeholder="Setup name (e.g. 3KW On-grid)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /><select value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}><option value="">Choose item</option>{items.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select><input type="number" min="1" placeholder="Quantity" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /><input type="number" min="0" placeholder="Final price incl GST" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /><button className="btn secondary" type="button" onClick={addItem}>Add item</button></div>{selectedItems.length > 0 && <div className="setup-item-summary">{selectedItems.map((item) => <span key={item.item}>{item.name} × {item.quantity} • Final ₹{Number(item.price || 0).toFixed(2)} <em style={{fontStyle:'normal',color:'#5E6F83'}}>Base ₹{calculateTaxableValue(Number(item.price || 0), getEffectiveGstRate(item)).toFixed(2)}</em></span>)}</div>}<button className="btn primary" type="submit">Save standard setup</button>{message && <p className="status-message">{message}</p>}</form>
-    <div className="setup-library-grid">{setups.map((setup) => <article className="panel setup-card" key={setup._id}><div className="panel-header"><div><h4>{setup.name}</h4><p className="muted">{setup.description || 'Standard installation package'}</p></div><button className="btn outline" type="button" onClick={() => remove(setup._id)}>Delete</button></div><ul>{(setup.items || []).map((item) => <li key={item.item}>{item.name} <span>× {item.quantity} • Final ₹{Number(item.price || 0).toFixed(2)} • Base ₹{calculateTaxableValue(Number(item.price || 0), getEffectiveGstRate(item)).toFixed(2)}</span></li>)}</ul></article>)}</div>
+    <div className="page-header"><p className="eyebrow">Reusable billing templates</p><h3>Setup library</h3><p className="muted">Save a complete package at one final GST-inclusive value, then load it into any bill.</p></div>
+    <form className="panel setup-library-form" onSubmit={save}><h4>Create standard setup</h4><div className="form-grid"><input required placeholder="Setup name (e.g. 3KW On-grid)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /><input type="number" min="0" placeholder="Final setup price incl GST" value={form.finalPrice} onChange={(e) => setForm({ ...form, finalPrice: e.target.value })} /><input type="number" min="0" step="0.01" placeholder="GST %" value={form.gstRate} onChange={(e) => setForm({ ...form, gstRate: e.target.value })} /></div><div className="setup-item-summary"><span>Final {Number(form.finalPrice || 0).toFixed(2)} • Base {calculateTaxableValue(Number(form.finalPrice || 0), Number(form.gstRate || 0)).toFixed(2)} • GST {Number((Number(form.finalPrice || 0) - calculateTaxableValue(Number(form.finalPrice || 0), Number(form.gstRate || 0))).toFixed(2))}</span></div><button className="btn primary" type="submit">Save standard setup</button>{message && <p className="status-message">{message}</p>}</form>
+    <div className="setup-library-grid">{setups.map((setup) => <article className="panel setup-card" key={setup._id}><div className="panel-header"><div><h4>{setup.name}</h4><p className="muted">{setup.description || 'Standard installation package'}</p></div><button className="btn outline" type="button" onClick={() => remove(setup._id)}>Delete</button></div><ul><li><strong>{setup.name}</strong> <span>Final ₹{Number(setup.finalPrice || 0).toFixed(2)} • Base ₹{calculateTaxableValue(Number(setup.finalPrice || 0), Number(setup.gstRate || 0)).toFixed(2)} • GST {Number((Number(setup.finalPrice || 0) - calculateTaxableValue(Number(setup.finalPrice || 0), Number(setup.gstRate || 0))).toFixed(2))}</span></li>{(setup.items || []).length > 0 && (setup.items || []).map((item) => <li key={item.item}>{item.name} <span>× {item.quantity} • Final ₹{Number(item.price || 0).toFixed(2)}</span></li>)}</ul></article>)}</div>
   </div>;
 }
 
@@ -1397,6 +1387,22 @@ function BillingPage({ user }) {
     const setup = setups.find((entry) => entry._id === setupId);
     if (!setup) return;
     setType('setup');
+
+    if (setup.finalPrice > 0 || setup.gstRate > 0) {
+      setSelectedItems([{
+        item: setup._id,
+        name: setup.name,
+        quantity: 1,
+        price: Number(setup.finalPrice || 0),
+        gstRate: Number(setup.gstRate || 0),
+        sgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
+        cgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
+        igstRate: 0,
+        total: Number(setup.finalPrice || 0)
+      }]);
+      return;
+    }
+
     setSelectedItems((setup.items || []).map((entry) => ({
       item: entry.item,
       name: entry.name,
@@ -1426,9 +1432,17 @@ function BillingPage({ user }) {
   };
 
   const saveSetup = async () => {
-    if (!setupName.trim() || !setupItems.length) return setBillingMessage('Add a name and at least one item to save a setup');
+    if (!setupName.trim()) return setBillingMessage('Add a name to save a setup');
     try {
-      const response = await api.post('/setups', { name: setupName, description: setupDescription, items: setupItems });
+      const finalPrice = Number(setupItems.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0).toFixed(2));
+      const gstRate = setupItems.length ? Number((setupItems.reduce((sum, item) => sum + (Number(item.gstRate || getEffectiveGstRate(item)) * Number(item.price || 0) * Number(item.quantity || 1)), 0) / finalPrice * 100 || 0).toFixed(2)) : 0;
+      const response = await api.post('/setups', {
+        name: setupName,
+        description: setupDescription,
+        finalPrice,
+        gstRate,
+        items: setupItems
+      });
       setSetups((previous) => [...previous, response.data].sort((a, b) => a.name.localeCompare(b.name)));
       setSetupName('');
       setSetupDescription('');
