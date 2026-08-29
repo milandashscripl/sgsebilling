@@ -36,14 +36,35 @@ router.get('/', auth, async (req, res) => {
 
 router.post('/', auth, async (req, res) => {
   try {
-    const employee = await Employee.create({ ...req.body, monthlySalary: Number(req.body.monthlySalary || 0), monthlyAdvance: Number(req.body.monthlyAdvance || 0), fuelAllowance: Number(req.body.fuelAllowance || 0), incentive: Number(req.body.incentive || 0), otherAllowance: Number(req.body.otherAllowance || 0), createdBy: req.user._id });
+    const payload = {
+      ...req.body,
+      monthlySalary: Number(req.body.monthlySalary || 0),
+      monthlyAdvance: Number(req.body.monthlyAdvance || 0),
+      fuelAllowance: Number(req.body.fuelAllowance || 0),
+      incentive: Number(req.body.incentive || 0),
+      otherAllowance: Number(req.body.otherAllowance || 0),
+      personalDetails: req.body.personalDetails || {},
+      salaryAdjustments: req.body.salaryAdjustments || {},
+      createdBy: req.user._id
+    };
+    const employee = await Employee.create(payload);
     res.status(201).json({ ...employee.toObject(), id: String(employee._id) });
   } catch (error) { res.status(error.code === 11000 ? 409 : 500).json({ message: error.code === 11000 ? 'Employee ID already exists' : error.message }); }
 });
 
 router.put('/:id', auth, async (req, res) => {
   try {
-    const employee = await Employee.findByIdAndUpdate(req.params.id, { ...req.body, monthlySalary: Number(req.body.monthlySalary || 0), monthlyAdvance: Number(req.body.monthlyAdvance || 0), fuelAllowance: Number(req.body.fuelAllowance || 0), incentive: Number(req.body.incentive || 0), otherAllowance: Number(req.body.otherAllowance || 0) }, { new: true, runValidators: true }).lean();
+    const payload = {
+      ...req.body,
+      monthlySalary: Number(req.body.monthlySalary || 0),
+      monthlyAdvance: Number(req.body.monthlyAdvance || 0),
+      fuelAllowance: Number(req.body.fuelAllowance || 0),
+      incentive: Number(req.body.incentive || 0),
+      otherAllowance: Number(req.body.otherAllowance || 0),
+      personalDetails: req.body.personalDetails || {},
+      salaryAdjustments: req.body.salaryAdjustments || {}
+    };
+    const employee = await Employee.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true }).lean();
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
     res.json({ ...employee, id: String(employee._id) });
   } catch (error) { res.status(500).json({ message: error.message }); }
@@ -87,10 +108,33 @@ router.get('/:id/payslip', auth, async (req, res) => {
     const payableDays = present + halfday * 0.5;
     const dailySalary = Number(employee.monthlySalary || 0) / range.daysInMonth;
     const earnedSalary = dailySalary * payableDays;
-    const allowances = Number(employee.fuelAllowance || 0) + Number(employee.incentive || 0) + Number(employee.otherAllowance || 0);
+    const adjustments = employee.salaryAdjustments || {};
+    const manualAdvance = Number(adjustments.advance || employee.monthlyAdvance || 0);
+    const manualBonus = Number(adjustments.bonus || 0);
+    const manualIncentive = Number(adjustments.incentive || 0);
+    const manualDeduction = Number(adjustments.deduction || 0);
+    const allowances = Number(employee.fuelAllowance || 0) + Number(employee.incentive || 0) + Number(employee.otherAllowance || 0) + manualBonus + manualIncentive;
     const gross = earnedSalary + allowances;
-    const netPay = Math.max(0, gross - Number(employee.monthlyAdvance || 0));
-    res.json({ employee, month: range.month, daysInMonth: range.daysInMonth, present, halfday, absent, payableDays, earnedSalary, allowances, gross, advance: Number(employee.monthlyAdvance || 0), netPay, records });
+    const netPay = Math.max(0, gross - manualAdvance - manualDeduction);
+    res.json({
+      employee,
+      month: range.month,
+      daysInMonth: range.daysInMonth,
+      present,
+      halfday,
+      absent,
+      payableDays,
+      earnedSalary,
+      allowances,
+      gross,
+      advance: manualAdvance,
+      bonus: manualBonus,
+      incentive: manualIncentive,
+      deduction: manualDeduction,
+      adjustmentNote: adjustments.note || '',
+      netPay,
+      records
+    });
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 

@@ -117,6 +117,25 @@ function App() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const brandName = user?.shopName || 'SGSE Billing';
+    document.title = brandName;
+
+    let favicon = document.querySelector('link[rel="icon"]');
+    if (!favicon) {
+      favicon = document.createElement('link');
+      favicon.rel = 'icon';
+      document.head.appendChild(favicon);
+    }
+
+    favicon.href = user?.shopLogoUrl || 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="14" fill="#1d4ed8"/>
+        <text x="32" y="40" text-anchor="middle" font-size="26" fill="#fff" font-family="Arial, sans-serif" font-weight="700">SG</text>
+      </svg>
+    `);
+  }, [user]);
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -191,9 +210,12 @@ function AuthenticatedApp({ user, setUser, logout }) {
     <div>
       <nav className="topbar">
         <button className="mobile-menu-button" type="button" aria-label="Open navigation" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen((open) => !open)}><span></span><span></span><span></span></button>
-        <div>
-          <h2>SGSE Billing</h2>
-          <p>{user.role === 'admin' ? 'Admin control center' : 'Sales and inventory workspace'}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {user.shopLogoUrl ? <img src={user.shopLogoUrl} alt={user.shopName || 'Shop logo'} style={{ width: 34, height: 34, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }} /> : <span className="sidebar-brand-mark" style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 }}>{(user.shopName || 'SG').slice(0, 2).toUpperCase()}</span>}
+          <div>
+            <h2>{user.shopName || 'SGSE Billing'}</h2>
+            <p>{user.role === 'admin' ? 'Admin control center' : 'Sales and inventory workspace'}</p>
+          </div>
         </div>
         <div className="topbar-actions">
           <span className="chip">{user.name}</span>
@@ -204,9 +226,9 @@ function AuthenticatedApp({ user, setUser, logout }) {
         {sidebarOpen && <button className="sidebar-backdrop" type="button" aria-label="Close navigation" onClick={closeSidebar} />}
         <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
           <div className="sidebar-brand">
-            <span className="sidebar-brand-mark">SG</span>
+            {user.shopLogoUrl ? <img src={user.shopLogoUrl} alt={user.shopName || 'Shop logo'} style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'cover' }} /> : <span className="sidebar-brand-mark">{(user.shopName || 'SG').slice(0, 2).toUpperCase()}</span>}
             <div>
-              <strong>SGSE</strong>
+              <strong>{user.shopName || 'SGSE'}</strong>
               <small>Business hub</small>
             </div>
           </div>
@@ -1496,8 +1518,7 @@ function AccountingPage() {
   const [expenses, setExpenses] = useState([]);
   const [summary, setSummary] = useState({ accounts: [], paymentMethods: [], incomeTotal: 0, expenseTotal: 0, netCash: 0, receivables: 0 });
   const [accountForm, setAccountForm] = useState({ name: '', type: 'cash', openingBalance: '0', notes: '' });
-  const [transactionForm, setTransactionForm] = useState({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
-  const [expenseForm, setExpenseForm] = useState({ date: toLocalDateTimeValue(), category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
+  const [transactionForm, setTransactionForm] = useState({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '', date: toLocalDateTimeValue() });
   const [transferForm, setTransferForm] = useState({ fromAccountId: '', toAccountId: '', amount: '', note: '' });
   const [depositForm, setDepositForm] = useState({ accountId: '', amount: '', paymentMethod: 'cash', reference: '', note: '' });
   const [message, setMessage] = useState('');
@@ -1543,13 +1564,14 @@ function AccountingPage() {
     try {
       await api.post('/accounting/transactions', {
         ...transactionForm,
-        amount: Number(transactionForm.amount || 0)
+        amount: Number(transactionForm.amount || 0),
+        date: transactionForm.date || toLocalDateTimeValue()
       });
-      setTransactionForm({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '' });
-      setMessage('Ledger entry saved');
+      setTransactionForm({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '', date: toLocalDateTimeValue() });
+      setMessage('Transaction saved');
       await load();
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Unable to save ledger');
+      setMessage(error.response?.data?.message || 'Unable to save transaction');
     }
   };
 
@@ -1577,22 +1599,6 @@ function AccountingPage() {
     }
   };
 
-  const addExpense = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/accounting/expenses', {
-        ...expenseForm,
-        date: expenseForm.date || toLocalDateTimeValue(),
-        amount: Number(expenseForm.amount || 0)
-      });
-      setExpenseForm({ date: toLocalDateTimeValue(), category: '', amount: '', accountId: '', paymentMethod: 'cash', note: '' });
-      setMessage('Expense saved');
-      await load();
-    } catch (error) {
-      setMessage(error.response?.data?.message || 'Unable to save expense');
-    }
-  };
-
   const deleteExpense = async (id) => {
     if (!window.confirm('Delete this expense?')) return;
     try {
@@ -1606,7 +1612,14 @@ function AccountingPage() {
 
   const downloadExpenseCsv = async () => {
     try {
-      const rows = transactionHistory.map((entry) => [entry.date, entry.accountName, entry.kind, entry.reference, entry.type === 'income' ? entry.amount : -entry.amount, entry.balanceAfter].map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
+      const rows = transactionHistory.map((entry) => [
+        entry.date,
+        entry.accountName,
+        entry.kind,
+        entry.reference || entry.note || '',
+        entry.type === 'income' ? Number(entry.amount || 0) : -(Number(entry.amount || 0)),
+        Number(entry.balanceAfter || 0)
+      ].map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
       const csv = ['date,account,entry,reference,change,balanceAfter', ...rows].join('\n');
       const url = window.URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
       const link = document.createElement('a');
@@ -1670,15 +1683,15 @@ function AccountingPage() {
     const openingBalances = Object.fromEntries(accounts.map((account) => [account._id, Number(account.openingBalance || 0)]));
     const runningBalances = { ...openingBalances };
     const entries = [
-      ...transactions.map((entry) => ({ ...entry, kind: 'Ledger entry', accountKey: String(entry.accountId || '') })),
-      ...expenses.map((entry) => ({ ...entry, kind: 'Expense', type: 'expense', accountKey: String(entry.accountId || '') }))
-    ].sort((a, b) => new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
+      ...transactions.map((entry) => ({ ...entry, kind: entry.reference || entry.note || 'Transaction', accountKey: String(entry.accountId || '') })),
+      ...expenses.map((entry) => ({ ...entry, kind: entry.category || 'Expense', type: 'expense', accountKey: String(entry.accountId || '') }))
+    ].sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
     return entries.map((entry) => {
       const amount = Number(entry.amount || 0);
-      const account = accounts.find((item) => String(item._id) === entry.accountKey);
+      const account = accounts.find((item) => String(item._id) === (String(entry.accountKey || '')));
       runningBalances[entry.accountKey] = (runningBalances[entry.accountKey] || 0) + (entry.type === 'income' ? amount : -amount);
       return { ...entry, accountName: account?.name || 'Unassigned account', balanceAfter: runningBalances[entry.accountKey] || 0 };
-    }).reverse();
+    });
   })();
 
   return (
@@ -1760,8 +1773,18 @@ function AccountingPage() {
       </div>
 
       <div className="panel">
-        <h4>Ledger / cash book entry</h4>
+        <div className="panel-header">
+          <div>
+            <h4>New transaction</h4>
+            <p className="muted">Add any income or expense directly to the shared transaction ledger.</p>
+          </div>
+          <div className="inline-actions">
+            <button className="btn secondary" type="button" onClick={downloadExpenseCsv}>Export Excel / CSV</button>
+            <button className="btn secondary" type="button" onClick={downloadExpensePdf}>Export PDF</button>
+          </div>
+        </div>
         <form className="form-grid" onSubmit={addTransaction}>
+          <input type="datetime-local" value={transactionForm.date} onChange={(e) => setTransactionForm({ ...transactionForm, date: e.target.value })} />
           <select value={transactionForm.accountId} onChange={(e) => setTransactionForm({ ...transactionForm, accountId: e.target.value })}>
             <option value="">Select account</option>
             {accounts.map((account) => (<option key={account._id} value={account._id}>{account.name}</option>))}
@@ -1780,57 +1803,9 @@ function AccountingPage() {
             <option value="withdrawal">Withdrawal</option>
           </select>
           <input placeholder="Reference / receipt" value={transactionForm.reference} onChange={(e) => setTransactionForm({ ...transactionForm, reference: e.target.value })} />
-          <input placeholder="Note" value={transactionForm.note} onChange={(e) => setTransactionForm({ ...transactionForm, note: e.target.value })} />
-          <button className="btn primary" type="submit">Save ledger entry</button>
+          <input placeholder="Expense / entry note" value={transactionForm.note} onChange={(e) => setTransactionForm({ ...transactionForm, note: e.target.value })} />
+          <button className="btn primary" type="submit">Save transaction</button>
         </form>
-      </div>
-
-      <div className="panel">
-        <h4>Daily expenses</h4>
-        <form className="form-grid" onSubmit={addExpense}>
-          <input type="datetime-local" value={expenseForm.date} onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })} />
-          <input placeholder="Expense category" value={expenseForm.category} onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })} />
-          <input placeholder="Amount" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} />
-          <select value={expenseForm.accountId} onChange={(e) => setExpenseForm({ ...expenseForm, accountId: e.target.value })}>
-            <option value="">Select account</option>
-            {accounts.map((account) => (<option key={account._id} value={account._id}>{account.name}</option>))}
-          </select>
-          <select value={expenseForm.paymentMethod} onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}>
-            <option value="cash">Cash</option>
-            <option value="phonepe">PhonePe</option>
-            <option value="gpay">GPay</option>
-            <option value="neft">NEFT</option>
-            <option value="rtgs">RTGS</option>
-            <option value="withdrawal">Withdrawal</option>
-          </select>
-          <input placeholder="Note" value={expenseForm.note} onChange={(e) => setExpenseForm({ ...expenseForm, note: e.target.value })} />
-          <button className="btn primary" type="submit">Save expense</button>
-        </form>
-      </div>
-
-      <div className="panel">
-        <div className="panel-header">
-          <h4>Recent expenses</h4>
-          <div className="inline-actions">
-            <button className="btn secondary" type="button" onClick={downloadExpenseCsv}>Export Excel / CSV</button>
-            <button className="btn secondary" type="button" onClick={downloadExpensePdf}>Export PDF</button>
-          </div>
-        </div>
-        {expenses.length === 0 ? <p className="muted">No expenses recorded</p> : (
-          expenses.map((exp) => (
-            <div className="list-row" key={exp._id}>
-              <div>
-                <strong>{exp.category || 'Expense'}</strong>
-                <div className="muted">{(accounts.find(a => a._id === exp.accountId)?.name) || exp.accountName || '—'} • {exp.paymentMethod} • {exp.date ? formatAbsoluteDate(exp.date) : (exp.createdAt ? formatAbsoluteDate(exp.createdAt) : '—')}</div>
-                {exp.note && <div className="muted">{exp.note}</div>}
-              </div>
-              <div style={{textAlign:'right'}}>
-                <div style={{color:'#C23C3C'}}>- ₹{Number(exp.amount || 0).toLocaleString()}</div>
-                <div style={{marginTop:8}}><button className="btn outline" onClick={() => deleteExpense(exp._id)}>Delete</button></div>
-              </div>
-            </div>
-          ))
-        )}
       </div>
 
       <div className="panel">
@@ -2326,7 +2301,34 @@ function UsersPage() {
   );
 }
 
-const emptyEmployee = { employeeId: '', name: '', phone: '', role: 'Staff', joiningDate: '', monthlySalary: '', monthlyAdvance: '', fuelAllowance: '', incentive: '', otherAllowance: '', active: true };
+const emptyEmployee = {
+  employeeId: '',
+  name: '',
+  phone: '',
+  role: 'Staff',
+  joiningDate: '',
+  monthlySalary: '',
+  fuelAllowance: '',
+  incentive: '',
+  otherAllowance: '',
+  personalDetails: {
+    address: '',
+    bankName: '',
+    accountNumber: '',
+    ifsc: '',
+    pan: '',
+    aadhaar: '',
+    emergencyContact: ''
+  },
+  salaryAdjustments: {
+    advance: '',
+    bonus: '',
+    incentive: '',
+    deduction: '',
+    note: ''
+  },
+  active: true
+};
 
 function EmployeesPage() {
   const [employees, setEmployees] = useState([]);
@@ -2336,6 +2338,7 @@ function EmployeesPage() {
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().slice(0, 10));
   const [attendance, setAttendance] = useState({ records: [], daysInMonth: 0 });
   const [attendanceForm, setAttendanceForm] = useState({ checkIn: '09:00', checkOut: '19:30', note: '' });
+  const [adjustmentForm, setAdjustmentForm] = useState({ advance: '', bonus: '', incentive: '', deduction: '', note: '' });
   const [payslip, setPayslip] = useState(null);
   const [message, setMessage] = useState('');
 
@@ -2346,33 +2349,115 @@ function EmployeesPage() {
 
   useEffect(() => { loadEmployees().catch(() => setMessage('Unable to load employees')); }, []);
   useEffect(() => { if (selectedId) { loadAttendance(); loadPayslip(); } }, [selectedId, month]);
+  useEffect(() => {
+    if (!selectedEmployee) return;
+    setAdjustmentForm({
+      advance: String(selectedEmployee.salaryAdjustments?.advance ?? ''),
+      bonus: String(selectedEmployee.salaryAdjustments?.bonus ?? ''),
+      incentive: String(selectedEmployee.salaryAdjustments?.incentive ?? ''),
+      deduction: String(selectedEmployee.salaryAdjustments?.deduction ?? ''),
+      note: selectedEmployee.salaryAdjustments?.note || ''
+    });
+  }, [selectedEmployee]);
 
   const saveEmployee = async (event) => {
     event.preventDefault();
     try {
-      const response = form._id ? await api.put(`/employees/${form._id}`, form) : await api.post('/employees', form);
+      const payload = {
+        ...form,
+        personalDetails: form.personalDetails || {},
+        salaryAdjustments: form.salaryAdjustments || {},
+        monthlySalary: Number(form.monthlySalary || 0),
+        fuelAllowance: Number(form.fuelAllowance || 0),
+        incentive: Number(form.incentive || 0),
+        otherAllowance: Number(form.otherAllowance || 0)
+      };
+      const response = form._id ? await api.put(`/employees/${form._id}`, payload) : await api.post('/employees', payload);
       setMessage(form._id ? 'Employee updated' : 'Employee added');
       setForm(emptyEmployee);
       await loadEmployees();
       setSelectedId(String(response.data._id));
     } catch (error) { setMessage(error.response?.data?.message || 'Unable to save employee'); }
   };
-  const editEmployee = (employee) => setForm({ ...emptyEmployee, ...employee, _id: employee._id });
+  const editEmployee = (employee) => setForm({
+    ...emptyEmployee,
+    ...employee,
+    _id: employee._id,
+    personalDetails: employee.personalDetails || emptyEmployee.personalDetails,
+    salaryAdjustments: employee.salaryAdjustments || emptyEmployee.salaryAdjustments
+  });
   const deleteEmployee = async (id) => { if (!window.confirm('Delete this employee and attendance history?')) return; await api.delete(`/employees/${id}`); setSelectedId(''); setPayslip(null); setMessage('Employee deleted'); await loadEmployees(); };
   const selectEmployee = (employee) => { setSelectedId(String(employee._id)); setForm(emptyEmployee); };
   const saveAttendance = async (event) => { event.preventDefault(); try { await api.post(`/employees/${selectedId}/attendance`, { date: attendanceDate, ...attendanceForm }); setMessage('Attendance saved'); await loadAttendance(); await loadPayslip(); } catch (error) { setMessage(error.response?.data?.message || 'Unable to save attendance'); } };
+  const saveSalaryAdjustment = async (event) => {
+    event.preventDefault();
+    try {
+      const nextEmployee = {
+        ...selectedEmployee,
+        salaryAdjustments: {
+          advance: Number(adjustmentForm.advance || 0),
+          bonus: Number(adjustmentForm.bonus || 0),
+          incentive: Number(adjustmentForm.incentive || 0),
+          deduction: Number(adjustmentForm.deduction || 0),
+          note: adjustmentForm.note || ''
+        }
+      };
+      await api.put(`/employees/${selectedId}`, nextEmployee);
+      setMessage('Salary adjustment saved');
+      await loadEmployees();
+      await loadPayslip();
+    } catch (error) { setMessage(error.response?.data?.message || 'Unable to save salary adjustment'); }
+  };
   const attendanceForDate = attendance.records.find((record) => record.date === attendanceDate);
   const printPayslip = () => { if (!payslip) return; window.print(); };
+  const downloadPayslipPdf = () => {
+    if (!payslip) return;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const margin = 16;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text('Salary Slip', margin, y);
+    y += 8;
+
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`${payslip.employee.name} • ${payslip.employee.employeeId} • ${payslip.employee.role}`, margin, y);
+    y += 6;
+    doc.text(`Month: ${payslip.month}`, margin, y);
+    y += 12;
+
+    const rows = [
+      ['Present', String(payslip.present)],
+      ['Half day', String(payslip.halfday)],
+      ['Absent', String(payslip.absent)],
+      ['Earned salary', `₹${Math.round(payslip.earnedSalary).toLocaleString()}`],
+      ['Allowances', `₹${Math.round(payslip.allowances).toLocaleString()}`],
+      ['Bonus / incentive', `₹${Math.round((payslip.bonus || 0) + (payslip.incentive || 0)).toLocaleString()}`],
+      ['Advance / deduction', `-₹${Math.round((payslip.advance || 0) + (payslip.deduction || 0)).toLocaleString()}`],
+      ['Net payable', `₹${Math.round(payslip.netPay).toLocaleString()}`]
+    ];
+
+    rows.forEach(([label, value]) => {
+      doc.text(label, margin, y);
+      doc.text(String(value), pageWidth - margin - 10, y, { align: 'right' });
+      y += 7;
+    });
+
+    doc.save(`${payslip.employee.name.replace(/\s+/g, '-').toLowerCase()}-${payslip.month}-payslip.pdf`);
+  };
 
   return <div className="employees-page">
     <div className="page-header"><p className="eyebrow">People operations</p><h3>Employees & payroll</h3><p className="muted">Manage pay, daily attendance, advances, allowances, and monthly payslips in one place.</p></div>
     {message && <p className="status-message">{message}</p>}
     <div className="employee-layout">
       <section className="panel employee-directory"><div className="panel-header"><div><h4>Employee directory</h4><p className="muted">{employees.length} team member{employees.length === 1 ? '' : 's'}</p></div><button className="btn primary" type="button" onClick={() => setForm(emptyEmployee)}>Add employee</button></div>{employees.map((employee) => <button className={`employee-list-item ${selectedId === String(employee._id) ? 'selected' : ''}`} key={employee._id} type="button" onClick={() => selectEmployee(employee)}><span className="employee-avatar">{employee.name.slice(0, 2).toUpperCase()}</span><span><strong>{employee.name}</strong><small>{employee.employeeId} • {employee.role}</small></span><b>₹{Number(employee.monthlySalary || 0).toLocaleString()}</b></button>)}{!employees.length && <p className="empty-state muted">Add your first employee to start payroll.</p>}</section>
-      <form className="panel employee-form" onSubmit={saveEmployee}><div className="panel-header"><div><h4>{form._id ? 'Edit employee' : 'Add employee'}</h4><p className="muted">Fixed monthly pay and deductions</p></div>{form._id && <button className="btn outline" type="button" onClick={() => setForm(emptyEmployee)}>Cancel</button>}</div><div className="form-grid"><label>Employee ID<input required value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} /></label><label>Full name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>Role<input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} /></label><label>Phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label><label>Joining date<input type="date" value={form.joiningDate} onChange={(e) => setForm({ ...form, joiningDate: e.target.value })} /></label><label>Monthly salary<input required type="number" min="0" value={form.monthlySalary} onChange={(e) => setForm({ ...form, monthlySalary: e.target.value })} /></label><label>Monthly advance<input type="number" min="0" value={form.monthlyAdvance} onChange={(e) => setForm({ ...form, monthlyAdvance: e.target.value })} /></label><label>Fuel allowance<input type="number" min="0" value={form.fuelAllowance} onChange={(e) => setForm({ ...form, fuelAllowance: e.target.value })} /></label><label>Incentive<input type="number" min="0" value={form.incentive} onChange={(e) => setForm({ ...form, incentive: e.target.value })} /></label><label>Other allowance<input type="number" min="0" value={form.otherAllowance} onChange={(e) => setForm({ ...form, otherAllowance: e.target.value })} /></label></div><div className="inline-actions"><button className="btn primary" type="submit">{form._id ? 'Save employee' : 'Add employee'}</button>{form._id && <button className="btn secondary" type="button" onClick={() => deleteEmployee(form._id)}>Delete employee</button>}</div></form>
+      <form className="panel employee-form" onSubmit={saveEmployee}><div className="panel-header"><div><h4>{form._id ? 'Edit employee' : 'Add employee'}</h4><p className="muted">Fixed monthly pay and deductions</p></div>{form._id && <button className="btn outline" type="button" onClick={() => setForm(emptyEmployee)}>Cancel</button>}</div><div className="form-grid"><label>Employee ID<input required value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} /></label><label>Full name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>Role<input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} /></label><label>Phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label><label>Joining date<input type="date" value={form.joiningDate} onChange={(e) => setForm({ ...form, joiningDate: e.target.value })} /></label><label>Monthly salary<input required type="number" min="0" value={form.monthlySalary} onChange={(e) => setForm({ ...form, monthlySalary: e.target.value })} /></label><label>Fuel allowance<input type="number" min="0" value={form.fuelAllowance} onChange={(e) => setForm({ ...form, fuelAllowance: e.target.value })} /></label><label>Incentive<input type="number" min="0" value={form.incentive} onChange={(e) => setForm({ ...form, incentive: e.target.value })} /></label><label>Other allowance<input type="number" min="0" value={form.otherAllowance} onChange={(e) => setForm({ ...form, otherAllowance: e.target.value })} /></label><label>Address<textarea value={form.personalDetails.address} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, address: e.target.value } })} /></label><label>Bank name<input value={form.personalDetails.bankName} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, bankName: e.target.value } })} /></label><label>Account number<input value={form.personalDetails.accountNumber} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, accountNumber: e.target.value } })} /></label><label>IFSC<input value={form.personalDetails.ifsc} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, ifsc: e.target.value } })} /></label><label>PAN<input value={form.personalDetails.pan} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, pan: e.target.value } })} /></label><label>Aadhaar<input value={form.personalDetails.aadhaar} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, aadhaar: e.target.value } })} /></label><label>Emergency contact<input value={form.personalDetails.emergencyContact} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, emergencyContact: e.target.value } })} /></label></div><div className="inline-actions"><button className="btn primary" type="submit">{form._id ? 'Save employee' : 'Add employee'}</button>{form._id && <button className="btn secondary" type="button" onClick={() => deleteEmployee(form._id)}>Delete employee</button>}</div></form>
     </div>
     {selectedEmployee && <section className="panel attendance-panel"><div className="panel-header"><div><p className="eyebrow">Daily time clock</p><h4>Attendance for {selectedEmployee.name}</h4></div><label className="month-picker">Payroll month<input type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></label></div><p className="muted">Check-in is expected by 9:30 AM. Checkout from 7:30 PM is a full day; earlier checkout is half-day.</p><form className="attendance-form" onSubmit={saveAttendance}><label>Date<input type="date" value={attendanceDate} onChange={(e) => { setAttendanceDate(e.target.value); const record = attendance.records.find((item) => item.date === e.target.value); setAttendanceForm({ checkIn: record?.checkIn || '', checkOut: record?.checkOut || '', note: record?.note || '' }); }} /></label><label>Check in<input type="time" value={attendanceForm.checkIn} onChange={(e) => setAttendanceForm({ ...attendanceForm, checkIn: e.target.value })} /></label><label>Check out<input type="time" value={attendanceForm.checkOut} onChange={(e) => setAttendanceForm({ ...attendanceForm, checkOut: e.target.value })} /></label><label>Note<input value={attendanceForm.note} onChange={(e) => setAttendanceForm({ ...attendanceForm, note: e.target.value })} placeholder="Optional note" /></label><button className="btn primary" type="submit">Save day</button></form>{attendanceForDate && <p className={`attendance-status ${attendanceForDate.status}`}>{attendanceForDate.status} for {attendanceForDate.date}</p>}</section>}
-    {payslip && <section className="panel payslip-panel"><div className="panel-header"><div><p className="eyebrow">Monthly salary slip</p><h4>{payslip.employee.name} • {payslip.month}</h4><p className="muted">{payslip.employee.employeeId} • {payslip.employee.role}</p></div><button className="btn secondary" type="button" onClick={printPayslip}>Print payslip</button></div><div className="payroll-metrics"><div><span>Present</span><strong>{payslip.present}</strong></div><div><span>Half-days</span><strong>{payslip.halfday}</strong></div><div><span>Absent</span><strong>{payslip.absent}</strong></div><div className="payable"><span>Net payable</span><strong>₹{Math.round(payslip.netPay).toLocaleString()}</strong></div></div><div className="payslip-lines"><div><span>Earned salary</span><strong>₹{Math.round(payslip.earnedSalary).toLocaleString()}</strong></div><div><span>Fuel + incentives + other</span><strong>₹{Math.round(payslip.allowances).toLocaleString()}</strong></div><div><span>Advance deduction</span><strong>- ₹{Math.round(payslip.advance).toLocaleString()}</strong></div></div></section>}
+    {payslip && <section className="panel payslip-panel"><div className="panel-header"><div><p className="eyebrow">Monthly salary slip</p><h4>{payslip.employee.name} • {payslip.month}</h4><p className="muted">{payslip.employee.employeeId} • {payslip.employee.role}</p></div><div className="inline-actions"><button className="btn secondary" type="button" onClick={downloadPayslipPdf}>Download PDF</button><button className="btn secondary" type="button" onClick={printPayslip}>Print</button></div></div><div className="payroll-metrics"><div><span>Present</span><strong>{payslip.present}</strong></div><div><span>Half-days</span><strong>{payslip.halfday}</strong></div><div><span>Absent</span><strong>{payslip.absent}</strong></div><div className="payable"><span>Net payable</span><strong>₹{Math.round(payslip.netPay).toLocaleString()}</strong></div></div><div className="payslip-lines"><div><span>Earned salary</span><strong>₹{Math.round(payslip.earnedSalary).toLocaleString()}</strong></div><div><span>Allowances</span><strong>₹{Math.round(payslip.allowances).toLocaleString()}</strong></div><div><span>Bonus / incentive</span><strong>₹{Math.round((payslip.bonus || 0) + (payslip.incentive || 0)).toLocaleString()}</strong></div><div><span>Advance / deduction</span><strong>- ₹{Math.round((payslip.advance || 0) + (payslip.deduction || 0)).toLocaleString()}</strong></div><div><span>Notes</span><strong>{payslip.adjustmentNote || 'No manual adjustment recorded'}</strong></div></div><form className="form-grid" onSubmit={saveSalaryAdjustment}><h4>Manual adjustment</h4><input type="number" min="0" placeholder="Advance" value={adjustmentForm.advance} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, advance: e.target.value })} /><input type="number" min="0" placeholder="Bonus" value={adjustmentForm.bonus} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, bonus: e.target.value })} /><input type="number" min="0" placeholder="Incentive" value={adjustmentForm.incentive} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, incentive: e.target.value })} /><input type="number" min="0" placeholder="Deduction" value={adjustmentForm.deduction} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, deduction: e.target.value })} /><input placeholder="Adjustment note" value={adjustmentForm.note} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, note: e.target.value })} /><button className="btn primary" type="submit">Apply adjustment</button></form></section>}
   </div>;
 }
 
