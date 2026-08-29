@@ -230,6 +230,10 @@ function PublicApp({ setUser }) {
       <div className="hero-card">
         <div className="hero-glow glow-one" />
         <div className="hero-glow glow-two" />
+        <div className="hero-logo-wrap">
+          <div className="hero-logo">SG</div>
+          <span>SGSE</span>
+        </div>
         <div className="hero-badges">
           <span className="feature-pill">GST-ready</span>
           <span className="feature-pill soft">Inventory synced</span>
@@ -237,7 +241,12 @@ function PublicApp({ setUser }) {
         <div>
           <p className="eyebrow">Modern billing & stock management</p>
           <h1>SGSE Billing Suite</h1>
-          <p>Create invoices, manage stock, handle purchases, returns, payments, and reports from one polished workspace.</p>
+          <p>Run your sales, stock, purchases, and GST workflows from one premium business dashboard.</p>
+          <ul className="feature-list">
+            <li>Fast invoice generation</li>
+            <li>Smart stock tracking</li>
+            <li>Professional GST billing</li>
+          </ul>
           <div className="hero-actions">
             <Link className="btn primary" to="/login">Login</Link>
             <Link className="btn secondary" to="/register">Create account</Link>
@@ -367,11 +376,21 @@ function Login({ setUser }) {
           <h3>Welcome back</h3>
         </div>
       </div>
+      <p className="auth-subtitle">Manage business billing, inventory, and payroll from a single dashboard.</p>
       {error && <p className="error">{error}</p>}
-      <input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-      <input type="password" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-      <button className="btn primary" type="submit">Sign in</button>
-      <p className="auth-switch-copy">Need an account? <Link to="/register">Create one</Link></p>
+      <label className="auth-field-label">
+        <span>Email address</span>
+        <input placeholder="you@company.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      </label>
+      <label className="auth-field-label">
+        <span>Password</span>
+        <input type="password" placeholder="Enter your password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      </label>
+      <div className="auth-extra-row">
+        <label className="checkbox-row"><input type="checkbox" defaultChecked /> Keep me signed in</label>
+        <Link to="/register">Create account</Link>
+      </div>
+      <button className="btn primary auth-submit" type="submit">Sign in</button>
     </form>
   );
 }
@@ -409,12 +428,25 @@ function Register({ setUser }) {
           <h3>Create an account</h3>
         </div>
       </div>
+      <p className="auth-subtitle">Set up your business workspace and start managing sales instantly.</p>
       {error && <p className="error">{error}</p>}
-      <input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-      <input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-      <input type="password" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-      <button className="btn primary" type="submit">Register</button>
-      <p className="auth-switch-copy">Already have an account? <Link to="/login">Sign in</Link></p>
+      <label className="auth-field-label">
+        <span>Full name</span>
+        <input placeholder="Your full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      </label>
+      <label className="auth-field-label">
+        <span>Email address</span>
+        <input placeholder="you@company.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      </label>
+      <label className="auth-field-label">
+        <span>Password</span>
+        <input type="password" placeholder="Create a secure password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      </label>
+      <div className="auth-extra-row">
+        <label className="checkbox-row"><input type="checkbox" defaultChecked /> I agree to the terms</label>
+        <Link to="/login">Sign in</Link>
+      </div>
+      <button className="btn primary auth-submit" type="submit">Register</button>
     </form>
   );
 }

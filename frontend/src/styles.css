@@ -50,10 +50,17 @@ button { appearance: none; }
   overflow: hidden;
   padding: 34px;
   border-radius: 30px;
-  background: linear-gradient(135deg, rgba(10, 27, 44, 0.95), rgba(18, 75, 126, 0.92));
+  background: linear-gradient(135deg, rgba(9, 24, 38, 0.98), rgba(14, 66, 110, 0.96));
   color: #eff8ff;
   animation: fadeUp 0.7s ease;
-  box-shadow: 0 25px 60px rgba(15, 38, 63, 0.2);
+  box-shadow: 0 30px 70px rgba(9, 31, 53, 0.24);
+}
+.hero-logo-wrap {
+  display: inline-flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 10px 16px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+}
+.hero-logo-wrap span { font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #edfafe; }
+.hero-logo {
+  width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-weight: 900; color: #0a2344; background: linear-gradient(135deg, #dfeeff, #9bd0ff); box-shadow: 0 14px 26px rgba(134, 194, 255, 0.28);
 }
 .hero-card h1 { font-size: clamp(2.5rem, 3vw, 3.6rem); margin: 0 0 10px; color: #ffffff; }
 .hero-card p { color: rgba(233, 244, 255, 0.82); max-width: 560px; }
@@ -65,6 +72,9 @@ button { appearance: none; }
   display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #dff3ff; font-weight: 700; border: 1px solid rgba(255,255,255,0.1);
 }
 .feature-pill.soft { background: rgba(122, 214, 165, 0.12); color: #dbffe7; border-color: rgba(122, 214, 165, 0.18); }
+.feature-list { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 10px; color: rgba(234, 246, 255, 0.84); }
+.feature-list li { position: relative; padding-left: 20px; }
+.feature-list li::before { content: '•'; position: absolute; left: 0; color: #87d3ff; font-size: 1.2rem; line-height: 1; }
 .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
 .hero-stats div { padding: 16px 14px; border-radius: 16px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); }
 .hero-stats strong { display: block; color: #ffffff; font-size: clamp(1.1rem, 2vw, 1.6rem); }
@@ -87,10 +97,11 @@ button { appearance: none; }
 
 .form-card { padding: 24px; border-radius: 24px; display: grid; gap: 12px; box-shadow: 0 4px 12px rgba(31, 58, 85, 0.08); }
 .auth-form-card {
-  position: relative; z-index: 1; background: rgba(255,255,255,0.95);
+  position: relative; z-index: 1; background: rgba(255,255,255,0.96);
   border: 1px solid rgba(24,111,175,0.12);
   box-shadow: 0 24px 50px rgba(18, 50, 83, 0.12);
   animation: fadeUp 0.65s cubic-bezier(0.2, 0.8, 0.2, 1);
+  padding: 28px 26px;
 }
 .form-card h3 { margin: 0 0 8px 0; font-size: 1.5rem; color: #123f63; }
 .auth-form-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
@@ -98,6 +109,16 @@ button { appearance: none; }
   width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center; font-weight: 800; color: #0b2340; background: linear-gradient(135deg, #dfeeff, #a1d9ff);
   box-shadow: 0 12px 26px rgba(63, 154, 232, 0.2);
 }
+.auth-subtitle {
+  margin: 0 0 6px; color: var(--text-muted); font-size: 0.92rem; line-height: 1.5;
+}
+.auth-field-label { display: grid; gap: 8px; font-size: 0.82rem; font-weight: 700; color: #25557f; }
+.auth-field-label span { padding-left: 4px; }
+.auth-extra-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; margin-bottom: 8px; font-size: 0.82rem; color: var(--text-muted); }
+.auth-extra-row a { color: #0f5e9d; font-weight: 700; }
+.checkbox-row { display: inline-flex; align-items: center; gap: 8px; }
+.checkbox-row input { width: 16px; height: 16px; margin: 0; accent-color: #1b72be; }
+.auth-submit { width: 100%; margin-top: 8px; }
 .auth-switch-copy { margin: 4px 0 0; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
 .auth-switch-copy a { color: #0f5e9d; font-weight: 700; }
 input, select, textarea { border-radius: 14px; border: 1px solid var(--input-border); padding: 14px 16px; background: var(--input-bg); color: #1B2A3B; transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease; }
