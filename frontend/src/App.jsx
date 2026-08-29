@@ -882,14 +882,29 @@ function Dashboard({ user }) {
       </div>
 
       <div className="dashboard-panels-grid">
-        <div className="panel quick-panel">
-          <h4>Low stock alert</h4>
+        <div className="panel quick-panel low-stock-panel">
+          <div className="panel-header compact-header">
+            <h4>Low stock alert</h4>
+            <span className="stock-alert-badge">{lowStockItems.length}</span>
+          </div>
           {lowStockItems.length === 0 ? (
             <p className="muted">No urgent stock issues.</p>
           ) : (
             <ul className="alert-list">
               {lowStockItems.map((item) => (
-                <li key={item._id}><span>{item.name}</span><strong>{item.stock} left</strong></li>
+                <li key={item._id}>
+                  <div className="alert-item-name">
+                    <span className="alert-dot" aria-hidden="true" />
+                    <div>
+                      <strong>{item.name}</strong>
+                      <small>{item.itemType || 'General'} • {item.category || 'General'}</small>
+                    </div>
+                  </div>
+                  <div className="alert-item-stock">
+                    <strong>{item.stock}</strong>
+                    <span>left</span>
+                  </div>
+                </li>
               ))}
             </ul>
           )}
@@ -1353,11 +1368,10 @@ function BillingPage({ user }) {
   const [items, setItems] = useState([]);
   const [setups, setSetups] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
-  const [setupItems, setSetupItems] = useState([]);
   const [setupName, setSetupName] = useState('');
   const [setupDescription, setSetupDescription] = useState('');
-  const [setupItemId, setSetupItemId] = useState('');
-  const [setupItemQuantity, setSetupItemQuantity] = useState('1');
+  const [setupPrice, setSetupPrice] = useState('');
+  const [setupGstRate, setSetupGstRate] = useState('18');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [partyName, setPartyName] = useState('');
@@ -1447,39 +1461,30 @@ function BillingPage({ user }) {
     })));
   };
 
-  const addSetupItem = () => {
-    const item = items.find((entry) => entry._id === setupItemId);
-    if (!item) return;
-    setSetupItems((previous) => [...previous.filter((entry) => entry.item !== item._id), {
-      item: item._id,
-      name: item.name,
-      quantity: Math.max(1, Number(setupItemQuantity || 1)),
-      price: Number(item.salePrice || 0),
-      sgstRate: Number(item.sgstRate || 0),
-      cgstRate: Number(item.cgstRate || 0),
-      igstRate: Number(item.igstRate || 0)
-    }]);
-    setSetupItemId('');
-    setSetupItemQuantity('1');
-  };
-
   const saveSetup = async () => {
     if (!setupName.trim()) return setBillingMessage('Add a name to save a setup');
+    const finalPrice = Number(setupPrice || 0);
+    const gstRate = Number(setupGstRate || 0);
+
+    if (!finalPrice || finalPrice <= 0) {
+      setBillingMessage('Enter a final setup price including GST');
+      return;
+    }
+
     try {
-      const finalPrice = Number(setupItems.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0).toFixed(2));
-      const gstRate = setupItems.length ? Number((setupItems.reduce((sum, item) => sum + (Number(item.gstRate || getEffectiveGstRate(item)) * Number(item.price || 0) * Number(item.quantity || 1)), 0) / finalPrice * 100 || 0).toFixed(2)) : 0;
       const response = await api.post('/setups', {
         name: setupName,
         description: setupDescription,
         finalPrice,
         gstRate,
-        items: setupItems
+        items: []
       });
       setSetups((previous) => [...previous, response.data].sort((a, b) => a.name.localeCompare(b.name)));
       setSetupName('');
       setSetupDescription('');
-      setSetupItems([]);
-      setBillingMessage('Setup saved and ready for billing');
+      setSetupPrice('');
+      setSetupGstRate('18');
+      setBillingMessage('Setup saved as a single final-value package');
     } catch (error) {
       setBillingMessage(error.response?.data?.message || 'Unable to save setup');
     }
@@ -1577,7 +1582,7 @@ function BillingPage({ user }) {
           </div>
 
           <div className="setup-tools">
-            <div className="panel-header"><div><h4>Reusable setups</h4><p className="muted">Save a standard installation package once, then load it into a bill.</p></div></div>
+            <div className="panel-header"><div><h4>Reusable setups</h4><p className="muted">One final package amount, including GST, for the entire setup.</p></div></div>
             <div className="form-grid">
               <select value="" onChange={(e) => selectSetup(e.target.value)}>
                 <option value="">Select saved setup</option>
@@ -1585,15 +1590,15 @@ function BillingPage({ user }) {
               </select>
               <input placeholder="Setup name" value={setupName} onChange={(e) => setSetupName(e.target.value)} />
               <input placeholder="Description (optional)" value={setupDescription} onChange={(e) => setSetupDescription(e.target.value)} />
-              <select value={setupItemId} onChange={(e) => setSetupItemId(e.target.value)}>
-                <option value="">Add item to setup</option>
-                {items.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
-              </select>
-              <input type="number" min="1" placeholder="Qty" value={setupItemQuantity} onChange={(e) => setSetupItemQuantity(e.target.value)} />
-              <button className="btn secondary" type="button" onClick={addSetupItem}>Add setup item</button>
-              <button className="btn primary" type="button" onClick={saveSetup}>Save setup</button>
+              <input type="number" min="0" step="0.01" placeholder="Final setup price incl. GST" value={setupPrice} onChange={(e) => setSetupPrice(e.target.value)} />
+              <input type="number" min="0" step="0.01" placeholder="GST %" value={setupGstRate} onChange={(e) => setSetupGstRate(e.target.value)} />
+              <button className="btn primary" type="button" onClick={saveSetup}>Save final-value setup</button>
             </div>
-            {setupItems.length > 0 && <p className="muted">Template: {setupItems.map((entry) => `${entry.name} × ${entry.quantity}`).join(', ')}</p>}
+            {Number(setupPrice || 0) > 0 && (
+              <p className="muted setup-price-preview">
+                Final ₹{Number(setupPrice || 0).toFixed(2)} • Base ₹{calculateTaxableValue(Number(setupPrice || 0), Number(setupGstRate || 0)).toFixed(2)} • GST ₹{(Number(setupPrice || 0) - calculateTaxableValue(Number(setupPrice || 0), Number(setupGstRate || 0))).toFixed(2)}
+              </p>
+            )}
           </div>
 
           <div className="billing-customer-grid">
