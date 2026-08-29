@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Routes, Route, Navigate, Link, NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import { downloadInvoicePdf } from './utils/invoicePdf';
+import { calculateTaxableValue, getEffectiveGstRate } from './utils/gstMath';
 
 const API = API_BASE_URL;
 
@@ -81,6 +82,7 @@ const getStageClass = (status) => {
 };
 
 const normalizeContactValue = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+const formatMoney = (value) => Number.isFinite(Number(value)) ? Number(value).toFixed(2) : '0.00';
 
 function App() {
   const [user, setUser] = useState(() => {
@@ -349,6 +351,8 @@ function ContactsPage() {
   const [visibleContacts, setVisibleContacts] = useState(20);
   const [expandedContactId, setExpandedContactId] = useState(null);
 
+  const quickCallerNames = useMemo(() => ['Owner', 'Sales Team', 'Support Team', 'Field Agent'], []);
+
   const loadContacts = async () => {
     setLoading(true);
     try {
@@ -417,66 +421,82 @@ function ContactsPage() {
 
   const cancelCall = () => setCallForm({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' });
 
-  const counts = {
-    all: contacts.length,
-    not_yet_called: contacts.filter(c => c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0).length,
-    hot: contacts.filter(c => c.status === 'Hot Lead').length,
-    warm: contacts.filter(c => c.status === 'Warm Lead').length,
-    cool: contacts.filter(c => c.status === 'Cool Lead').length,
-    notinterested: contacts.filter(c => c.status === 'Not Interested').length,
-    no_response: contacts.filter(c => c.status === 'No Response' || !c.callHistory || c.callHistory.length === 0).length,
-    may_convert: contacts.filter(c => c.status === 'May Convert').length,
-    following_up: contacts.filter(c => c.status === 'Following Up').length
-  };
+  const derived = useMemo(() => {
+    const counts = {
+      all: contacts.length,
+      not_yet_called: contacts.filter(c => c.status === 'Not Yet Called' || !c.callHistory || c.callHistory.length === 0).length,
+      hot: contacts.filter(c => c.status === 'Hot Lead').length,
+      warm: contacts.filter(c => c.status === 'Warm Lead').length,
+      cool: contacts.filter(c => c.status === 'Cool Lead').length,
+      notinterested: contacts.filter(c => c.status === 'Not Interested').length,
+      no_response: contacts.filter(c => c.status === 'No Response' || !c.callHistory || c.callHistory.length === 0).length,
+      may_convert: contacts.filter(c => c.status === 'May Convert').length,
+      following_up: contacts.filter(c => c.status === 'Following Up').length
+    };
 
-  const duplicateConsumerNumbers = new Set(contacts.map((contact) => normalizeContactValue(contact.consumerNumber)).filter(Boolean).filter((number, index, values) => values.indexOf(number) !== index));
-  const duplicateContacts = contacts.filter((contact) => duplicateConsumerNumbers.has(normalizeContactValue(contact.consumerNumber)));
-  const similarContacts = contacts.filter((contact, index, list) => {
-    const name = normalizeContactValue(contact.name);
-    const mobile = normalizeContactValue(contact.contactNumber);
-    return list.some((other, otherIndex) => otherIndex !== index && ((name && name === normalizeContactValue(other.name)) || (mobile && mobile === normalizeContactValue(other.contactNumber))));
-  });
+    const duplicateConsumerNumbers = new Set(
+      contacts
+        .map((contact) => normalizeContactValue(contact.consumerNumber))
+        .filter(Boolean)
+        .filter((number, index, values) => values.indexOf(number) !== index)
+    );
+    const duplicateContacts = contacts.filter((contact) => duplicateConsumerNumbers.has(normalizeContactValue(contact.consumerNumber)));
+    const similarContacts = contacts.filter((contact, index, list) => {
+      const name = normalizeContactValue(contact.name);
+      const mobile = normalizeContactValue(contact.contactNumber);
+      return list.some((other, otherIndex) => otherIndex !== index && ((name && name === normalizeContactValue(other.name)) || (mobile && mobile === normalizeContactValue(other.contactNumber))));
+    });
 
-  const filtered = contacts.filter(c => {
-    if (searchTerm) {
-      const s = searchTerm.toLowerCase();
-      const callerName = (c.callerName || '').toLowerCase();
-      const customerName = (c.name || '').toLowerCase();
-      const contactNumber = (c.contactNumber || '').toLowerCase();
-      const consumerNumber = (c.consumerNumber || '').toLowerCase();
-      if (!callerName.includes(s) && !customerName.includes(s) && !contactNumber.includes(s) && !consumerNumber.includes(s)) return false;
-    }
-    if (statusTab === 'duplicates' && !duplicateContacts.includes(c)) return false;
-    if (statusTab === 'similars' && !similarContacts.includes(c)) return false;
-    if (statusTab === 'not_yet_called' && c.status !== 'Not Yet Called' && c.callHistory && c.callHistory.length) return false;
-    if (statusTab === 'hot' && c.status !== 'Hot Lead') return false;
-    if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
-    if (statusTab === 'cool' && c.status !== 'Cool Lead') return false;
-    if (statusTab === 'notinterested' && c.status !== 'Not Interested') return false;
-    if (statusTab === 'no_response' && c.status !== 'No Response' && c.callHistory && c.callHistory.length) return false;
-    if (statusTab === 'may_convert' && c.status !== 'May Convert') return false;
-    if (statusTab === 'following_up' && c.status !== 'Following Up') return false;
-    if (selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
-    return true;
-  });
+    const filtered = contacts.filter((c) => {
+      if (searchTerm) {
+        const s = searchTerm.toLowerCase();
+        const callerName = (c.callerName || '').toLowerCase();
+        const customerName = (c.name || '').toLowerCase();
+        const contactNumber = (c.contactNumber || '').toLowerCase();
+        const consumerNumber = (c.consumerNumber || '').toLowerCase();
+        if (!callerName.includes(s) && !customerName.includes(s) && !contactNumber.includes(s) && !consumerNumber.includes(s)) return false;
+      }
+      if (statusTab === 'duplicates' && !duplicateContacts.includes(c)) return false;
+      if (statusTab === 'similars' && !similarContacts.includes(c)) return false;
+      if (statusTab === 'not_yet_called' && c.status !== 'Not Yet Called' && c.callHistory && c.callHistory.length) return false;
+      if (statusTab === 'hot' && c.status !== 'Hot Lead') return false;
+      if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
+      if (statusTab === 'cool' && c.status !== 'Cool Lead') return false;
+      if (statusTab === 'notinterested' && c.status !== 'Not Interested') return false;
+      if (statusTab === 'no_response' && c.status !== 'No Response' && c.callHistory && c.callHistory.length) return false;
+      if (statusTab === 'may_convert' && c.status !== 'May Convert') return false;
+      if (statusTab === 'following_up' && c.status !== 'Following Up') return false;
+      if (selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
+      return true;
+    });
 
-  const tabContacts = statusTab === 'all' ? contacts : contacts.filter((contact) => {
-    if (statusTab === 'not_yet_called') return contact.status === 'Not Yet Called' || !contact.callHistory || contact.callHistory.length === 0;
-    if (statusTab === 'no_response') return contact.status === 'No Response' || !contact.callHistory || contact.callHistory.length === 0;
-    if (statusTab === 'duplicates') return duplicateContacts.includes(contact);
-    if (statusTab === 'similars') return similarContacts.includes(contact);
-    const status = { hot: 'Hot Lead', warm: 'Warm Lead', cool: 'Cool Lead', notinterested: 'Not Interested' }[statusTab];
-    if (statusTab === 'may_convert') return contact.status === 'May Convert';
-    if (statusTab === 'following_up') return contact.status === 'Following Up';
-    return !status || contact.status === status;
-  });
-  const callerList = [...new Set(tabContacts.map(c => (c.callerName || 'Not assigned').trim() || 'Not assigned'))].sort();
-  
+    const tabContacts = statusTab === 'all' ? contacts : contacts.filter((contact) => {
+      if (statusTab === 'not_yet_called') return contact.status === 'Not Yet Called' || !contact.callHistory || contact.callHistory.length === 0;
+      if (statusTab === 'no_response') return contact.status === 'No Response' || !contact.callHistory || contact.callHistory.length === 0;
+      if (statusTab === 'duplicates') return duplicateContacts.includes(contact);
+      if (statusTab === 'similars') return similarContacts.includes(contact);
+      const status = { hot: 'Hot Lead', warm: 'Warm Lead', cool: 'Cool Lead', notinterested: 'Not Interested' }[statusTab];
+      if (statusTab === 'may_convert') return contact.status === 'May Convert';
+      if (statusTab === 'following_up') return contact.status === 'Following Up';
+      return !status || contact.status === status;
+    });
+
+    const callerList = [...new Set(tabContacts.map(c => (c.callerName || 'Not assigned').trim() || 'Not assigned'))].sort();
+
+    return { counts, duplicateContacts, similarContacts, filtered, tabContacts, callerList };
+  }, [contacts, searchTerm, statusTab, selectedCaller]);
+
   const handleStatusTabChange = (tab) => {
     setStatusTab(tab);
     setSelectedCaller(null);
     setVisibleContacts(20);
   };
+
+  const assignQuickCaller = (name) => {
+    setForm((current) => ({ ...current, callerName: name }));
+  };
+
+  const { counts, duplicateContacts, similarContacts, filtered, tabContacts, callerList } = derived;
 
   return (
     <div className="contacts-page">
@@ -506,12 +526,17 @@ function ContactsPage() {
       <div className="panel">
         <h4>{editingId ? 'Edit contact' : 'Add contact'}</h4>
         <form className="form-grid" onSubmit={save}>
-          <label>Caller name<input value={form.callerName} onChange={(e)=>setForm({...form, callerName:e.target.value})} /></label>
-          <label>Customer name<input value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} /></label>
-          <label>Contact number<input value={form.contactNumber} onChange={(e)=>setForm({...form, contactNumber:e.target.value})} /></label>
-          <label>Consumer number<input value={form.consumerNumber} onChange={(e)=>setForm({...form, consumerNumber:e.target.value})} /></label>
-          <label>Lead stage<select value={form.status} onChange={(e)=>setForm({...form, status:e.target.value})}>{LEAD_STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}</select></label>
-          <label>Contacted now?<select value={form.markContacted ? 'contacted' : 'not_contacted'} onChange={(e)=>setForm({...form, markContacted: e.target.value==='contacted'})}><option value="contacted">Contacted</option><option value="not_contacted">Not contacted</option></select></label>
+          <label>Caller name<input value={form.callerName} onChange={(e) => setForm((current) => ({ ...current, callerName: e.target.value }))} /></label>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {quickCallerNames.map((name) => (
+              <button key={name} className="btn outline" type="button" onClick={() => assignQuickCaller(name)}>{name}</button>
+            ))}
+          </div>
+          <label>Customer name<input value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} /></label>
+          <label>Contact number<input value={form.contactNumber} onChange={(e) => setForm((current) => ({ ...current, contactNumber: e.target.value }))} /></label>
+          <label>Consumer number<input value={form.consumerNumber} onChange={(e) => setForm((current) => ({ ...current, consumerNumber: e.target.value }))} /></label>
+          <label>Lead stage<select value={form.status} onChange={(e) => setForm((current) => ({ ...current, status: e.target.value }))}>{LEAD_STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}</select></label>
+          <label>Contacted now?<select value={form.markContacted ? 'contacted' : 'not_contacted'} onChange={(e) => setForm((current) => ({ ...current, markContacted: e.target.value === 'contacted' }))}><option value="contacted">Contacted</option><option value="not_contacted">Not contacted</option></select></label>
           <div style={{gridColumn:'1/-1', display:'flex', gap:8}}>
             <button className="btn primary" type="submit">{editingId ? 'Update' : 'Add'}</button>
             <button className="btn secondary" type="button" onClick={reset}>Clear</button>
@@ -542,7 +567,7 @@ function ContactsPage() {
             {callerList.map((caller) => {
               const callerCount = tabContacts.filter(c => (c.callerName || 'Not assigned').trim() === caller).length;
               return (
-                <button 
+                <button
                   key={caller}
                   className={selectedCaller === caller ? 'btn primary' : 'btn outline'}
                   onClick={() => setSelectedCaller(caller)}
@@ -1190,7 +1215,16 @@ function SetupLibraryPage() {
   const addItem = () => {
     const item = items.find((entry) => entry._id === form.itemId);
     if (!item) return;
-    setSelectedItems((current) => [...current.filter((entry) => entry.item !== item._id), { item: item._id, name: item.name, quantity: Math.max(1, Number(form.quantity || 1)), price: Number(form.price || item.salePrice || 0) }]);
+    const finalPrice = Number(form.price || item.salePrice || 0);
+    setSelectedItems((current) => [...current.filter((entry) => entry.item !== item._id), {
+      item: item._id,
+      name: item.name,
+      quantity: Math.max(1, Number(form.quantity || 1)),
+      price: finalPrice,
+      sgstRate: Number(item.sgstRate || 0),
+      cgstRate: Number(item.cgstRate || 0),
+      igstRate: Number(item.igstRate || 0)
+    }]);
     setForm({ ...form, itemId: '', quantity: '1', price: '' });
   };
   const save = async (event) => {
@@ -1207,8 +1241,8 @@ function SetupLibraryPage() {
 
   return <div className="setup-library-page">
     <div className="page-header"><p className="eyebrow">Reusable billing templates</p><h3>Setup library</h3><p className="muted">Create standard solar installation packages once and load them into any setup bill.</p></div>
-    <form className="panel setup-library-form" onSubmit={save}><h4>Create standard setup</h4><div className="form-grid"><input required placeholder="Setup name (e.g. 3KW On-grid)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /><select value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}><option value="">Choose item</option>{items.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select><input type="number" min="1" placeholder="Quantity" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /><input type="number" min="0" placeholder="Price override (optional)" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /><button className="btn secondary" type="button" onClick={addItem}>Add item</button></div>{selectedItems.length > 0 && <div className="setup-item-summary">{selectedItems.map((item) => <span key={item.item}>{item.name} × {item.quantity} at ₹{item.price}</span>)}</div>}<button className="btn primary" type="submit">Save standard setup</button>{message && <p className="status-message">{message}</p>}</form>
-    <div className="setup-library-grid">{setups.map((setup) => <article className="panel setup-card" key={setup._id}><div className="panel-header"><div><h4>{setup.name}</h4><p className="muted">{setup.description || 'Standard installation package'}</p></div><button className="btn outline" type="button" onClick={() => remove(setup._id)}>Delete</button></div><ul>{(setup.items || []).map((item) => <li key={item.item}>{item.name} <span>× {item.quantity} • ₹{Number(item.price || 0).toLocaleString()}</span></li>)}</ul></article>)}</div>
+    <form className="panel setup-library-form" onSubmit={save}><h4>Create standard setup</h4><div className="form-grid"><input required placeholder="Setup name (e.g. 3KW On-grid)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /><select value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}><option value="">Choose item</option>{items.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select><input type="number" min="1" placeholder="Quantity" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /><input type="number" min="0" placeholder="Final price incl GST" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /><button className="btn secondary" type="button" onClick={addItem}>Add item</button></div>{selectedItems.length > 0 && <div className="setup-item-summary">{selectedItems.map((item) => <span key={item.item}>{item.name} × {item.quantity} • Final ₹{Number(item.price || 0).toFixed(2)} <em style={{fontStyle:'normal',color:'#5E6F83'}}>Base ₹{calculateTaxableValue(Number(item.price || 0), getEffectiveGstRate(item)).toFixed(2)}</em></span>)}</div>}<button className="btn primary" type="submit">Save standard setup</button>{message && <p className="status-message">{message}</p>}</form>
+    <div className="setup-library-grid">{setups.map((setup) => <article className="panel setup-card" key={setup._id}><div className="panel-header"><div><h4>{setup.name}</h4><p className="muted">{setup.description || 'Standard installation package'}</p></div><button className="btn outline" type="button" onClick={() => remove(setup._id)}>Delete</button></div><ul>{(setup.items || []).map((item) => <li key={item.item}>{item.name} <span>× {item.quantity} • Final ₹{Number(item.price || 0).toFixed(2)} • Base ₹{calculateTaxableValue(Number(item.price || 0), getEffectiveGstRate(item)).toFixed(2)}</span></li>)}</ul></article>)}</div>
   </div>;
 }
 
@@ -1256,11 +1290,23 @@ function BillingPage({ user }) {
     setSelectedItems((prev) => {
       const existing = prev.find((x) => x.item === item._id);
       if (existing) {
-        return prev.map((x) => x.item === item._id ? { ...x, quantity: x.quantity + 1, total: (x.price * (x.quantity + 1)) } : x);
+        const nextQuantity = existing.quantity + 1;
+        return prev.map((x) => x.item === item._id ? { ...x, quantity: nextQuantity, total: Number(x.price || 0) * nextQuantity } : x);
       }
 
-      const price = type === 'purchase' ? item.purchasePrice : item.salePrice;
-      return [...prev, { item: item._id, name: item.name, quantity: 1, price, sgstRate: item.sgstRate || 0, cgstRate: item.cgstRate || 0, igstRate: item.igstRate || 0, total: price }];
+      const price = Number(type === 'purchase' ? item.purchasePrice : item.salePrice || item.finalPrice || 0);
+      const taxRate = getEffectiveGstRate(item);
+      return [...prev, {
+        item: item._id,
+        name: item.name,
+        quantity: 1,
+        price,
+        sgstRate: Number(item.sgstRate || 0),
+        cgstRate: Number(item.cgstRate || 0),
+        igstRate: Number(item.igstRate || 0),
+        taxableValue: calculateTaxableValue(price, taxRate),
+        total: price
+      }];
     });
   };
 
@@ -1284,7 +1330,13 @@ function BillingPage({ user }) {
     const item = items.find((entry) => entry._id === setupItemId);
     if (!item) return;
     setSetupItems((previous) => [...previous.filter((entry) => entry.item !== item._id), {
-      item: item._id, name: item.name, quantity: Math.max(1, Number(setupItemQuantity || 1)), price: Number(item.salePrice || 0)
+      item: item._id,
+      name: item.name,
+      quantity: Math.max(1, Number(setupItemQuantity || 1)),
+      price: Number(item.salePrice || 0),
+      sgstRate: Number(item.sgstRate || 0),
+      cgstRate: Number(item.cgstRate || 0),
+      igstRate: Number(item.igstRate || 0)
     }]);
     setSetupItemId('');
     setSetupItemQuantity('1');
@@ -1363,12 +1415,13 @@ function BillingPage({ user }) {
     }
   };
 
-  const total = selectedItems.reduce((sum, entry) => sum + entry.quantity * entry.price, 0);
+  const total = selectedItems.reduce((sum, entry) => sum + Number(entry.quantity || 0) * Number(entry.price || 0), 0);
   const subtotal = selectedItems.reduce((sum, entry) => {
     const taxRate = Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0);
-    return sum + ((entry.quantity * entry.price) / (1 + taxRate / 100));
+    const lineTotal = Number(entry.quantity || 0) * Number(entry.price || 0);
+    return sum + (taxRate > 0 ? Number((lineTotal / (1 + taxRate / 100)).toFixed(2)) : lineTotal);
   }, 0);
-  const gstAmount = total - subtotal;
+  const gstAmount = Number((total - subtotal).toFixed(2));
 
   return (
     <div className="billing-page">
@@ -1489,10 +1542,10 @@ function BillingPage({ user }) {
                     <button className="btn small" onClick={() => updateQty(entry.item, 1)}>+</button>
                   </div>
                   <div className="price-box">
-                    <label>Price incl. GST<input className="line-price" type="number" min="0" step="0.01" value={entry.price} onChange={(e) => setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? { ...line, price: Number(e.target.value || 0) } : line))} aria-label={`Price including GST for ${entry.name}`} /></label>
-                    <small>Basic ₹{(Number(entry.price || 0) / (1 + (Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0)) / 100)).toFixed(2)}</small>
+                    <label>Final incl. GST<input className="line-price" type="number" min="0" step="0.01" value={entry.price} onChange={(e) => setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? { ...line, price: Number(e.target.value || 0) } : line))} aria-label={`Final price including GST for ${entry.name}`} /></label>
+                    <small>Base ₹{calculateTaxableValue(Number(entry.price || 0), getEffectiveGstRate(entry)).toFixed(2)}</small>
                   </div>
-                  <strong>₹{(entry.quantity * entry.price).toFixed(2)}</strong>
+                  <strong>₹{(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}</strong>
                 </div>
               ))
             )}

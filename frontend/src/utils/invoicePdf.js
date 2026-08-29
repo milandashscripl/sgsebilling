@@ -16,6 +16,12 @@ const loadImageAsDataUrl = async (url) => {
   }
 };
 
+const getItemTaxRate = (item = {}) => Number(item.sgstRate || 0) + Number(item.cgstRate || 0) + Number(item.igstRate || 0);
+const safeValue = (value, fallback = 0) => {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? parsed : Number(fallback);
+};
+
 export async function downloadInvoicePdf(invoice) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -24,7 +30,6 @@ export async function downloadInvoicePdf(invoice) {
   const contentWidth = pageWidth - marginLeft - marginRight;
   let y = 10;
 
-  // Header with optional logo
   let sellerLogo = invoice.sellerLogo || null;
   try {
     const storedUser = localStorage.getItem('user');
@@ -32,110 +37,134 @@ export async function downloadInvoicePdf(invoice) {
       const su = JSON.parse(storedUser);
       if (su?.shopLogoUrl) sellerLogo = su.shopLogoUrl;
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
 
-  doc.setFontSize(20);
-  doc.setFont(undefined, 'bold');
-  doc.setTextColor('#186FAF');
-
+  doc.setFillColor(13, 82, 131);
+  doc.rect(0, 0, pageWidth, 28, 'F');
   if (sellerLogo) {
     const imgData = await loadImageAsDataUrl(sellerLogo).catch(() => null);
     if (imgData) {
-      try { doc.addImage(imgData, 'PNG', marginLeft, y - 2, 30, 30); } catch { try { doc.addImage(imgData, 'JPEG', marginLeft, y - 2, 30, 30); } catch {} }
+      try {
+        doc.addImage(imgData, 'PNG', marginLeft, 7, 22, 22);
+      } catch {
+        try { doc.addImage(imgData, 'JPEG', marginLeft, 7, 22, 22); } catch {}
+      }
     }
   }
 
-  const titleX = sellerLogo ? marginLeft + 36 : marginLeft;
-  doc.text(invoice.sellerName || 'GST INVOICE', titleX, y + 6);
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont(undefined, 'bold');
+  doc.text(invoice.sellerName || 'SGSE Billing', marginLeft + 28, 16);
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'normal');
+  if (invoice.sellerAddress) {
+    const addressLines = doc.splitTextToSize(invoice.sellerAddress, contentWidth - 28);
+    doc.text(addressLines, marginLeft + 28, 21);
+  }
+
+  y = 38;
+  doc.setTextColor(20, 20, 20);
+  doc.setFontSize(15);
+  doc.setFont(undefined, 'bold');
+  const invoiceTitle = invoice.type === 'purchase' ? 'PURCHASE INVOICE' : invoice.type === 'setup' ? 'SETUP BILL' : invoice.type === 'return' ? 'RETURN INVOICE' : 'GST INVOICE';
+  doc.text(invoiceTitle, marginLeft, y);
   doc.setFont(undefined, 'normal');
   doc.setFontSize(9);
-  doc.setTextColor('#333333');
-  y += 14;
-
-  if (invoice.sellerAddress) {
-    const addressLines = doc.splitTextToSize(invoice.sellerAddress, contentWidth - (sellerLogo ? 36 : 0));
-    doc.text(addressLines, titleX, y);
-    y += addressLines.length * 3.5 + 2;
-  }
-
-  if (invoice.sellerGSTIN || invoice.sellerPhone || invoice.sellerEmail) {
-    doc.setFontSize(8);
-    if (invoice.sellerGSTIN) doc.text(`GSTIN: ${invoice.sellerGSTIN}`, titleX, y);
-    y += 3;
-    if (invoice.sellerPhone) doc.text(`Phone: ${invoice.sellerPhone}`, titleX, y);
-    y += 3;
-    if (invoice.sellerEmail) doc.text(`Email: ${invoice.sellerEmail}`, titleX, y);
-    y += 3;
-  }
-
-  y += 3;
-  doc.setDrawColor('#186FAF');
-  doc.setLineWidth(0.5);
-  doc.line(marginLeft, y, pageWidth - marginRight, y);
+  doc.text(`Invoice No: ${invoice.invoiceNumber || 'N/A'}`, pageWidth - marginRight - 60, y);
+  y += 6;
+  doc.text(`Date: ${invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}`, pageWidth - marginRight - 60, y);
   y += 8;
 
-  // Rest of the invoice (items, taxes, totals)
-  doc.setFontSize(14);
+  doc.setDrawColor(218, 226, 233);
+  doc.setFillColor(245, 249, 252);
+  doc.roundedRect(marginLeft, y, contentWidth, 24, 2, 2, 'F');
+  doc.setTextColor(30, 50, 72);
   doc.setFont(undefined, 'bold');
-  doc.setTextColor('#186FAF');
-  doc.text('GST INVOICE', marginLeft, y);
+  doc.text('Bill To', marginLeft + 5, y + 7);
   doc.setFont(undefined, 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor('#333333');
+  doc.text(invoice.partyName || invoice.customerName || 'Walk-in Customer', marginLeft + 5, y + 13);
+  doc.text(invoice.partyPhone || invoice.customerPhone || '—', marginLeft + 5, y + 18);
+  doc.text(invoice.partyGSTIN || 'GSTIN: Not provided', pageWidth - marginRight - 55, y + 13, { align: 'right' });
+  y += 30;
 
-  // Invoice meta
-  doc.text(`Invoice No: ${invoice.invoiceNumber || ''}`, pageWidth - marginRight - 60, y);
+  doc.setTextColor(20, 20, 20);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(9);
+  const headers = ['Item', 'Qty', 'Final Price', 'Base', 'GST', 'Amount'];
+  const startX = [marginLeft + 2, marginLeft + 92, marginLeft + 118, marginLeft + 150, marginLeft + 172, marginLeft + 193];
+  headers.forEach((header, index) => {
+    doc.text(header, startX[index], y);
+  });
   y += 5;
-  if (invoice.createdAt) doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString('en-IN')}`, pageWidth - marginRight - 60, y);
-  y += 6;
 
-  // Buyer
-  doc.setFont(undefined, 'bold');
-  doc.text('Buyer (Bill To)', marginLeft, y);
-  y += 4;
-  doc.setFont(undefined, 'normal');
-  doc.text(invoice.partyName || invoice.customerName || '-', marginLeft, y);
+  doc.setDrawColor(200, 210, 220);
+  doc.line(marginLeft, y, pageWidth - marginRight, y);
   y += 4;
 
-  // Items minimal rendering (adapted)
-  doc.setFontSize(9);
-  doc.setFont(undefined, 'normal');
-  if (invoice.items && invoice.items.length) {
+  const items = Array.isArray(invoice.items) && invoice.items.length ? invoice.items : [];
+  let subtotalValue = 0;
+  let gstTotal = 0;
+
+  items.forEach((item, index) => {
+    if (y > 250) {
+      doc.addPage();
+      y = 20;
+    }
+    const qty = safeValue(item.quantity, 1);
+    const finalPrice = safeValue(item.price, 0);
+    const taxRate = getItemTaxRate(item);
+    const taxableValue = taxRate > 0 ? Number((finalPrice / (1 + taxRate / 100)).toFixed(2)) : finalPrice;
+    const lineTax = Number((finalPrice * qty - taxableValue * qty).toFixed(2));
+    const lineTotal = Number((finalPrice * qty).toFixed(2));
+    subtotalValue += Number((taxableValue * qty).toFixed(2));
+    gstTotal += lineTax;
+
+    doc.setFont(undefined, 'normal');
+    doc.text(String(index + 1), marginLeft + 2, y);
+    const itemName = String(item.name || 'Item').slice(0, 25);
+    doc.text(itemName, marginLeft + 10, y);
+    doc.text(String(qty), marginLeft + 95, y);
+    doc.text(`₹${finalPrice.toFixed(2)}`, marginLeft + 115, y);
+    doc.text(`₹${(taxableValue).toFixed(2)}`, marginLeft + 150, y);
+    doc.text(`₹${lineTax.toFixed(2)}`, marginLeft + 172, y);
+    doc.text(`₹${lineTotal.toFixed(2)}`, marginLeft + 193, y, { align: 'right' });
     y += 6;
-    invoice.items.forEach((item) => {
-      if (y > doc.internal.pageSize.getHeight() - 40) { doc.addPage(); y = 20; }
-      const line = `${item.name || item.description || ''} — Qty: ${item.quantity || 1} — ₹${(item.total || (item.quantity*(item.price||0))).toFixed(2)}`;
-      const lines = doc.splitTextToSize(line, contentWidth);
-      doc.text(lines, marginLeft, y);
-      y += lines.length * 4;
-    });
-  }
+  });
 
-  // Totals
-  y += 6;
-  const subtotal = invoice.subtotal || 0;
-  const gstAmount = invoice.gstAmount || 0;
-  const total = invoice.grandTotal || 0;
-  doc.text(`Taxable Value: ₹${subtotal.toFixed(2)}`, pageWidth - marginRight - 80, y, { align: 'right' });
   y += 5;
-  doc.text(`GST: ₹${gstAmount.toFixed(2)}`, pageWidth - marginRight - 80, y, { align: 'right' });
-  y += 6;
+  doc.line(marginLeft, y, pageWidth - marginRight, y);
+  y += 5;
+
+  const subtotalFromInvoice = safeValue(invoice.subtotal, subtotalValue);
+  const gstFromInvoice = safeValue(invoice.gstAmount, gstTotal);
+  const grandTotal = safeValue(invoice.grandTotal, subtotalFromInvoice + gstFromInvoice);
+
   doc.setFont(undefined, 'bold');
-  doc.text(`TOTAL: ₹${total.toFixed(2)}`, pageWidth - marginRight - 80, y, { align: 'right' });
+  doc.text('Taxable Value', marginLeft + 140, y);
+  doc.text(`₹${subtotalFromInvoice.toFixed(2)}`, pageWidth - marginRight, y, { align: 'right' });
+  y += 6;
+  doc.text('GST', marginLeft + 140, y);
+  doc.text(`₹${gstFromInvoice.toFixed(2)}`, pageWidth - marginRight, y, { align: 'right' });
+  y += 8;
+  doc.setFillColor(244, 248, 251);
+  doc.rect(marginLeft + 120, y - 4, contentWidth - 120, 10, 'F');
+  doc.text('TOTAL', marginLeft + 140, y);
+  doc.text(`₹${grandTotal.toFixed(2)}`, pageWidth - marginRight, y, { align: 'right' });
+  y += 14;
 
-  // Declaration & signature
-  y += 12;
-  const declaration = 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
-  const declLines = doc.splitTextToSize(declaration, contentWidth);
+  doc.setFont(undefined, 'normal');
   doc.setFontSize(8);
+  const declaration = 'We declare that this invoice shows the actual price of the goods/services described and that all particulars are true and correct.';
+  const declLines = doc.splitTextToSize(declaration, contentWidth - 30);
   doc.text(declLines, marginLeft, y);
-
   y += declLines.length * 4 + 8;
-  doc.text(`FOR ${invoice.sellerName || 'SGSE'}`, pageWidth - marginRight - 40, y);
+  doc.text(`Authorized Signatory`, pageWidth - marginRight - 30, y, { align: 'right' });
+  doc.text(`For ${invoice.sellerName || 'SGSE Billing'}`, pageWidth - marginRight - 30, y + 6, { align: 'right' });
 
-  doc.save(`${invoice.invoiceNumber || 'invoice'}.pdf`);
+  doc.save(`${invoice.invoiceNumber || 'gst-invoice'}.pdf`);
 }
 
 export default downloadInvoicePdf;
