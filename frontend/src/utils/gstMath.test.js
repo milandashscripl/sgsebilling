@@ -7,6 +7,8 @@ test('GST breakdown returns correct taxable value and GST amount for 18% rate', 
   assert.equal(result.taxableValue, 1000);
   assert.equal(result.gstAmount, 180);
   assert.equal(result.finalAmount, 1180);
+  assert.equal(result.sgstAmount, 90);
+  assert.equal(result.cgstAmount, 90);
 });
 
 test('Taxable value calculation is precise for inclusive pricing', () => {

@@ -9,16 +9,19 @@ export function calculateGstBreakdown(inclusiveAmount, gstRate = 0) {
   const amount = Number(inclusiveAmount || 0);
   const rate = Number(gstRate || 0);
   if (!Number.isFinite(amount) || amount <= 0) {
-    return { taxableValue: 0, gstAmount: 0, finalAmount: 0 };
+    return { taxableValue: 0, gstAmount: 0, finalAmount: 0, sgstAmount: 0, cgstAmount: 0 };
   }
 
   const taxableValue = calculateTaxableValue(amount, rate);
   const gstAmount = Number((amount - taxableValue).toFixed(2));
+  const splitAmount = Number((gstAmount / 2).toFixed(2));
 
   return {
     taxableValue,
     gstAmount,
-    finalAmount: Number((taxableValue + gstAmount).toFixed(2))
+    finalAmount: Number((taxableValue + gstAmount).toFixed(2)),
+    sgstAmount: splitAmount,
+    cgstAmount: splitAmount
   };
 }
 

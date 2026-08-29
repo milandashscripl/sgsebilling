@@ -84,6 +84,38 @@ const getStageClass = (status) => {
 const normalizeContactValue = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 const formatMoney = (value) => Number.isFinite(Number(value)) ? Number(value).toFixed(2) : '0.00';
 
+function AnimatedNumber({ value, prefix = '', suffix = '', decimals = 0 }) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    const startValue = Number(display) || 0;
+    const endValue = Number(value) || 0;
+    const animationDuration = 700;
+    const startTime = performance.now();
+
+    let frameId = 0;
+    const animate = (timestamp) => {
+      const progress = Math.min((timestamp - startTime) / animationDuration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const nextValue = startValue + (endValue - startValue) * eased;
+      setDisplay(Number(nextValue.toFixed(decimals)));
+      if (progress < 1) {
+        frameId = requestAnimationFrame(animate);
+      }
+    };
+
+    frameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameId);
+  }, [value, decimals]);
+
+  const formatted = new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  }).format(display);
+
+  return <>{prefix}{formatted}{suffix}</>;
+}
+
 function App() {
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user');
@@ -145,7 +177,17 @@ function App() {
     navigate('/login');
   };
 
-  if (loading) return <div className="loading">Loading SGSE Billing...</div>;
+  if (loading) return (
+    <div className="loading">
+      <div className="loading-shell">
+        <span className="spinner" aria-hidden="true" />
+        <div>
+          <strong>Loading SGSE Billing...</strong>
+          <small>Syncing your dashboard and stock data</small>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="app-shell">
@@ -186,6 +228,12 @@ function PublicApp({ setUser }) {
   return (
     <div className="public-screen">
       <div className="hero-card">
+        <div className="hero-glow glow-one" />
+        <div className="hero-glow glow-two" />
+        <div className="hero-badges">
+          <span className="feature-pill">GST-ready</span>
+          <span className="feature-pill soft">Inventory synced</span>
+        </div>
         <div>
           <p className="eyebrow">Modern billing & stock management</p>
           <h1>SGSE Billing Suite</h1>
@@ -195,12 +243,31 @@ function PublicApp({ setUser }) {
             <Link className="btn secondary" to="/register">Create account</Link>
           </div>
         </div>
+
+        <div className="hero-stats">
+          <div>
+            <strong>₹2.4L+</strong>
+            <span>Monthly flow</span>
+          </div>
+          <div>
+            <strong>1200+</strong>
+            <span>Transactions</span>
+          </div>
+          <div>
+            <strong>99.9%</strong>
+            <span>Track accuracy</span>
+          </div>
+        </div>
       </div>
-      <Routes>
-        <Route path="/login" element={<Login setUser={setUser} />} />
-        <Route path="/register" element={<Register setUser={setUser} />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+
+      <div className="auth-panel">
+        <div className="auth-ambient" />
+        <Routes>
+          <Route path="/login" element={<Login setUser={setUser} />} />
+          <Route path="/register" element={<Register setUser={setUser} />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </div>
     </div>
   );
 }
@@ -292,12 +359,19 @@ function Login({ setUser }) {
   };
 
   return (
-    <form className="form-card" onSubmit={submit}>
-      <h3>Welcome back</h3>
+    <form className="form-card auth-form-card" onSubmit={submit}>
+      <div className="auth-form-header">
+        <div className="auth-badge">SG</div>
+        <div>
+          <p className="eyebrow small">Secure access</p>
+          <h3>Welcome back</h3>
+        </div>
+      </div>
       {error && <p className="error">{error}</p>}
       <input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       <input type="password" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
       <button className="btn primary" type="submit">Sign in</button>
+      <p className="auth-switch-copy">Need an account? <Link to="/register">Create one</Link></p>
     </form>
   );
 }
@@ -327,13 +401,20 @@ function Register({ setUser }) {
   };
 
   return (
-    <form className="form-card" onSubmit={submit}>
-      <h3>Create an account</h3>
+    <form className="form-card auth-form-card" onSubmit={submit}>
+      <div className="auth-form-header">
+        <div className="auth-badge">SG</div>
+        <div>
+          <p className="eyebrow small">Start free</p>
+          <h3>Create an account</h3>
+        </div>
+      </div>
       {error && <p className="error">{error}</p>}
       <input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
       <input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       <input type="password" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
       <button className="btn primary" type="submit">Register</button>
+      <p className="auth-switch-copy">Already have an account? <Link to="/login">Sign in</Link></p>
     </form>
   );
 }
@@ -721,15 +802,15 @@ function Dashboard({ user }) {
       <div className="dashboard-summary-band">
         <div className="summary-highlight">
           <span>Net sales</span>
-          <strong>₹{netSales.toLocaleString()}</strong>
+          <strong><AnimatedNumber value={netSales} prefix="₹" /></strong>
         </div>
         <div className="summary-highlight muted-highlight">
           <span>Invoices</span>
-          <strong>{summary.invoiceCount || 0}</strong>
+          <strong><AnimatedNumber value={summary.invoiceCount || 0} /></strong>
         </div>
         <div className="summary-highlight accent-highlight">
           <span>Margin</span>
-          <strong>{marginRate.toFixed(1)}%</strong>
+          <strong><AnimatedNumber value={marginRate} suffix="%" decimals={1} /></strong>
         </div>
       </div>
 
@@ -739,7 +820,7 @@ function Dashboard({ user }) {
             <h4>Sales</h4>
             <span className="stat-trend up">Live</span>
           </div>
-          <p>₹{(summary.totalSales || 0).toLocaleString()}</p>
+          <p><AnimatedNumber value={summary.totalSales || 0} prefix="₹" /></p>
           <span>Current period</span>
         </div>
         <div className="stat-card stat-purchases">
@@ -747,7 +828,7 @@ function Dashboard({ user }) {
             <h4>Purchases</h4>
             <span className="stat-trend neutral">Stock</span>
           </div>
-          <p>₹{(summary.totalPurchases || 0).toLocaleString()}</p>
+          <p><AnimatedNumber value={summary.totalPurchases || 0} prefix="₹" /></p>
           <span>Inbound stock</span>
         </div>
         <div className="stat-card stat-returns">
@@ -755,7 +836,7 @@ function Dashboard({ user }) {
             <h4>Returns</h4>
             <span className="stat-trend down">Watch</span>
           </div>
-          <p>₹{(summary.totalReturns || 0).toLocaleString()}</p>
+          <p><AnimatedNumber value={summary.totalReturns || 0} prefix="₹" /></p>
           <span>Returned value</span>
         </div>
         <div className="stat-card stat-invoices">
@@ -763,7 +844,7 @@ function Dashboard({ user }) {
             <h4>Inventory</h4>
             <span className="stat-trend up">Value</span>
           </div>
-          <p>₹{inventoryValue.toLocaleString()}</p>
+          <p><AnimatedNumber value={inventoryValue} prefix="₹" /></p>
           <span>Stock holding</span>
         </div>
       </div>
@@ -1294,18 +1375,20 @@ function BillingPage({ user }) {
         return prev.map((x) => x.item === item._id ? { ...x, quantity: nextQuantity, total: Number(x.price || 0) * nextQuantity } : x);
       }
 
-      const price = Number(type === 'purchase' ? item.purchasePrice : item.salePrice || item.finalPrice || 0);
-      const taxRate = getEffectiveGstRate(item);
+      const finalPrice = Number(type === 'purchase' ? item.purchasePrice : item.salePrice || item.finalPrice || 0);
+      const gstRate = getEffectiveGstRate(item);
+      const sgstRate = Number((gstRate / 2).toFixed(2));
       return [...prev, {
         item: item._id,
         name: item.name,
         quantity: 1,
-        price,
-        sgstRate: Number(item.sgstRate || 0),
-        cgstRate: Number(item.cgstRate || 0),
-        igstRate: Number(item.igstRate || 0),
-        taxableValue: calculateTaxableValue(price, taxRate),
-        total: price
+        price: finalPrice,
+        gstRate,
+        sgstRate,
+        cgstRate: sgstRate,
+        igstRate: 0,
+        taxableValue: calculateTaxableValue(finalPrice, gstRate),
+        total: finalPrice
       }];
     });
   };
@@ -1417,11 +1500,13 @@ function BillingPage({ user }) {
 
   const total = selectedItems.reduce((sum, entry) => sum + Number(entry.quantity || 0) * Number(entry.price || 0), 0);
   const subtotal = selectedItems.reduce((sum, entry) => {
-    const taxRate = Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0);
+    const taxRate = Number(entry.gstRate ?? (Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0)));
     const lineTotal = Number(entry.quantity || 0) * Number(entry.price || 0);
     return sum + (taxRate > 0 ? Number((lineTotal / (1 + taxRate / 100)).toFixed(2)) : lineTotal);
   }, 0);
   const gstAmount = Number((total - subtotal).toFixed(2));
+  const sgstAmount = Number((gstAmount / 2).toFixed(2));
+  const cgstAmount = Number((gstAmount / 2).toFixed(2));
 
   return (
     <div className="billing-page">
@@ -1543,7 +1628,18 @@ function BillingPage({ user }) {
                   </div>
                   <div className="price-box">
                     <label>Final incl. GST<input className="line-price" type="number" min="0" step="0.01" value={entry.price} onChange={(e) => setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? { ...line, price: Number(e.target.value || 0) } : line))} aria-label={`Final price including GST for ${entry.name}`} /></label>
-                    <small>Base ₹{calculateTaxableValue(Number(entry.price || 0), getEffectiveGstRate(entry)).toFixed(2)}</small>
+                    <label>GST %<input className="line-price" type="number" min="0" step="0.01" value={entry.gstRate ?? getEffectiveGstRate(entry)} onChange={(e) => {
+                      const nextRate = Number(e.target.value || 0);
+                      const splitRate = Number((nextRate / 2).toFixed(2));
+                      setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? {
+                        ...line,
+                        gstRate: nextRate,
+                        sgstRate: splitRate,
+                        cgstRate: splitRate,
+                        igstRate: 0
+                      } : line));
+                    }} aria-label={`GST rate for ${entry.name}`} /></label>
+                    <small>Base ₹{calculateTaxableValue(Number(entry.price || 0), Number(entry.gstRate ?? getEffectiveGstRate(entry))).toFixed(2)} • SGST {((Number(entry.gstRate ?? getEffectiveGstRate(entry)) / 2) || 0).toFixed(2)}% • CGST {((Number(entry.gstRate ?? getEffectiveGstRate(entry)) / 2) || 0).toFixed(2)}%</small>
                   </div>
                   <strong>₹{(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}</strong>
                 </div>
@@ -1552,8 +1648,10 @@ function BillingPage({ user }) {
           </div>
 
           <div className="invoice-totals">
-            <div><span>Subtotal</span><strong>₹{subtotal.toFixed(2)}</strong></div>
-            <div><span>GST</span><strong>₹{gstAmount.toFixed(2)}</strong></div>
+            <div><span>Taxable value</span><strong>₹{subtotal.toFixed(2)}</strong></div>
+            <div><span>SGST</span><strong>₹{sgstAmount.toFixed(2)}</strong></div>
+            <div><span>CGST</span><strong>₹{cgstAmount.toFixed(2)}</strong></div>
+            <div><span>GST total</span><strong>₹{gstAmount.toFixed(2)}</strong></div>
             <div className="grand-total"><span>Total</span><strong>₹{total.toFixed(2)}</strong></div>
           </div>
 
