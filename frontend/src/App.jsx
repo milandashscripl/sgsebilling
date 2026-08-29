@@ -2477,41 +2477,106 @@ function EmployeesPage() {
   };
   const attendanceForDate = attendance.records.find((record) => record.date === attendanceDate);
   const printPayslip = () => { if (!payslip) return; window.print(); };
-  const downloadPayslipPdf = () => {
+  const downloadPayslipPdf = async () => {
     if (!payslip) return;
+
+    const storedUser = (() => {
+      try {
+        return JSON.parse(localStorage.getItem('user') || 'null');
+      } catch {
+        return null;
+      }
+    })();
+    const shopName = storedUser?.shopName || 'SGSE Billing';
+    const shopAddress = storedUser?.shopAddress || 'Solar equipment and service provider';
+    const shopLogo = storedUser?.shopLogoUrl || '';
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const margin = 16;
     const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 20;
+    let y = 16;
 
+    doc.setFillColor(11, 82, 131);
+    doc.rect(0, 0, pageWidth, 34, 'F');
+
+    if (shopLogo) {
+      try {
+        const response = await fetch(shopLogo);
+        if (response.ok) {
+          const blob = await response.blob();
+          const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          doc.addImage(dataUrl, 'PNG', margin, 8, 18, 18);
+        }
+      } catch {
+        // ignore logo fetch issues and keep the branded header without breaking PDF generation
+      }
+    }
+
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
     doc.setFont(undefined, 'bold');
-    doc.text('Salary Slip', margin, y);
+    doc.text(shopName, margin + 24, 19);
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text(shopAddress, margin + 24, 26);
+
+    y = 44;
+    doc.setTextColor(20, 20, 20);
+    doc.setFontSize(15);
+    doc.setFont(undefined, 'bold');
+    doc.text('MONTHLY PAYSLIP', margin, y);
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Month: ${payslip.month}`, pageWidth - margin - 30, y, { align: 'right' });
     y += 8;
 
-    doc.setFontSize(10);
+    doc.setDrawColor(217, 226, 233);
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 28, 3, 3, 'S');
+    doc.setFont(undefined, 'bold');
+    doc.text('Employee', margin + 5, y + 8);
     doc.setFont(undefined, 'normal');
-    doc.text(`${payslip.employee.name} • ${payslip.employee.employeeId} • ${payslip.employee.role}`, margin, y);
-    y += 6;
-    doc.text(`Month: ${payslip.month}`, margin, y);
-    y += 12;
+    doc.text(`${payslip.employee.name} • ${payslip.employee.employeeId} • ${payslip.employee.role}`, margin + 5, y + 14);
+    doc.text(`Phone: ${payslip.employee.phone || '—'}`, margin + 5, y + 20);
+    doc.text(`Department / Role: ${payslip.employee.role || 'Staff'}`, pageWidth - margin - 60, y + 14, { align: 'right' });
+    y += 36;
 
-    const rows = [
-      ['Present', String(payslip.present)],
-      ['Half day', String(payslip.halfday)],
-      ['Absent', String(payslip.absent)],
-      ['Earned salary', `₹${Math.round(payslip.earnedSalary).toLocaleString()}`],
-      ['Allowances', `₹${Math.round(payslip.allowances).toLocaleString()}`],
-      ['Bonus / incentive', `₹${Math.round((payslip.bonus || 0) + (payslip.incentive || 0)).toLocaleString()}`],
-      ['Advance / deduction', `-₹${Math.round((payslip.advance || 0) + (payslip.deduction || 0)).toLocaleString()}`],
-      ['Net payable', `₹${Math.round(payslip.netPay).toLocaleString()}`]
+    const summaryRows = [
+      ['Present days', String(payslip.present || 0)],
+      ['Half days', String(payslip.halfday || 0)],
+      ['Absent days', String(payslip.absent || 0)],
+      ['Earned salary', `₹${Math.round(payslip.earnedSalary || 0).toLocaleString()}`],
+      ['Allowances', `₹${Math.round(payslip.allowances || 0).toLocaleString()}`],
+      ['Bonus / Incentive', `₹${Math.round((payslip.bonus || 0) + (payslip.incentive || 0)).toLocaleString()}`],
+      ['Advance / Deduction', `-₹${Math.round((payslip.advance || 0) + (payslip.deduction || 0)).toLocaleString()}`],
+      ['Net payable', `₹${Math.round(payslip.netPay || 0).toLocaleString()}`]
     ];
 
-    rows.forEach(([label, value]) => {
-      doc.text(label, margin, y);
-      doc.text(String(value), pageWidth - margin - 10, y, { align: 'right' });
-      y += 7;
+    summaryRows.forEach(([label, value], index) => {
+      const rowY = y + index * 7;
+      doc.text(label, margin + 5, rowY);
+      doc.text(String(value), pageWidth - margin - 10, rowY, { align: 'right' });
     });
+    y += summaryRows.length * 7 + 10;
+
+    doc.setFillColor(244, 248, 252);
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 22, 3, 3, 'F');
+    doc.setFont(undefined, 'bold');
+    doc.text('Net Payable', margin + 5, y + 8);
+    doc.text(`₹${Math.round(payslip.netPay || 0).toLocaleString()}`, pageWidth - margin - 10, y + 8, { align: 'right' });
+    y += 30;
+
+    doc.setFont(undefined, 'normal');
+    const noteText = payslip.adjustmentNote || 'No manual adjustments recorded for this month.';
+    const noteLines = doc.splitTextToSize(`Notes: ${noteText}`, pageWidth - margin * 2 - 10);
+    doc.text(noteLines, margin, y);
+    y += noteLines.length * 4 + 8;
+
+    doc.text('Authorized Signatory', pageWidth - margin - 30, y, { align: 'right' });
+    doc.text(shopName, pageWidth - margin - 30, y + 5, { align: 'right' });
 
     doc.save(`${payslip.employee.name.replace(/\s+/g, '-').toLowerCase()}-${payslip.month}-payslip.pdf`);
   };
@@ -2524,7 +2589,7 @@ function EmployeesPage() {
       <form className="panel employee-form" onSubmit={saveEmployee}><div className="panel-header"><div><h4>{form._id ? 'Edit employee' : 'Add employee'}</h4><p className="muted">Basic payroll profile and employee details</p></div><div className="inline-actions">{selectedEmployee && !form._id && <button className="btn outline" type="button" onClick={() => selectEmployee(selectedEmployee)}>Edit selected</button>}{form._id && <button className="btn outline" type="button" onClick={resetEmployeeForm}>Cancel</button>}</div></div><div className="form-grid"><label>Employee ID<input required value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} /></label><label>Full name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>Role<input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} /></label><label>Phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label><label>Joining date<input type="date" value={form.joiningDate} onChange={(e) => setForm({ ...form, joiningDate: e.target.value })} /></label><label>Monthly salary<input required type="number" min="0" value={form.monthlySalary} onChange={(e) => setForm({ ...form, monthlySalary: e.target.value })} /></label><label>Fuel allowance<input type="number" min="0" value={form.fuelAllowance} onChange={(e) => setForm({ ...form, fuelAllowance: e.target.value })} /></label><label>Incentive<input type="number" min="0" value={form.incentive} onChange={(e) => setForm({ ...form, incentive: e.target.value })} /></label><label>Other allowance<input type="number" min="0" value={form.otherAllowance} onChange={(e) => setForm({ ...form, otherAllowance: e.target.value })} /></label><label>Address<textarea value={form.personalDetails.address} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, address: e.target.value } })} /></label><label>Bank name<input value={form.personalDetails.bankName} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, bankName: e.target.value } })} /></label><label>Account number<input value={form.personalDetails.accountNumber} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, accountNumber: e.target.value } })} /></label><label>IFSC<input value={form.personalDetails.ifsc} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, ifsc: e.target.value } })} /></label><label>PAN<input value={form.personalDetails.pan} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, pan: e.target.value } })} /></label><label>Aadhaar<input value={form.personalDetails.aadhaar} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, aadhaar: e.target.value } })} /></label><label>Emergency contact<input value={form.personalDetails.emergencyContact} onChange={(e) => setForm({ ...form, personalDetails: { ...form.personalDetails, emergencyContact: e.target.value } })} /></label></div><div className="inline-actions"><button className="btn primary" type="submit">{form._id ? 'Save employee' : 'Add employee'}</button>{form._id && <button className="btn secondary" type="button" onClick={() => deleteEmployee(form._id)}>Delete employee</button>}</div></form>
     </div>
     {selectedEmployee && <section className="panel attendance-panel"><div className="panel-header"><div><p className="eyebrow">Daily time clock</p><h4>Attendance for {selectedEmployee.name}</h4></div><label className="month-picker">Payroll month<input type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></label></div><p className="muted">Check-in is expected by 9:30 AM. Checkout from 7:30 PM is a full day; earlier checkout is half-day.</p><form className="attendance-form" onSubmit={saveAttendance}><label>Date<input type="date" value={attendanceDate} onChange={(e) => { setAttendanceDate(e.target.value); const record = attendance.records.find((item) => item.date === e.target.value); setAttendanceForm({ checkIn: record?.checkIn || '', checkOut: record?.checkOut || '', note: record?.note || '' }); }} /></label><label>Check in<input type="time" value={attendanceForm.checkIn} onChange={(e) => setAttendanceForm({ ...attendanceForm, checkIn: e.target.value })} /></label><label>Check out<input type="time" value={attendanceForm.checkOut} onChange={(e) => setAttendanceForm({ ...attendanceForm, checkOut: e.target.value })} /></label><label>Note<input value={attendanceForm.note} onChange={(e) => setAttendanceForm({ ...attendanceForm, note: e.target.value })} placeholder="Optional note" /></label><button className="btn primary" type="submit">Save day</button></form>{attendanceForDate && <p className={`attendance-status ${attendanceForDate.status}`}>{attendanceForDate.status} for {attendanceForDate.date}</p>}</section>}
-    {payslip && <section className="panel payslip-panel"><div className="panel-header"><div><p className="eyebrow">Monthly salary slip</p><h4>{payslip.employee.name} • {payslip.month}</h4><p className="muted">{payslip.employee.employeeId} • {payslip.employee.role}</p></div><div className="inline-actions"><button className="btn secondary" type="button" onClick={downloadPayslipPdf}>Download PDF</button><button className="btn secondary" type="button" onClick={printPayslip}>Print</button></div></div><div className="payroll-metrics"><div><span>Present</span><strong>{payslip.present}</strong></div><div><span>Half-days</span><strong>{payslip.halfday}</strong></div><div><span>Absent</span><strong>{payslip.absent}</strong></div><div className="payable"><span>Net payable</span><strong>₹{Math.round(payslip.netPay).toLocaleString()}</strong></div></div><div className="payslip-lines"><div><span>Earned salary</span><strong>₹{Math.round(payslip.earnedSalary).toLocaleString()}</strong></div><div><span>Allowances</span><strong>₹{Math.round(payslip.allowances).toLocaleString()}</strong></div><div><span>Bonus / incentive</span><strong>₹{Math.round((payslip.bonus || 0) + (payslip.incentive || 0)).toLocaleString()}</strong></div><div><span>Advance / deduction</span><strong>- ₹{Math.round((payslip.advance || 0) + (payslip.deduction || 0)).toLocaleString()}</strong></div><div><span>Notes</span><strong>{payslip.adjustmentNote || 'No manual adjustment recorded'}</strong></div></div><form className="form-grid" onSubmit={saveSalaryAdjustment}><h4>Manual adjustment</h4><input type="number" min="0" placeholder="Advance" value={adjustmentForm.advance} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, advance: e.target.value })} /><input type="number" min="0" placeholder="Bonus" value={adjustmentForm.bonus} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, bonus: e.target.value })} /><input type="number" min="0" placeholder="Incentive" value={adjustmentForm.incentive} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, incentive: e.target.value })} /><input type="number" min="0" placeholder="Deduction" value={adjustmentForm.deduction} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, deduction: e.target.value })} /><input placeholder="Adjustment note" value={adjustmentForm.note} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, note: e.target.value })} /><button className="btn primary" type="submit">Apply adjustment</button></form></section>}
+    {payslip && <section className="panel payslip-panel"><div className="panel-header"><div className="payslip-brand"><div className="payslip-brand-mark">{(JSON.parse(localStorage.getItem('user') || '{}')?.shopName || 'SG').slice(0, 2).toUpperCase()}</div><div><p className="eyebrow">Monthly salary slip</p><h4>{payslip.employee.name} • {payslip.month}</h4><p className="muted">{payslip.employee.employeeId} • {payslip.employee.role}</p></div></div><div className="inline-actions"><button className="btn secondary" type="button" onClick={downloadPayslipPdf}>Download PDF</button><button className="btn secondary" type="button" onClick={printPayslip}>Print</button></div></div><div className="payslip-brand-strip"><div className="payslip-shop-info"><strong>{JSON.parse(localStorage.getItem('user') || '{}')?.shopName || 'SGSE Billing'}</strong><span>{JSON.parse(localStorage.getItem('user') || '{}')?.shopAddress || 'Solar vendor operations'}</span></div><div className="payslip-chip">Net payable ₹{Math.round(payslip.netPay).toLocaleString()}</div></div><div className="payroll-metrics"><div><span>Present</span><strong>{payslip.present}</strong></div><div><span>Half-days</span><strong>{payslip.halfday}</strong></div><div><span>Absent</span><strong>{payslip.absent}</strong></div><div className="payable"><span>Net payable</span><strong>₹{Math.round(payslip.netPay).toLocaleString()}</strong></div></div><div className="payslip-lines"><div><span>Earned salary</span><strong>₹{Math.round(payslip.earnedSalary).toLocaleString()}</strong></div><div><span>Allowances</span><strong>₹{Math.round(payslip.allowances).toLocaleString()}</strong></div><div><span>Bonus / incentive</span><strong>₹{Math.round((payslip.bonus || 0) + (payslip.incentive || 0)).toLocaleString()}</strong></div><div><span>Advance / deduction</span><strong>- ₹{Math.round((payslip.advance || 0) + (payslip.deduction || 0)).toLocaleString()}</strong></div><div><span>Notes</span><strong>{payslip.adjustmentNote || 'No manual adjustment recorded'}</strong></div></div><form className="form-grid" onSubmit={saveSalaryAdjustment}><h4>Manual adjustment</h4><input type="number" min="0" placeholder="Advance" value={adjustmentForm.advance} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, advance: e.target.value })} /><input type="number" min="0" placeholder="Bonus" value={adjustmentForm.bonus} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, bonus: e.target.value })} /><input type="number" min="0" placeholder="Incentive" value={adjustmentForm.incentive} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, incentive: e.target.value })} /><input type="number" min="0" placeholder="Deduction" value={adjustmentForm.deduction} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, deduction: e.target.value })} /><input placeholder="Adjustment note" value={adjustmentForm.note} onChange={(e) => setAdjustmentForm({ ...adjustmentForm, note: e.target.value })} /><button className="btn primary" type="submit">Apply adjustment</button></form></section>}
   </div>;
 }
 

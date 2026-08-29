@@ -87,6 +87,20 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .payroll-metrics strong { font-size: 1.2rem; color: #1B2A3B; }
 .payroll-metrics .payable { background: linear-gradient(135deg, rgba(34,197,94,0.14), rgba(255,255,255,0.7)); }
 .payroll-metrics .payable strong { color: #166534; }
+.payslip-brand { display: flex; align-items: center; gap: 12px; }
+.payslip-brand-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: linear-gradient(135deg, #dff4ff, #ffe9ba); color: #0c3a5d; font-weight: 800; }
+.payslip-brand-strip { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: linear-gradient(135deg, rgba(24,111,175,0.08), rgba(255,255,255,0.9)); border: 1px solid rgba(24,111,175,0.08); }
+.payslip-shop-info { display: grid; gap: 4px; }
+.payslip-shop-info strong { color: #103f63; }
+.payslip-shop-info span { color: var(--text-muted); font-size: 0.8rem; }
+.payslip-chip { display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; background: rgba(34,197,94,0.12); color: #166534; font-weight: 700; }
+.payslip-brand { display: flex; align-items: center; gap: 12px; }
+.payslip-brand-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: linear-gradient(135deg, #dff4ff, #ffe9ba); color: #0c3a5d; font-weight: 800; }
+.payslip-brand-strip { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: linear-gradient(135deg, rgba(24,111,175,0.08), rgba(255,255,255,0.9)); border: 1px solid rgba(24,111,175,0.08); }
+.payslip-shop-info { display: grid; gap: 4px; }
+.payslip-shop-info strong { color: #103f63; }
+.payslip-shop-info span { color: var(--text-muted); font-size: 0.8rem; }
+.payslip-chip { display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; background: rgba(34,197,94,0.12); color: #166534; font-weight: 700; }
 .payslip-lines { display: grid; gap: 8px; padding-top: 6px; border-top: 1px solid var(--panel-border); }
 .payslip-lines > div { display: flex; justify-content: space-between; gap: 12px; }
 .dashboard-page { display: grid; gap: 18px; }
