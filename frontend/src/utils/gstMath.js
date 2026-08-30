@@ -5,6 +5,15 @@ export function calculateTaxableValue(inclusiveAmount, gstRate = 0) {
   return Number((Number(inclusiveAmount) / (1 + rate / 100)).toFixed(2));
 }
 
+export function calculateGstAmount(inclusiveAmount, gstRate = 0) {
+  const amount = Number(inclusiveAmount || 0);
+  const rate = Number(gstRate || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  if (rate <= 0) return 0;
+  const taxableValue = calculateTaxableValue(amount, rate);
+  return Number((amount - taxableValue).toFixed(2));
+}
+
 export function calculateGstBreakdown(inclusiveAmount, gstRate = 0) {
   const amount = Number(inclusiveAmount || 0);
   const rate = Number(gstRate || 0);

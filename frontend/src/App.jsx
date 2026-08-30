@@ -5,7 +5,7 @@ import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import { downloadInvoicePdf } from './utils/invoicePdf';
-import { calculateTaxableValue, getEffectiveGstRate } from './utils/gstMath';
+import { calculateGstAmount, calculateTaxableValue, getEffectiveGstRate } from './utils/gstMath';
 
 const API = API_BASE_URL;
 
