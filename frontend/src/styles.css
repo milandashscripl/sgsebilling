@@ -297,8 +297,10 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
   border: 1px solid rgba(31, 58, 85, 0.1); border-radius: 14px; overflow: hidden; background: #fff;
 }
 .invoice-item-head, .invoice-item-row {
-  display: grid; grid-template-columns: minmax(180px, 2fr) 90px 150px 120px 120px 120px;
-  gap: 10px; align-items: center;
+  display: grid;
+  grid-template-columns: minmax(170px, 2.2fr) 90px minmax(90px, 1fr) minmax(90px, 1fr) minmax(100px, 1.2fr);
+  gap: 10px;
+  align-items: center;
 }
 .invoice-item-head {
   background: linear-gradient(135deg, rgba(31, 91, 67, 0.08), rgba(24, 111, 175, 0.05));

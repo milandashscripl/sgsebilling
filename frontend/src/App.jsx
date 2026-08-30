@@ -1925,7 +1925,6 @@ function BillingPage({ user }) {
                 <div className="invoice-item-head">
                   <span>Item</span>
                   <span>Qty</span>
-                  <span>Final Price</span>
                   <span>Base</span>
                   <span>GST</span>
                   <span>Amount</span>
@@ -2042,7 +2041,6 @@ function BillingPage({ user }) {
               <div className="invoice-item-head">
                 <span>Item</span>
                 <span>Qty</span>
-                <span>Final Price</span>
                 <span>Base</span>
                 <span>GST</span>
                 <span>Amount</span>
@@ -2054,7 +2052,6 @@ function BillingPage({ user }) {
                     <small>{previewInvoice.type === 'setup' ? 'Package item' : 'Item line'}</small>
                   </div>
                   <span className="invoice-plain-value">{entry.quantity}</span>
-                  <span className="invoice-plain-value">{previewInvoice.type === 'setup' ? '—' : `₹${Number(entry.price || 0).toFixed(2)}`}</span>
                   <span className="invoice-plain-value">{previewInvoice.type === 'setup' ? `₹${Number(previewInvoice.subtotal || 0).toFixed(2)}` : `₹${Number((Number(entry.price || 0) / (1 + (Number(entry.gstRate || 0) / 100))) || 0).toFixed(2)}`}</span>
                   <span className="invoice-plain-value">{previewInvoice.type === 'setup' ? `₹${Number(previewInvoice.gstAmount || 0).toFixed(2)}` : `₹${Number((Number(entry.price || 0) - (Number(entry.price || 0) / (1 + (Number(entry.gstRate || 0) / 100)))) || 0).toFixed(2)}`}</span>
                   <strong className="invoice-total-value">{previewInvoice.type === 'setup' ? '—' : `₹${(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}`}</strong>
