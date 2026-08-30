@@ -1466,8 +1466,17 @@ function BillingPage({ user }) {
     setSelectedItems(setupRows);
   };
 
+  const getSetupLinePrice = () => {
+    const finalPrice = Number(setupPrice || 0);
+    const totalQuantity = selectedItems.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
+    if (!finalPrice || finalPrice <= 0 || totalQuantity <= 0) return 0;
+    return Number((finalPrice / totalQuantity).toFixed(2));
+  };
+
   const saveSetup = async () => {
     if (!setupName.trim()) return setBillingMessage('Add a name to save a setup');
+    if (!selectedItems.length) return setBillingMessage('Select at least one item before saving a setup');
+
     const finalPrice = Number(setupPrice || 0);
     const gstRate = Number(setupGstRate || 0);
 
@@ -1476,8 +1485,7 @@ function BillingPage({ user }) {
       return;
     }
 
-    const totalQty = selectedItems.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0) || 1;
-    const proportionalUnitPrice = Number((finalPrice / totalQty).toFixed(2));
+    const packageLinePrice = getSetupLinePrice();
 
     try {
       const response = await api.post('/setups', {
@@ -1489,7 +1497,7 @@ function BillingPage({ user }) {
           item: entry.item,
           name: entry.name,
           quantity: Number(entry.quantity || 1),
-          price: proportionalUnitPrice
+          price: packageLinePrice || Number(entry.price || 0)
         }))
       });
       setSetups((previous) => [...previous, response.data].sort((a, b) => a.name.localeCompare(b.name)));
@@ -1568,15 +1576,15 @@ function BillingPage({ user }) {
       return null;
     }
 
-    const totalQty = selectedItems.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0) || 1;
     const setupTotal = Number(setupPrice || 0);
     const setupRate = Number(setupGstRate || 0);
+    const isSetupPackage = type === 'setup' && setupTotal > 0;
 
     const previewItems = selectedItems.map((entry) => {
       const quantity = Number(entry.quantity || 1);
-      const lineRate = type === 'setup' && setupTotal > 0 ? Number((setupTotal / totalQty).toFixed(2)) : Number(entry.price || 0);
-      const taxRate = type === 'setup' ? setupRate : Number(entry.gstRate ?? (Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0)));
+      const taxRate = isSetupPackage ? setupRate : Number(entry.gstRate ?? (Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0)));
       const splitRate = Number((taxRate / 2).toFixed(2));
+      const lineRate = isSetupPackage ? Number((setupTotal / Math.max(1, selectedItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0))).toFixed(2)) : Number(entry.price || 0);
       return {
         item: entry.item,
         name: entry.name,
@@ -1590,8 +1598,8 @@ function BillingPage({ user }) {
       };
     });
 
-    const invoiceSubtotal = type === 'setup' && setupTotal > 0 ? calculateTaxableValue(setupTotal, setupRate) : subtotal;
-    const invoiceGstAmount = type === 'setup' && setupTotal > 0 ? Number((setupTotal - invoiceSubtotal).toFixed(2)) : gstAmount;
+    const invoiceSubtotal = isSetupPackage ? calculateTaxableValue(setupTotal, setupRate) : subtotal;
+    const invoiceGstAmount = isSetupPackage ? Number((setupTotal - invoiceSubtotal).toFixed(2)) : gstAmount;
 
     return {
       partyName: partyName || customerName,
@@ -1602,7 +1610,7 @@ function BillingPage({ user }) {
       type,
       subtotal: invoiceSubtotal,
       gstAmount: invoiceGstAmount,
-      grandTotal: type === 'setup' && setupTotal > 0 ? setupTotal : total,
+      grandTotal: isSetupPackage ? setupTotal : total,
       items: previewItems,
       sellerName: vendor.name,
       sellerAddress: vendor.address,
@@ -1804,19 +1812,29 @@ function BillingPage({ user }) {
                     <button className="btn small" onClick={() => updateQty(entry.item, 1)}>+</button>
                   </div>
                   <div className="price-box">
-                    <label>Final incl. GST<input className="line-price" type="number" min="0" step="0.01" value={entry.price} onChange={(e) => setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? { ...line, price: Number(e.target.value || 0) } : line))} aria-label={`Final price including GST for ${entry.name}`} /></label>
-                    <label>GST %<input className="line-price" type="number" min="0" step="0.01" value={entry.gstRate ?? getEffectiveGstRate(entry)} onChange={(e) => {
-                      const nextRate = Number(e.target.value || 0);
-                      const splitRate = Number((nextRate / 2).toFixed(2));
-                      setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? {
-                        ...line,
-                        gstRate: nextRate,
-                        sgstRate: splitRate,
-                        cgstRate: splitRate,
-                        igstRate: 0
-                      } : line));
-                    }} aria-label={`GST rate for ${entry.name}`} /></label>
-                    <small>Base ₹{calculateTaxableValue(Number(entry.price || 0), Number(entry.gstRate ?? getEffectiveGstRate(entry))).toFixed(2)} • SGST {((Number(entry.gstRate ?? getEffectiveGstRate(entry)) / 2) || 0).toFixed(2)}% • CGST {((Number(entry.gstRate ?? getEffectiveGstRate(entry)) / 2) || 0).toFixed(2)}%</small>
+                    {type === 'setup' && Number(setupPrice || 0) > 0 ? (
+                      <>
+                        <label>Package split price<input className="line-price" type="number" min="0" step="0.01" value={getSetupLinePrice()} readOnly aria-label={`Package split price for ${entry.name}`} /></label>
+                        <label>GST %<input className="line-price" type="number" min="0" step="0.01" value={setupGstRate || 0} readOnly aria-label={`GST rate for ${entry.name}`} /></label>
+                        <small>Base ₹{calculateTaxableValue(Number(getSetupLinePrice() || 0), Number(setupGstRate || 0)).toFixed(2)} • SGST {((Number(setupGstRate || 0) / 2) || 0).toFixed(2)}% • CGST {((Number(setupGstRate || 0) / 2) || 0).toFixed(2)}%</small>
+                      </>
+                    ) : (
+                      <>
+                        <label>Final incl. GST<input className="line-price" type="number" min="0" step="0.01" value={entry.price} onChange={(e) => setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? { ...line, price: Number(e.target.value || 0) } : line))} aria-label={`Final price including GST for ${entry.name}`} /></label>
+                        <label>GST %<input className="line-price" type="number" min="0" step="0.01" value={entry.gstRate ?? getEffectiveGstRate(entry)} onChange={(e) => {
+                          const nextRate = Number(e.target.value || 0);
+                          const splitRate = Number((nextRate / 2).toFixed(2));
+                          setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? {
+                            ...line,
+                            gstRate: nextRate,
+                            sgstRate: splitRate,
+                            cgstRate: splitRate,
+                            igstRate: 0
+                          } : line));
+                        }} aria-label={`GST rate for ${entry.name}`} /></label>
+                        <small>Base ₹{calculateTaxableValue(Number(entry.price || 0), Number(entry.gstRate ?? getEffectiveGstRate(entry))).toFixed(2)} • SGST {((Number(entry.gstRate ?? getEffectiveGstRate(entry)) / 2) || 0).toFixed(2)}% • CGST {((Number(entry.gstRate ?? getEffectiveGstRate(entry)) / 2) || 0).toFixed(2)}%</small>
+                      </>
+                    )}
                   </div>
                   <strong>₹{(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}</strong>
                 </div>
