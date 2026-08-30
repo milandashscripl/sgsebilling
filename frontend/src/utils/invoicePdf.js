@@ -72,12 +72,12 @@ export async function downloadInvoicePdf(invoice) {
   const invoiceTitle = invoice.type === 'purchase' ? 'PURCHASE INVOICE' : invoice.type === 'setup' ? 'SETUP BILL' : invoice.type === 'return' ? 'RETURN INVOICE' : 'GST INVOICE';
   doc.text(invoiceTitle, marginLeft, y);
   doc.setFont(undefined, 'normal');
-  doc.setFontSize(9);
-  doc.text(`Invoice No: ${invoice.invoiceNumber || 'N/A'}`, pageWidth - marginRight - 60, y);
-  doc.text(`Nature: ${invoice.natureOfSupply || 'B2B'}`, pageWidth - marginRight - 60, y + 5);
-  y += 6;
-  doc.text(`Date: ${invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}`, pageWidth - marginRight - 60, y);
-  y += 8;
+  doc.setFontSize(8.5);
+  const rightMetaX = pageWidth - marginRight - 58;
+  doc.text(`Invoice No: ${invoice.invoiceNumber || 'N/A'}`, rightMetaX, y);
+  doc.text(`Nature: ${invoice.natureOfSupply || 'B2B'}`, rightMetaX, y + 5);
+  doc.text(`Date: ${invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}`, rightMetaX, y + 10);
+  y += 14;
 
   doc.setDrawColor(218, 226, 233);
   doc.setFillColor(245, 249, 252);
@@ -86,16 +86,26 @@ export async function downloadInvoicePdf(invoice) {
   doc.setFont(undefined, 'bold');
   doc.text('Bill To', marginLeft + 5, y + 7);
   doc.setFont(undefined, 'normal');
-  doc.text(invoice.partyName || invoice.customerName || 'Walk-in Customer', marginLeft + 5, y + 13);
-  doc.text(invoice.partyPhone || invoice.customerPhone || '—', marginLeft + 5, y + 18);
-  doc.text(invoice.partyGSTIN || 'GSTIN: Not provided', pageWidth - marginRight - 55, y + 13, { align: 'right' });
-  y += 30;
+  const billToName = invoice.partyName || invoice.customerName || 'Walk-in Customer';
+  const billToPhone = invoice.partyPhone || invoice.customerPhone || '—';
+  const billToGstin = invoice.partyGSTIN || 'GSTIN: Not provided';
+  const billToLines = doc.splitTextToSize(billToName, 62);
+  doc.text(billToLines, marginLeft + 5, y + 13);
+  doc.text(billToPhone, marginLeft + 5, y + 18 + (billToLines.length - 1) * 3.5);
+  doc.text(billToGstin, pageWidth - marginRight - 52, y + 13, { align: 'right' });
+  y += 30 + Math.max(0, billToLines.length - 1) * 2;
 
   doc.setTextColor(20, 20, 20);
   doc.setFont(undefined, 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
+  const itemNameWidth = 52;
+  const qtyX = marginLeft + 85;
+  const finalPriceX = marginLeft + 104;
+  const baseX = marginLeft + 136;
+  const gstX = marginLeft + 160;
+  const amountX = marginLeft + 186;
   const headers = ['Item', 'Qty', 'Final Price', 'Base', 'GST', 'Amount'];
-  const startX = [marginLeft + 2, marginLeft + 92, marginLeft + 118, marginLeft + 150, marginLeft + 172, marginLeft + 193];
+  const startX = [marginLeft + 2, qtyX, finalPriceX, baseX, gstX, amountX];
   headers.forEach((header, index) => {
     doc.text(header, startX[index], y);
   });
@@ -134,15 +144,19 @@ export async function downloadInvoicePdf(invoice) {
     gstTotal += invoice.type === 'setup' ? 0 : lineTax;
 
     doc.setFont(undefined, 'normal');
-    doc.text(String(index + 1), marginLeft + 2, y);
-    const itemName = String(item.name || 'Item').slice(0, 25);
-    doc.text(itemName, marginLeft + 10, y);
-    doc.text(String(qty), marginLeft + 95, y);
-    doc.text(invoice.type === 'setup' ? '' : `₹${finalPrice.toFixed(2)}`, marginLeft + 115, y);
-    doc.text(invoice.type === 'setup' ? '' : `₹${(taxableValue).toFixed(2)}`, marginLeft + 150, y);
-    doc.text(invoice.type === 'setup' ? '' : `₹${lineTax.toFixed(2)}`, marginLeft + 172, y);
-    doc.text(invoice.type === 'setup' ? '' : `₹${lineTotal.toFixed(2)}`, marginLeft + 193, y, { align: 'right' });
-    y += 6;
+    const itemName = String(item.name || 'Item');
+    const itemLines = doc.splitTextToSize(itemName, itemNameWidth);
+    const linesToRender = itemLines.slice(0, 2);
+    doc.text(String(index + 1), marginLeft + 2, y + 2);
+    linesToRender.forEach((line, lineIndex) => {
+      doc.text(line, marginLeft + 10, y + 2 + (lineIndex * 4));
+    });
+    doc.text(String(qty), qtyX + 4, y + 2);
+    doc.text(invoice.type === 'setup' ? '' : `₹${finalPrice.toFixed(2)}`, finalPriceX + 2, y + 2);
+    doc.text(invoice.type === 'setup' ? '' : `₹${(taxableValue).toFixed(2)}`, baseX + 2, y + 2);
+    doc.text(invoice.type === 'setup' ? '' : `₹${lineTax.toFixed(2)}`, gstX + 2, y + 2);
+    doc.text(invoice.type === 'setup' ? '' : `₹${lineTotal.toFixed(2)}`, amountX + 2, y + 2, { align: 'right' });
+    y += 5 + Math.max(0, linesToRender.length - 1) * 4;
   });
 
   y += 5;
@@ -154,15 +168,15 @@ export async function downloadInvoicePdf(invoice) {
   const grandTotal = safeValue(invoice.grandTotal, subtotalFromInvoice + gstFromInvoice);
 
   doc.setFont(undefined, 'bold');
-  doc.text('Taxable Value', marginLeft + 140, y);
+  doc.text('Taxable Value', marginLeft + 120, y);
   doc.text(`₹${subtotalFromInvoice.toFixed(2)}`, pageWidth - marginRight, y, { align: 'right' });
   y += 6;
-  doc.text('GST', marginLeft + 140, y);
+  doc.text('GST', marginLeft + 120, y);
   doc.text(`₹${gstFromInvoice.toFixed(2)}`, pageWidth - marginRight, y, { align: 'right' });
   y += 8;
   doc.setFillColor(244, 248, 251);
   doc.rect(marginLeft + 120, y - 4, contentWidth - 120, 10, 'F');
-  doc.text('TOTAL', marginLeft + 140, y);
+  doc.text('TOTAL', marginLeft + 120, y);
   doc.text(`₹${grandTotal.toFixed(2)}`, pageWidth - marginRight, y, { align: 'right' });
   y += 14;
 
