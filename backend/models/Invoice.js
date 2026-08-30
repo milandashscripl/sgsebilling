@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const invoiceSchema = new mongoose.Schema({
   invoiceNumber: { type: String, required: true, unique: true },
+  natureOfSupply: { type: String, enum: ['B2B', 'B2C'], default: 'B2B' },
   partyName: { type: String, default: 'Walk-in Customer' },
   partyPhone: { type: String, default: '' },
   partyGSTIN: { type: String, default: '' },

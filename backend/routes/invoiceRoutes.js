@@ -20,6 +20,8 @@ router.post('/', auth, async (req, res) => {
   try {
     const {
       items = [],
+      invoiceNumber: requestedInvoiceNumber,
+      natureOfSupply,
       partyName,
       partyPhone,
       partyGSTIN,
@@ -64,10 +66,11 @@ router.post('/', auth, async (req, res) => {
     const paid = Number(paidAmount || 0);
     const balance = grandTotal - paid;
     const paymentStatus = balance <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
-    const invoiceNumber = `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const invoiceNumber = (requestedInvoiceNumber || '').trim() || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     const invoice = await Invoice.create({
       invoiceNumber,
+      natureOfSupply: ['B2B', 'B2C'].includes((natureOfSupply || '').toUpperCase()) ? (natureOfSupply || '').toUpperCase() : 'B2B',
       partyName: partyName || customerName || 'Walk-in Customer',
       partyPhone: partyPhone || customerPhone || '',
       partyGSTIN: partyGSTIN || '',

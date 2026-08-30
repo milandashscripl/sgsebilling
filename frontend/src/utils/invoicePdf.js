@@ -74,6 +74,7 @@ export async function downloadInvoicePdf(invoice) {
   doc.setFont(undefined, 'normal');
   doc.setFontSize(9);
   doc.text(`Invoice No: ${invoice.invoiceNumber || 'N/A'}`, pageWidth - marginRight - 60, y);
+  doc.text(`Nature: ${invoice.natureOfSupply || 'B2B'}`, pageWidth - marginRight - 60, y + 5);
   y += 6;
   doc.text(`Date: ${invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}`, pageWidth - marginRight - 60, y);
   y += 8;
@@ -130,14 +131,14 @@ export async function downloadInvoicePdf(invoice) {
       : Number((finalPrice * qty).toFixed(2));
 
     subtotalValue += invoice.type === 'setup' ? taxableValue : Number((taxableValue * qty).toFixed(2));
-    gstTotal += invoice.type === 'setup' ? lineTax : lineTax;
+    gstTotal += lineTax;
 
     doc.setFont(undefined, 'normal');
     doc.text(String(index + 1), marginLeft + 2, y);
     const itemName = String(item.name || 'Item').slice(0, 25);
     doc.text(itemName, marginLeft + 10, y);
     doc.text(String(qty), marginLeft + 95, y);
-    doc.text(invoice.type === 'setup' ? 'Included' : `₹${finalPrice.toFixed(2)}`, marginLeft + 115, y);
+    doc.text(invoice.type === 'setup' ? '' : `₹${finalPrice.toFixed(2)}`, marginLeft + 115, y);
     doc.text(invoice.type === 'setup' ? '—' : `₹${(taxableValue).toFixed(2)}`, marginLeft + 150, y);
     doc.text(invoice.type === 'setup' ? '—' : `₹${lineTax.toFixed(2)}`, marginLeft + 172, y);
     doc.text(invoice.type === 'setup' ? `₹${lineTotal.toFixed(2)}` : `₹${lineTotal.toFixed(2)}`, marginLeft + 193, y, { align: 'right' });

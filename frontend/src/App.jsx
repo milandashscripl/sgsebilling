@@ -1477,6 +1477,8 @@ function BillingPage({ user }) {
   const [itemSearch, setItemSearch] = useState('');
   const [billingMessage, setBillingMessage] = useState('');
   const [previewInvoice, setPreviewInvoice] = useState(null);
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [invoiceNature, setInvoiceNature] = useState('B2B');
 
   const vendor = {
     name: user?.shopName || user?.name || 'SGSE Billing',
@@ -1619,6 +1621,8 @@ function BillingPage({ user }) {
 
     try {
       const payload = {
+        invoiceNumber: invoiceNumber.trim() || `INV-${Date.now()}`,
+        natureOfSupply: invoiceNature,
         partyName: partyName || customerName,
         partyPhone: partyPhone || customerPhone,
         partyGSTIN,
@@ -1661,6 +1665,8 @@ function BillingPage({ user }) {
       setPartyGSTIN('');
       setCustomerName('');
       setCustomerPhone('');
+      setInvoiceNumber('');
+      setInvoiceNature('B2B');
     } catch (error) {
       setBillingMessage(error.response?.data?.message || 'Unable to create invoice');
     }
@@ -1698,6 +1704,8 @@ function BillingPage({ user }) {
     const invoiceGstAmount = isSetupPackage ? Number((setupTotal - invoiceSubtotal).toFixed(2)) : gstAmount;
 
     return {
+      invoiceNumber: invoiceNumber.trim() || `PREVIEW-${Date.now()}`,
+      natureOfSupply: invoiceNature,
       partyName: partyName || customerName,
       partyPhone: partyPhone || customerPhone,
       partyGSTIN,
@@ -1712,8 +1720,7 @@ function BillingPage({ user }) {
       sellerAddress: vendor.address,
       sellerPhone: vendor.phone,
       sellerGSTIN: user?.shopGSTIN || '',
-      sellerLogo: vendor.logo,
-      invoiceNumber: `PREVIEW-${Date.now()}`
+      sellerLogo: vendor.logo
     };
   };
 
@@ -1730,6 +1737,8 @@ function BillingPage({ user }) {
 
     try {
       const payload = {
+        invoiceNumber: invoice.invoiceNumber || invoiceNumber.trim() || `INV-${Date.now()}`,
+        natureOfSupply: invoice.natureOfSupply || invoiceNature,
         partyName: partyName || customerName,
         partyPhone: partyPhone || customerPhone,
         partyGSTIN,
@@ -1770,6 +1779,8 @@ function BillingPage({ user }) {
       setCustomerPhone('');
       setSetupPrice('');
       setSetupGstRate('18');
+      setInvoiceNumber('');
+      setInvoiceNature('B2B');
     } catch (error) {
       setBillingMessage(error.response?.data?.message || 'Unable to create invoice');
     }
@@ -1803,12 +1814,25 @@ function BillingPage({ user }) {
               <h4>New invoice</h4>
               <p className="muted">Create a clean, branded bill with vendor details included.</p>
             </div>
-            <select value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="sale">Sale</option>
-              <option value="purchase">Purchase</option>
-                  <option value="return">Return</option>
-                  <option value="setup">Setup billing</option>
-            </select>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+              <input
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
+                placeholder="Invoice no"
+                aria-label="Invoice number"
+                style={{ minWidth: '140px' }}
+              />
+              <select value={invoiceNature} onChange={(e) => setInvoiceNature(e.target.value)} aria-label="Invoice type">
+                <option value="B2B">B2B</option>
+                <option value="B2C">B2C</option>
+              </select>
+              <select value={type} onChange={(e) => setType(e.target.value)}>
+                <option value="sale">Sale</option>
+                <option value="purchase">Purchase</option>
+                <option value="return">Return</option>
+                <option value="setup">Setup billing</option>
+              </select>
+            </div>
           </div>
 
           <div className="setup-tools">
@@ -1872,8 +1896,9 @@ function BillingPage({ user }) {
                 {vendor.phone && <div className="muted">{vendor.phone}</div>}
               </div>
             </div>
-            <div className="invoice-meta">
+            <div className="invoice-meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
               <span>{type === 'sale' ? 'Sale Invoice' : type === 'purchase' ? 'Purchase Invoice' : type === 'setup' ? 'Setup Billing' : 'Return Invoice'}</span>
+              <span className="status-badge status-warm-lead" style={{ marginTop: 0 }}>{invoiceNature}</span>
             </div>
           </div>
 
@@ -1910,9 +1935,8 @@ function BillingPage({ user }) {
                   <div className="price-box">
                     {type === 'setup' && Number(setupPrice || 0) > 0 ? (
                       <>
-                        <label>Final setup price<input className="line-price" type="number" min="0" step="0.01" value={Number(setupPrice || 0)} readOnly aria-label={`Final setup price for ${entry.name}`} /></label>
-                        <label>GST %<input className="line-price" type="number" min="0" step="0.01" value={setupGstRate || 0} readOnly aria-label={`GST rate for ${entry.name}`} /></label>
-                        <small>Included in one final package total • Base ₹{calculateTaxableValue(Number(setupPrice || 0), Number(setupGstRate || 0)).toFixed(2)}</small>
+                        <small>Included in final package total</small>
+                        <small>Base ₹{calculateTaxableValue(Number(setupPrice || 0), Number(setupGstRate || 0)).toFixed(2)}</small>
                       </>
                     ) : (
                       <>
@@ -1932,7 +1956,7 @@ function BillingPage({ user }) {
                       </>
                     )}
                   </div>
-                  <strong>{type === 'setup' ? 'Included' : `₹${(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}`}</strong>
+                  <strong>{type === 'setup' ? '' : `₹${(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}`}</strong>
                 </div>
               ))
             )}
@@ -1974,8 +1998,9 @@ function BillingPage({ user }) {
                   {vendor.phone && <div className="muted">{vendor.phone}</div>}
                 </div>
               </div>
-              <div className="invoice-meta">
+              <div className="invoice-meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                 <span>{previewInvoice.type === 'sale' ? 'Sale Invoice' : previewInvoice.type === 'purchase' ? 'Purchase Invoice' : previewInvoice.type === 'setup' ? 'Setup Billing' : 'Return Invoice'}</span>
+                <span className="status-badge status-warm-lead" style={{ marginTop: 0 }}>{previewInvoice.natureOfSupply || 'B2B'}</span>
               </div>
             </div>
 
@@ -2001,7 +2026,7 @@ function BillingPage({ user }) {
                     <strong>{entry.name}</strong>
                     <div className="muted">Qty: {entry.quantity}</div>
                   </div>
-                  <strong>{previewInvoice.type === 'setup' ? 'Included' : `₹${(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}`}</strong>
+                  <strong>{previewInvoice.type === 'setup' ? '' : `₹${(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}`}</strong>
                 </div>
               ))}
             </div>
