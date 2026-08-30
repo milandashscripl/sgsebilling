@@ -121,17 +121,17 @@ export async function downloadInvoicePdf(invoice) {
     const finalPrice = safeValue(item.price, 0);
     const taxRate = invoice.type === 'setup' ? 0 : getItemTaxRate(item);
     const taxableValue = invoice.type === 'setup'
-      ? safeValue(invoice.subtotal, 0) / Math.max(1, displayItems.length)
+      ? 0
       : (taxRate > 0 ? Number((finalPrice / (1 + taxRate / 100)).toFixed(2)) : finalPrice);
     const lineTax = invoice.type === 'setup'
-      ? safeValue(invoice.gstAmount, 0) / Math.max(1, displayItems.length)
+      ? 0
       : Number((finalPrice * qty - taxableValue * qty).toFixed(2));
     const lineTotal = invoice.type === 'setup'
-      ? safeValue(invoice.grandTotal, 0)
+      ? 0
       : Number((finalPrice * qty).toFixed(2));
 
-    subtotalValue += invoice.type === 'setup' ? taxableValue : Number((taxableValue * qty).toFixed(2));
-    gstTotal += lineTax;
+    subtotalValue += invoice.type === 'setup' ? 0 : Number((taxableValue * qty).toFixed(2));
+    gstTotal += invoice.type === 'setup' ? 0 : lineTax;
 
     doc.setFont(undefined, 'normal');
     doc.text(String(index + 1), marginLeft + 2, y);
@@ -139,9 +139,9 @@ export async function downloadInvoicePdf(invoice) {
     doc.text(itemName, marginLeft + 10, y);
     doc.text(String(qty), marginLeft + 95, y);
     doc.text(invoice.type === 'setup' ? '' : `₹${finalPrice.toFixed(2)}`, marginLeft + 115, y);
-    doc.text(invoice.type === 'setup' ? '—' : `₹${(taxableValue).toFixed(2)}`, marginLeft + 150, y);
-    doc.text(invoice.type === 'setup' ? '—' : `₹${lineTax.toFixed(2)}`, marginLeft + 172, y);
-    doc.text(invoice.type === 'setup' ? `₹${lineTotal.toFixed(2)}` : `₹${lineTotal.toFixed(2)}`, marginLeft + 193, y, { align: 'right' });
+    doc.text(invoice.type === 'setup' ? '' : `₹${(taxableValue).toFixed(2)}`, marginLeft + 150, y);
+    doc.text(invoice.type === 'setup' ? '' : `₹${lineTax.toFixed(2)}`, marginLeft + 172, y);
+    doc.text(invoice.type === 'setup' ? '' : `₹${lineTotal.toFixed(2)}`, marginLeft + 193, y, { align: 'right' });
     y += 6;
   });
 
