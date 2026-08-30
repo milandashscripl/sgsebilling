@@ -41,29 +41,28 @@ export async function downloadInvoicePdf(invoice) {
     // ignore
   }
 
-  doc.setFillColor(13, 82, 131);
+  doc.setFillColor(12, 82, 131);
   doc.rect(0, 0, pageWidth, 28, 'F');
   if (sellerLogo) {
     const imgData = await loadImageAsDataUrl(sellerLogo).catch(() => null);
     if (imgData) {
       try {
-        doc.addImage(imgData, 'PNG', marginLeft, 7, 22, 22);
+        doc.addImage(imgData, 'PNG', marginLeft, 6, 22, 22);
       } catch {
-        try { doc.addImage(imgData, 'JPEG', marginLeft, 7, 22, 22); } catch {}
+        try { doc.addImage(imgData, 'JPEG', marginLeft, 6, 22, 22); } catch {}
       }
     }
   }
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
+  doc.setFontSize(17);
   doc.setFont(undefined, 'bold');
   doc.text(invoice.sellerName || 'SGSE Billing', marginLeft + 28, 16);
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont(undefined, 'normal');
-  if (invoice.sellerAddress) {
-    const addressLines = doc.splitTextToSize(invoice.sellerAddress, contentWidth - 28);
-    doc.text(addressLines, marginLeft + 28, 21);
-  }
+  const sellerAddress = invoice.sellerAddress || 'Business address';
+  const sellerAddressLines = doc.splitTextToSize(sellerAddress, contentWidth - 32);
+  doc.text(sellerAddressLines, marginLeft + 28, 21);
 
   y = 38;
   doc.setTextColor(20, 20, 20);
@@ -79,9 +78,9 @@ export async function downloadInvoicePdf(invoice) {
   doc.text(`Date: ${invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}`, rightMetaX, y + 10);
   y += 14;
 
-  doc.setDrawColor(218, 226, 233);
-  doc.setFillColor(245, 249, 252);
-  doc.roundedRect(marginLeft, y, contentWidth, 24, 2, 2, 'F');
+  doc.setDrawColor(220, 228, 236);
+  doc.setFillColor(246, 249, 252);
+  doc.roundedRect(marginLeft, y, contentWidth, 26, 2.5, 2.5, 'F');
   doc.setTextColor(30, 50, 72);
   doc.setFont(undefined, 'bold');
   doc.text('Bill To', marginLeft + 5, y + 7);
@@ -93,13 +92,13 @@ export async function downloadInvoicePdf(invoice) {
   doc.text(billToLines, marginLeft + 5, y + 13);
   doc.text(billToPhone, marginLeft + 5, y + 18 + (billToLines.length - 1) * 3.5);
   doc.text(billToGstin, pageWidth - marginRight - 52, y + 13, { align: 'right' });
-  y += 30 + Math.max(0, billToLines.length - 1) * 2;
+  y += 32 + Math.max(0, billToLines.length - 1) * 2;
 
   doc.setTextColor(20, 20, 20);
   doc.setFont(undefined, 'bold');
   doc.setFontSize(8.5);
   const itemNameWidth = 52;
-  const qtyX = marginLeft + 85;
+  const qtyX = marginLeft + 84;
   const finalPriceX = marginLeft + 104;
   const baseX = marginLeft + 136;
   const gstX = marginLeft + 160;
@@ -111,7 +110,7 @@ export async function downloadInvoicePdf(invoice) {
   });
   y += 5;
 
-  doc.setDrawColor(200, 210, 220);
+  doc.setDrawColor(205, 214, 224);
   doc.line(marginLeft, y, pageWidth - marginRight, y);
   y += 4;
 
