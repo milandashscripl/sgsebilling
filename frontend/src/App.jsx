@@ -1426,7 +1426,7 @@ function SetupLibraryPage() {
         {filteredItems.length === 0 ? <p className="muted empty-invoice-state">No items found.</p> : filteredItems.map((item) => (
           <button key={item._id} className="item-chip" type="button" onClick={() => addSetupItem(item)}>
             <span>{item.name}</span>
-            <small>₹{item.salePrice}</small>
+            <small>Qty item</small>
           </button>
         ))}
       </div>
@@ -1515,13 +1515,13 @@ function BillingPage({ user }) {
         item: item._id,
         name: item.name,
         quantity: 1,
-        price: finalPrice,
-        gstRate,
-        sgstRate,
-        cgstRate: sgstRate,
+        price: type === 'setup' ? 0 : finalPrice,
+        gstRate: type === 'setup' ? Number(setupGstRate || gstRate) : gstRate,
+        sgstRate: type === 'setup' ? Number((Number(setupGstRate || gstRate) / 2).toFixed(2)) : sgstRate,
+        cgstRate: type === 'setup' ? Number((Number(setupGstRate || gstRate) / 2).toFixed(2)) : sgstRate,
         igstRate: 0,
-        taxableValue: calculateTaxableValue(finalPrice, gstRate),
-        total: finalPrice
+        taxableValue: type === 'setup' ? calculateTaxableValue(Number(setupPrice || 0), Number(setupGstRate || gstRate)) : calculateTaxableValue(finalPrice, gstRate),
+        total: type === 'setup' ? 0 : finalPrice
       }];
     });
   };
@@ -1540,23 +1540,23 @@ function BillingPage({ user }) {
           item: entry.item,
           name: entry.name,
           quantity: Number(entry.quantity || 1),
-          price: Number(entry.price || 0),
+          price: 0,
           gstRate: Number(setup.gstRate || 0),
           sgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
           cgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
           igstRate: 0,
-          total: Number(entry.quantity || 1) * Number(entry.price || 0)
+          total: 0
         }))
       : [{
           item: setup._id,
           name: setup.name,
           quantity: 1,
-          price: Number(setup.finalPrice || 0),
+          price: 0,
           gstRate: Number(setup.gstRate || 0),
           sgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
           cgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
           igstRate: 0,
-          total: Number(setup.finalPrice || 0)
+          total: 0
         }];
 
     setSelectedItems(setupRows);
@@ -1855,7 +1855,7 @@ function BillingPage({ user }) {
               filteredItems.map((item) => (
                 <button key={item._id} className="item-chip" onClick={() => addItem(item)}>
                   <span>{item.name}</span>
-                  <small>₹{type === 'purchase' ? item.purchasePrice : item.salePrice}</small>
+                  <small>{type === 'setup' ? 'Setup item' : `₹${type === 'purchase' ? item.purchasePrice : item.salePrice}`}</small>
                 </button>
               ))
             )}
@@ -1900,7 +1900,7 @@ function BillingPage({ user }) {
                 <div className="invoice-item-row" key={entry.item}>
                   <div>
                     <strong>{entry.name}</strong>
-                    <div className="muted">₹{Number(entry.price).toFixed(2)} incl. GST × {entry.quantity}</div>
+                    <div className="muted">Qty: {entry.quantity}</div>
                   </div>
                   <div className="invoice-item-actions">
                     <button className="btn small" onClick={() => updateQty(entry.item, -1)}>-</button>
@@ -1910,9 +1910,9 @@ function BillingPage({ user }) {
                   <div className="price-box">
                     {type === 'setup' && Number(setupPrice || 0) > 0 ? (
                       <>
-                        <label>Package split price<input className="line-price" type="number" min="0" step="0.01" value={getSetupLinePrice()} readOnly aria-label={`Package split price for ${entry.name}`} /></label>
+                        <label>Final setup price<input className="line-price" type="number" min="0" step="0.01" value={Number(setupPrice || 0)} readOnly aria-label={`Final setup price for ${entry.name}`} /></label>
                         <label>GST %<input className="line-price" type="number" min="0" step="0.01" value={setupGstRate || 0} readOnly aria-label={`GST rate for ${entry.name}`} /></label>
-                        <small>Base ₹{calculateTaxableValue(Number(getSetupLinePrice() || 0), Number(setupGstRate || 0)).toFixed(2)} • SGST {((Number(setupGstRate || 0) / 2) || 0).toFixed(2)}% • CGST {((Number(setupGstRate || 0) / 2) || 0).toFixed(2)}%</small>
+                        <small>Included in one final package total • Base ₹{calculateTaxableValue(Number(setupPrice || 0), Number(setupGstRate || 0)).toFixed(2)}</small>
                       </>
                     ) : (
                       <>
@@ -1932,7 +1932,7 @@ function BillingPage({ user }) {
                       </>
                     )}
                   </div>
-                  <strong>₹{(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}</strong>
+                  <strong>{type === 'setup' ? 'Included' : `₹${(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}`}</strong>
                 </div>
               ))
             )}
@@ -1999,9 +1999,9 @@ function BillingPage({ user }) {
                 <div className="invoice-item-row" key={`${entry.item}-${entry.name}`}>
                   <div>
                     <strong>{entry.name}</strong>
-                    <div className="muted">₹{Number(entry.price || 0).toFixed(2)} incl. GST × {entry.quantity}</div>
+                    <div className="muted">Qty: {entry.quantity}</div>
                   </div>
-                  <strong>₹{(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}</strong>
+                  <strong>{previewInvoice.type === 'setup' ? 'Included' : `₹${(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}`}</strong>
                 </div>
               ))}
             </div>

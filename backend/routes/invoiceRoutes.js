@@ -44,12 +44,22 @@ router.post('/', auth, async (req, res) => {
       total: Number(item.total || ((Number(item.quantity || 0) * Number(item.price || 0))))
     }));
 
-    const grandTotal = invoiceItems.reduce((sum, it) => sum + (it.quantity * it.price), 0);
-    const subtotal = invoiceItems.reduce((sum, it) => {
+    const computedGrandTotal = invoiceItems.reduce((sum, it) => sum + (it.quantity * it.price), 0);
+    const computedSubtotal = invoiceItems.reduce((sum, it) => {
       const taxRate = Number(it.sgstRate || 0) + Number(it.cgstRate || 0) + Number(it.igstRate || 0);
       return sum + ((it.quantity * it.price) / (1 + taxRate / 100));
     }, 0);
-    const gstAmount = grandTotal - subtotal;
+    const computedGstAmount = computedGrandTotal - computedSubtotal;
+
+    const grandTotal = (type === 'setup' && Number.isFinite(Number(suppliedGrandTotal)) && Number(suppliedGrandTotal) > 0)
+      ? Number(suppliedGrandTotal)
+      : computedGrandTotal;
+    const subtotal = (type === 'setup' && Number.isFinite(Number(suppliedSubtotal)) && Number(suppliedSubtotal) > 0)
+      ? Number(suppliedSubtotal)
+      : computedSubtotal;
+    const gstAmount = (type === 'setup' && Number.isFinite(Number(suppliedGstAmount)) && Number(suppliedGstAmount) >= 0)
+      ? Number(suppliedGstAmount)
+      : computedGstAmount;
 
     const paid = Number(paidAmount || 0);
     const balance = grandTotal - paid;
