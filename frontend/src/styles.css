@@ -351,6 +351,11 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
   .contact-time { margin-left: 0; }
   .call-form { flex-direction: column; align-items: stretch; }
   .call-form select, .call-form input[type="datetime-local"], .call-form input[type="text"] { width: 100%; }
+  .caller-tabs { display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+  .caller-tabs .btn { white-space: nowrap; }
+  .contacts-summary-grid { width: 100%; }
+  .contact-actions { width: 100%; display: flex; flex-wrap: wrap; }
+  .contact-actions .btn { flex: 1 1 120px; }
 }
 .call-log-row { gap: 10px; flex-wrap: wrap; margin-top: 10px; }
 .call-history { padding: 14px; background: rgba(63,154,232,0.06); border-radius: 16px; margin-top: 12px; }
@@ -518,6 +523,25 @@ h5 { color: #1B2A3B; font-weight: 700; }
 }
 
 @media (max-width: 640px) {
+  .contacts-page { gap: 12px; }
+  .contacts-header { width: 100%; }
+  .contacts-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  .mini-stat { min-width: 0; }
+  .filter-bar { display: grid; grid-template-columns: 1fr; }
+  .filter-bar .btn, .filter-bar .search-field { width: 100%; }
+  .caller-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .caller-tabs .btn { width: 100%; }
+  .contact-card-head { display: grid; grid-template-columns: auto 1fr; align-items: start; }
+  .contact-primary { width: 100%; }
+  .contact-name-row { align-items: flex-start; }
+  .contact-time { display: block; margin-left: 0; }
+  .contact-actions { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .contact-actions .btn { width: 100%; }
+  .contact-detail-strip { display: grid; grid-template-columns: 1fr; }
+  .call-form { display: grid; grid-template-columns: 1fr; }
+  .inline-actions { display: grid; grid-template-columns: 1fr; }
+  .history-toggle-row .btn { width: 100%; }
+
   :root { --panel-shadow: 0 8px 20px rgba(25, 42, 76, 0.06); }
   .app-shell { padding: 10px; min-height: 100vh; }
   .topbar { padding: 12px 14px; margin-bottom: 12px; border-radius: 14px; gap: 10px; }
