@@ -1380,6 +1380,7 @@ function BillingPage({ user }) {
   const [type, setType] = useState('sale');
   const [itemSearch, setItemSearch] = useState('');
   const [billingMessage, setBillingMessage] = useState('');
+  const [previewInvoice, setPreviewInvoice] = useState(null);
 
   const vendor = {
     name: user?.shopName || user?.name || 'SGSE Billing',
@@ -1433,32 +1434,36 @@ function BillingPage({ user }) {
     const setup = setups.find((entry) => entry._id === setupId);
     if (!setup) return;
     setType('setup');
+    setSetupName(setup.name || '');
+    setSetupDescription(setup.description || '');
+    setSetupPrice(String(setup.finalPrice || ''));
+    setSetupGstRate(String(setup.gstRate || '18'));
 
-    if (setup.finalPrice > 0 || setup.gstRate > 0) {
-      setSelectedItems([{
-        item: setup._id,
-        name: setup.name,
-        quantity: 1,
-        price: Number(setup.finalPrice || 0),
-        gstRate: Number(setup.gstRate || 0),
-        sgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
-        cgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
-        igstRate: 0,
-        total: Number(setup.finalPrice || 0)
-      }]);
-      return;
-    }
+    const setupRows = Array.isArray(setup.items) && setup.items.length
+      ? (setup.items || []).map((entry) => ({
+          item: entry.item,
+          name: entry.name,
+          quantity: Number(entry.quantity || 1),
+          price: Number(entry.price || 0),
+          gstRate: Number(setup.gstRate || 0),
+          sgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
+          cgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
+          igstRate: 0,
+          total: Number(entry.quantity || 1) * Number(entry.price || 0)
+        }))
+      : [{
+          item: setup._id,
+          name: setup.name,
+          quantity: 1,
+          price: Number(setup.finalPrice || 0),
+          gstRate: Number(setup.gstRate || 0),
+          sgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
+          cgstRate: Number((Number(setup.gstRate || 0) / 2).toFixed(2)),
+          igstRate: 0,
+          total: Number(setup.finalPrice || 0)
+        }];
 
-    setSelectedItems((setup.items || []).map((entry) => ({
-      item: entry.item,
-      name: entry.name,
-      quantity: Number(entry.quantity || 1),
-      price: Number(entry.price || 0),
-      sgstRate: 0,
-      cgstRate: 0,
-      igstRate: 0,
-      total: Number(entry.quantity || 1) * Number(entry.price || 0)
-    })));
+    setSelectedItems(setupRows);
   };
 
   const saveSetup = async () => {
@@ -1471,20 +1476,28 @@ function BillingPage({ user }) {
       return;
     }
 
+    const totalQty = selectedItems.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0) || 1;
+    const proportionalUnitPrice = Number((finalPrice / totalQty).toFixed(2));
+
     try {
       const response = await api.post('/setups', {
         name: setupName,
         description: setupDescription,
         finalPrice,
         gstRate,
-        items: []
+        items: selectedItems.map((entry) => ({
+          item: entry.item,
+          name: entry.name,
+          quantity: Number(entry.quantity || 1),
+          price: proportionalUnitPrice
+        }))
       });
       setSetups((previous) => [...previous, response.data].sort((a, b) => a.name.localeCompare(b.name)));
       setSetupName('');
       setSetupDescription('');
       setSetupPrice('');
       setSetupGstRate('18');
-      setBillingMessage('Setup saved as a single final-value package');
+      setBillingMessage('Setup saved with item quantities and final package value');
     } catch (error) {
       setBillingMessage(error.response?.data?.message || 'Unable to save setup');
     }
@@ -1549,12 +1562,125 @@ function BillingPage({ user }) {
     }
   };
 
-  const total = selectedItems.reduce((sum, entry) => sum + Number(entry.quantity || 0) * Number(entry.price || 0), 0);
-  const subtotal = selectedItems.reduce((sum, entry) => {
-    const taxRate = Number(entry.gstRate ?? (Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0)));
-    const lineTotal = Number(entry.quantity || 0) * Number(entry.price || 0);
-    return sum + (taxRate > 0 ? Number((lineTotal / (1 + taxRate / 100)).toFixed(2)) : lineTotal);
-  }, 0);
+  const buildInvoicePreview = () => {
+    if (!selectedItems.length) {
+      setBillingMessage('Please add at least one item before previewing a bill');
+      return null;
+    }
+
+    const totalQty = selectedItems.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0) || 1;
+    const setupTotal = Number(setupPrice || 0);
+    const setupRate = Number(setupGstRate || 0);
+
+    const previewItems = selectedItems.map((entry) => {
+      const quantity = Number(entry.quantity || 1);
+      const lineRate = type === 'setup' && setupTotal > 0 ? Number((setupTotal / totalQty).toFixed(2)) : Number(entry.price || 0);
+      const taxRate = type === 'setup' ? setupRate : Number(entry.gstRate ?? (Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0)));
+      const splitRate = Number((taxRate / 2).toFixed(2));
+      return {
+        item: entry.item,
+        name: entry.name,
+        quantity,
+        price: lineRate,
+        sgstRate: splitRate,
+        cgstRate: splitRate,
+        igstRate: 0,
+        gstRate: taxRate,
+        total: Number((quantity * lineRate).toFixed(2))
+      };
+    });
+
+    const invoiceSubtotal = type === 'setup' && setupTotal > 0 ? calculateTaxableValue(setupTotal, setupRate) : subtotal;
+    const invoiceGstAmount = type === 'setup' && setupTotal > 0 ? Number((setupTotal - invoiceSubtotal).toFixed(2)) : gstAmount;
+
+    return {
+      partyName: partyName || customerName,
+      partyPhone: partyPhone || customerPhone,
+      partyGSTIN,
+      customerName,
+      customerPhone,
+      type,
+      subtotal: invoiceSubtotal,
+      gstAmount: invoiceGstAmount,
+      grandTotal: type === 'setup' && setupTotal > 0 ? setupTotal : total,
+      items: previewItems,
+      sellerName: vendor.name,
+      sellerAddress: vendor.address,
+      sellerPhone: vendor.phone,
+      sellerGSTIN: user?.shopGSTIN || '',
+      sellerLogo: vendor.logo,
+      invoiceNumber: `PREVIEW-${Date.now()}`
+    };
+  };
+
+  const previewInvoiceNow = () => {
+    const invoice = buildInvoicePreview();
+    if (!invoice) return;
+    setPreviewInvoice(invoice);
+    setBillingMessage('Invoice preview is ready. Review and submit when satisfied.');
+  };
+
+  const submitFinalInvoice = async () => {
+    const invoice = buildInvoicePreview();
+    if (!invoice) return;
+
+    try {
+      const payload = {
+        partyName: partyName || customerName,
+        partyPhone: partyPhone || customerPhone,
+        partyGSTIN,
+        customerName,
+        customerPhone,
+        type,
+        subtotal: invoice.subtotal,
+        gstAmount: invoice.gstAmount,
+        grandTotal: invoice.grandTotal,
+        items: invoice.items.map((entry) => ({
+          ...entry,
+          itemId: entry.item,
+          total: Number(entry.total || ((Number(entry.quantity || 0) * Number(entry.price || 0))))
+        }))
+      };
+      const res = await api.post('/invoices', payload);
+      const savedInvoice = res.data || {};
+      const printableInvoice = {
+        ...savedInvoice,
+        sellerName: vendor.name,
+        sellerAddress: vendor.address,
+        sellerPhone: vendor.phone,
+        sellerGSTIN: user?.shopGSTIN || '',
+        sellerLogo: vendor.logo,
+        items: (savedInvoice.items || invoice.items).map((entry) => ({
+          ...entry,
+          total: Number(entry.total || ((Number(entry.quantity || 0) * Number(entry.price || 0))))
+        }))
+      };
+      await downloadInvoicePdf(printableInvoice);
+      setBillingMessage('Invoice created successfully and PDF downloaded');
+      setPreviewInvoice(null);
+      setSelectedItems([]);
+      setPartyName('');
+      setPartyPhone('');
+      setPartyGSTIN('');
+      setCustomerName('');
+      setCustomerPhone('');
+      setSetupPrice('');
+      setSetupGstRate('18');
+    } catch (error) {
+      setBillingMessage(error.response?.data?.message || 'Unable to create invoice');
+    }
+  };
+
+  const total = type === 'setup' && Number(setupPrice || 0) > 0
+    ? Number(setupPrice || 0)
+    : selectedItems.reduce((sum, entry) => sum + Number(entry.quantity || 0) * Number(entry.price || 0), 0);
+  const subtotal = type === 'setup' && Number(setupPrice || 0) > 0
+    ? calculateTaxableValue(Number(setupPrice || 0), Number(setupGstRate || 0))
+    : selectedItems.reduce((sum, entry) => {
+        const taxRate = Number(entry.gstRate ?? (Number(entry.sgstRate || 0) + Number(entry.cgstRate || 0) + Number(entry.igstRate || 0)));
+        const lineTotal = Number(entry.quantity || 0) * Number(entry.price || 0);
+        return sum + (taxRate > 0 ? Number((lineTotal / (1 + taxRate / 100)).toFixed(2)) : lineTotal);
+      }, 0);
   const gstAmount = Number((total - subtotal).toFixed(2));
   const sgstAmount = Number((gstAmount / 2).toFixed(2));
   const cgstAmount = Number((gstAmount / 2).toFixed(2));
@@ -1707,9 +1833,78 @@ function BillingPage({ user }) {
           </div>
 
           {billingMessage && <p className="muted billing-message">{billingMessage}</p>}
-          <button className="btn primary invoice-create-btn" onClick={saveInvoice}>Create bill & download PDF</button>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <button className="btn outline" type="button" onClick={previewInvoiceNow}>Preview invoice</button>
+            <button className="btn primary invoice-create-btn" onClick={submitFinalInvoice}>Save & download PDF</button>
+          </div>
         </div>
       </div>
+
+      {previewInvoice && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(11, 17, 32, 0.56)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 }}>
+          <div className="panel" style={{ width: 'min(900px, 100%)', maxHeight: '90vh', overflowY: 'auto', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <strong>Invoice preview</strong>
+                <div className="muted">Review the bill before final submission.</div>
+              </div>
+              <button className="btn outline" type="button" onClick={() => setPreviewInvoice(null)}>Close</button>
+            </div>
+
+            <div className="invoice-header">
+              <div className="invoice-brand">
+                {vendor.logo ? <img src={vendor.logo} alt={vendor.name} className="vendor-logo" /> : <div className="vendor-logo placeholder">{(vendor.name || 'SG').slice(0, 2).toUpperCase()}</div>}
+                <div>
+                  <strong>{vendor.name}</strong>
+                  <div className="muted">{vendor.address}</div>
+                  {vendor.phone && <div className="muted">{vendor.phone}</div>}
+                </div>
+              </div>
+              <div className="invoice-meta">
+                <span>{previewInvoice.type === 'sale' ? 'Sale Invoice' : previewInvoice.type === 'purchase' ? 'Purchase Invoice' : previewInvoice.type === 'setup' ? 'Setup Billing' : 'Return Invoice'}</span>
+              </div>
+            </div>
+
+            <div className="invoice-customer-box">
+              <div>
+                <span className="invoice-label">Bill to</span>
+                <strong>{previewInvoice.partyName || previewInvoice.customerName || 'Walk-in Customer'}</strong>
+              </div>
+              <div>
+                <span className="invoice-label">Phone</span>
+                <strong>{previewInvoice.partyPhone || previewInvoice.customerPhone || '—'}</strong>
+              </div>
+              <div>
+                <span className="invoice-label">GSTIN</span>
+                <strong>{previewInvoice.partyGSTIN || '—'}</strong>
+              </div>
+            </div>
+
+            <div className="invoice-items">
+              {previewInvoice.items.map((entry) => (
+                <div className="invoice-item-row" key={`${entry.item}-${entry.name}`}>
+                  <div>
+                    <strong>{entry.name}</strong>
+                    <div className="muted">₹{Number(entry.price || 0).toFixed(2)} incl. GST × {entry.quantity}</div>
+                  </div>
+                  <strong>₹{(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}</strong>
+                </div>
+              ))}
+            </div>
+
+            <div className="invoice-totals">
+              <div><span>Taxable value</span><strong>₹{Number(previewInvoice.subtotal || 0).toFixed(2)}</strong></div>
+              <div><span>GST total</span><strong>₹{Number(previewInvoice.gstAmount || 0).toFixed(2)}</strong></div>
+              <div className="grand-total"><span>Total</span><strong>₹{Number(previewInvoice.grandTotal || 0).toFixed(2)}</strong></div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+              <button className="btn outline" type="button" onClick={() => setPreviewInvoice(null)}>Edit</button>
+              <button className="btn primary" type="button" onClick={submitFinalInvoice}>Confirm & save</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
