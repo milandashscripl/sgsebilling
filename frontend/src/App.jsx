@@ -1921,44 +1921,63 @@ function BillingPage({ user }) {
             {selectedItems.length === 0 ? (
               <div className="muted empty-invoice-state">No items added yet.</div>
             ) : (
-              selectedItems.map((entry) => (
-                <div className="invoice-item-row" key={entry.item}>
-                  <div>
-                    <strong>{entry.name}</strong>
-                    <div className="muted">Qty: {entry.quantity}</div>
-                  </div>
-                  <div className="invoice-item-actions">
-                    <button className="btn small" onClick={() => updateQty(entry.item, -1)}>-</button>
-                    <span>{entry.quantity}</span>
-                    <button className="btn small" onClick={() => updateQty(entry.item, 1)}>+</button>
-                  </div>
-                  <div className="price-box">
-                    {type === 'setup' && Number(setupPrice || 0) > 0 ? (
-                      <>
-                        <small>Included in final package total</small>
-                        <small>Base ₹{calculateTaxableValue(Number(setupPrice || 0), Number(setupGstRate || 0)).toFixed(2)}</small>
-                      </>
-                    ) : (
-                      <>
-                        <label>Final incl. GST<input className="line-price" type="number" min="0" step="0.01" value={entry.price} onChange={(e) => setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? { ...line, price: Number(e.target.value || 0) } : line))} aria-label={`Final price including GST for ${entry.name}`} /></label>
-                        <label>GST %<input className="line-price" type="number" min="0" step="0.01" value={entry.gstRate ?? getEffectiveGstRate(entry)} onChange={(e) => {
-                          const nextRate = Number(e.target.value || 0);
-                          const splitRate = Number((nextRate / 2).toFixed(2));
-                          setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? {
-                            ...line,
-                            gstRate: nextRate,
-                            sgstRate: splitRate,
-                            cgstRate: splitRate,
-                            igstRate: 0
-                          } : line));
-                        }} aria-label={`GST rate for ${entry.name}`} /></label>
-                        <small>Base ₹{calculateTaxableValue(Number(entry.price || 0), Number(entry.gstRate ?? getEffectiveGstRate(entry))).toFixed(2)} • SGST {((Number(entry.gstRate ?? getEffectiveGstRate(entry)) / 2) || 0).toFixed(2)}% • CGST {((Number(entry.gstRate ?? getEffectiveGstRate(entry)) / 2) || 0).toFixed(2)}%</small>
-                      </>
-                    )}
-                  </div>
-                  <strong>{type === 'setup' ? '' : `₹${(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}`}</strong>
+              <>
+                <div className="invoice-item-head">
+                  <span>Item</span>
+                  <span>Qty</span>
+                  <span>Final Price</span>
+                  <span>Base</span>
+                  <span>GST</span>
+                  <span>Amount</span>
                 </div>
-              ))
+                {selectedItems.map((entry) => {
+                  const lineRate = Number(entry.gstRate ?? getEffectiveGstRate(entry));
+                  const lineBase = calculateTaxableValue(Number(entry.price || 0), lineRate);
+                  const lineGst = calculateGstAmount(Number(entry.price || 0), lineRate);
+                  const lineAmount = Number(entry.quantity || 0) * Number(entry.price || 0);
+
+                  return (
+                    <div className="invoice-item-row" key={entry.item}>
+                      <div className="invoice-item-name">
+                        <strong>{entry.name}</strong>
+                        <small>{type === 'setup' ? 'Package item' : 'Item line'}</small>
+                      </div>
+                      <div className="invoice-item-actions">
+                        <button className="btn small" onClick={() => updateQty(entry.item, -1)}>-</button>
+                        <span>{entry.quantity}</span>
+                        <button className="btn small" onClick={() => updateQty(entry.item, 1)}>+</button>
+                      </div>
+                      <div className="price-box">
+                        {type === 'setup' && Number(setupPrice || 0) > 0 ? (
+                          <>
+                            <small>Included in package</small>
+                            <small>₹{calculateTaxableValue(Number(setupPrice || 0), Number(setupGstRate || 0)).toFixed(2)}</small>
+                          </>
+                        ) : (
+                          <>
+                            <label>Final incl. GST<input className="line-price" type="number" min="0" step="0.01" value={entry.price} onChange={(e) => setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? { ...line, price: Number(e.target.value || 0) } : line))} aria-label={`Final price including GST for ${entry.name}`} /></label>
+                            <label>GST %<input className="line-price" type="number" min="0" step="0.01" value={entry.gstRate ?? getEffectiveGstRate(entry)} onChange={(e) => {
+                              const nextRate = Number(e.target.value || 0);
+                              const splitRate = Number((nextRate / 2).toFixed(2));
+                              setSelectedItems((previous) => previous.map((line) => line.item === entry.item ? {
+                                ...line,
+                                gstRate: nextRate,
+                                sgstRate: splitRate,
+                                cgstRate: splitRate,
+                                igstRate: 0
+                              } : line));
+                            }} aria-label={`GST rate for ${entry.name}`} /></label>
+                            <small>Base ₹{lineBase.toFixed(2)} • GST ₹{lineGst.toFixed(2)}</small>
+                          </>
+                        )}
+                      </div>
+                      <span className="invoice-plain-value">{type === 'setup' ? `₹${calculateTaxableValue(Number(setupPrice || 0), Number(setupGstRate || 0)).toFixed(2)}` : `₹${lineBase.toFixed(2)}`}</span>
+                      <span className="invoice-plain-value">{type === 'setup' ? `₹${calculateGstAmount(Number(setupPrice || 0), Number(setupGstRate || 0)).toFixed(2)}` : `₹${lineGst.toFixed(2)}`}</span>
+                      <strong className="invoice-total-value">{type === 'setup' ? '—' : `₹${lineAmount.toFixed(2)}`}</strong>
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
 
@@ -2020,13 +2039,25 @@ function BillingPage({ user }) {
             </div>
 
             <div className="invoice-items">
+              <div className="invoice-item-head">
+                <span>Item</span>
+                <span>Qty</span>
+                <span>Final Price</span>
+                <span>Base</span>
+                <span>GST</span>
+                <span>Amount</span>
+              </div>
               {previewInvoice.items.map((entry) => (
                 <div className="invoice-item-row" key={`${entry.item}-${entry.name}`}>
-                  <div>
+                  <div className="invoice-item-name">
                     <strong>{entry.name}</strong>
-                    <div className="muted">Qty: {entry.quantity}</div>
+                    <small>{previewInvoice.type === 'setup' ? 'Package item' : 'Item line'}</small>
                   </div>
-                  <strong>{previewInvoice.type === 'setup' ? '' : `₹${(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}`}</strong>
+                  <span className="invoice-plain-value">{entry.quantity}</span>
+                  <span className="invoice-plain-value">{previewInvoice.type === 'setup' ? '—' : `₹${Number(entry.price || 0).toFixed(2)}`}</span>
+                  <span className="invoice-plain-value">{previewInvoice.type === 'setup' ? `₹${Number(previewInvoice.subtotal || 0).toFixed(2)}` : `₹${Number((Number(entry.price || 0) / (1 + (Number(entry.gstRate || 0) / 100))) || 0).toFixed(2)}`}</span>
+                  <span className="invoice-plain-value">{previewInvoice.type === 'setup' ? `₹${Number(previewInvoice.gstAmount || 0).toFixed(2)}` : `₹${Number((Number(entry.price || 0) - (Number(entry.price || 0) / (1 + (Number(entry.gstRate || 0) / 100)))) || 0).toFixed(2)}`}</span>
+                  <strong className="invoice-total-value">{previewInvoice.type === 'setup' ? '—' : `₹${(Number(entry.quantity || 0) * Number(entry.price || 0)).toFixed(2)}`}</strong>
                 </div>
               ))}
             </div>
@@ -3031,10 +3062,27 @@ function EmployeesPage() {
     doc.text(`Department / Role: ${payslip.employee.role || 'Staff'}`, pageWidth - margin - 62, y + 14, { align: 'right' });
     y += 36;
 
-    const summaryRows = [
-      ['Present days', String(payslip.present || 0)],
+    const metrics = [
+      ['Present', String(payslip.present || 0)],
       ['Half days', String(payslip.halfday || 0)],
-      ['Absent days', String(payslip.absent || 0)],
+      ['Absent', String(payslip.absent || 0)],
+      ['Net Pay', `₹${Math.round(payslip.netPay || 0).toLocaleString()}`]
+    ];
+
+    metrics.forEach(([label, value], index) => {
+      const boxX = margin + (index % 2) * 92;
+      const boxY = y + Math.floor(index / 2) * 20;
+      doc.setFillColor(index === 3 ? 216 : 246, index === 3 ? 237 : 248, index === 3 ? 228 : 252);
+      doc.roundedRect(boxX, boxY, 80, 15, 2, 2, 'F');
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(index === 3 ? 16 : 31, index === 3 ? 94 : 50, index === 3 ? 72 : 72);
+      doc.text(label, boxX + 4, boxY + 6);
+      doc.setFont(undefined, 'normal');
+      doc.text(String(value), boxX + 72, boxY + 6, { align: 'right' });
+    });
+    y += 46;
+
+    const summaryRows = [
       ['Earned salary', `₹${Math.round(payslip.earnedSalary || 0).toLocaleString()}`],
       ['Allowances', `₹${Math.round(payslip.allowances || 0).toLocaleString()}`],
       ['Bonus / Incentive', `₹${Math.round((payslip.bonus || 0) + (payslip.incentive || 0)).toLocaleString()}`],
@@ -3044,15 +3092,16 @@ function EmployeesPage() {
 
     doc.setDrawColor(214, 223, 233);
     summaryRows.forEach(([label, value], index) => {
-      const rowY = y + index * 7;
+      const rowY = y + index * 8;
       doc.setFillColor(index % 2 === 0 ? 249 : 255, index % 2 === 0 ? 251 : 255, index % 2 === 0 ? 253 : 255);
-      doc.rect(margin, rowY - 3, pageWidth - margin * 2, 6, 'F');
+      doc.rect(margin, rowY - 3, pageWidth - margin * 2, 7, 'F');
+      doc.setTextColor(20, 20, 20);
       doc.text(label, margin + 5, rowY);
       doc.text(String(value), pageWidth - margin - 8, rowY, { align: 'right' });
     });
-    y += summaryRows.length * 7 + 10;
+    y += summaryRows.length * 8 + 10;
 
-    doc.setFillColor(244, 248, 252);
+    doc.setFillColor(239, 248, 244);
     doc.roundedRect(margin, y, pageWidth - margin * 2, 22, 3, 3, 'F');
     doc.setFont(undefined, 'bold');
     doc.text('Net Payable', margin + 5, y + 8);
