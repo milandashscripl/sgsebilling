@@ -38,7 +38,7 @@ router.post('/', auth, async (req, res) => {
           item: item._id,
           name: item.name,
           quantity: Math.max(1, Number(entry.quantity || 1)),
-          price: Math.max(0, Number(entry.price ?? item.salePrice ?? 0))
+          price: Math.max(0, Number(entry.price ?? 0))
         };
       }));
     }

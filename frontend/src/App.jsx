@@ -1330,6 +1330,8 @@ function SetupLibraryPage() {
   const [items, setItems] = useState([]);
   const [setups, setSetups] = useState([]);
   const [form, setForm] = useState({ name: '', description: '', finalPrice: '', gstRate: '18' });
+  const [selectedSetupItems, setSelectedSetupItems] = useState([]);
+  const [itemSearch, setItemSearch] = useState('');
   const [message, setMessage] = useState('');
 
   const load = async () => {
@@ -1339,28 +1341,122 @@ function SetupLibraryPage() {
   };
   useEffect(() => { load().catch(() => setMessage('Unable to load setup library')); }, []);
 
+  const filteredItems = items.filter((item) => {
+    const query = itemSearch.trim().toLowerCase();
+    if (!query) return true;
+    return [item.name, item.itemType, item.category, item.specification].filter(Boolean).some((field) => String(field).toLowerCase().includes(query));
+  });
+
+  const addSetupItem = (item) => {
+    setSelectedSetupItems((previous) => {
+      const existing = previous.find((entry) => entry.item === item._id);
+      if (existing) {
+        return previous.map((entry) => entry.item === item._id ? { ...entry, quantity: Number(entry.quantity || 1) + 1 } : entry);
+      }
+      return [...previous, { item: item._id, name: item.name, quantity: 1, price: 0 }];
+    });
+  };
+
+  const updateSetupItemQty = (itemId, delta) => {
+    setSelectedSetupItems((previous) => previous.map((entry) => entry.item === itemId ? { ...entry, quantity: Math.max(1, Number(entry.quantity || 1) + delta) } : entry));
+  };
+
+  const removeSetupItem = (itemId) => {
+    setSelectedSetupItems((previous) => previous.filter((entry) => entry.item !== itemId));
+  };
+
   const save = async (event) => {
     event.preventDefault();
     try {
+      if (!form.name.trim()) return setMessage('Setup name is required');
+      if (!selectedSetupItems.length) return setMessage('Select at least one item for the setup');
+
+      const finalPrice = Number(form.finalPrice || 0);
+      const gstRate = Number(form.gstRate || 0);
+      if (!finalPrice || finalPrice <= 0) return setMessage('Enter the final setup price including GST');
+
       const payload = {
         name: form.name,
         description: form.description,
-        finalPrice: Number(form.finalPrice || 0),
-        gstRate: Number(form.gstRate || 0),
-        items: []
+        finalPrice,
+        gstRate,
+        items: selectedSetupItems.map((entry) => ({
+          item: entry.item,
+          name: entry.name,
+          quantity: Number(entry.quantity || 1),
+          price: 0
+        }))
       };
+
       await api.post('/setups', payload);
       setForm({ name: '', description: '', finalPrice: '', gstRate: '18' });
-      setMessage('Standard setup saved');
+      setSelectedSetupItems([]);
+      setItemSearch('');
+      setMessage('Setup saved with quantities and final package price');
       await load();
-    } catch (error) { setMessage(error.response?.data?.message || 'Unable to save setup'); }
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to save setup');
+    }
   };
+
   const remove = async (id) => { if (!window.confirm('Delete this setup?')) return; await api.delete(`/setups/${id}`); await load(); };
 
   return <div className="setup-library-page">
-    <div className="page-header"><p className="eyebrow">Reusable billing templates</p><h3>Setup library</h3><p className="muted">Save a complete package at one final GST-inclusive value, then load it into any bill.</p></div>
-    <form className="panel setup-library-form" onSubmit={save}><h4>Create standard setup</h4><div className="form-grid"><input required placeholder="Setup name (e.g. 3KW On-grid)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /><input type="number" min="0" placeholder="Final setup price incl GST" value={form.finalPrice} onChange={(e) => setForm({ ...form, finalPrice: e.target.value })} /><input type="number" min="0" step="0.01" placeholder="GST %" value={form.gstRate} onChange={(e) => setForm({ ...form, gstRate: e.target.value })} /></div><div className="setup-item-summary"><span>Final {Number(form.finalPrice || 0).toFixed(2)} • Base {calculateTaxableValue(Number(form.finalPrice || 0), Number(form.gstRate || 0)).toFixed(2)} • GST {Number((Number(form.finalPrice || 0) - calculateTaxableValue(Number(form.finalPrice || 0), Number(form.gstRate || 0))).toFixed(2))}</span></div><button className="btn primary" type="submit">Save standard setup</button>{message && <p className="status-message">{message}</p>}</form>
-    <div className="setup-library-grid">{setups.map((setup) => <article className="panel setup-card" key={setup._id}><div className="panel-header"><div><h4>{setup.name}</h4><p className="muted">{setup.description || 'Standard installation package'}</p></div><button className="btn outline" type="button" onClick={() => remove(setup._id)}>Delete</button></div><ul><li><strong>{setup.name}</strong> <span>Final ₹{Number(setup.finalPrice || 0).toFixed(2)} • Base ₹{calculateTaxableValue(Number(setup.finalPrice || 0), Number(setup.gstRate || 0)).toFixed(2)} • GST {Number((Number(setup.finalPrice || 0) - calculateTaxableValue(Number(setup.finalPrice || 0), Number(setup.gstRate || 0))).toFixed(2))}</span></li>{(setup.items || []).length > 0 && (setup.items || []).map((item) => <li key={item.item}>{item.name} <span>× {item.quantity} • Final ₹{Number(item.price || 0).toFixed(2)}</span></li>)}</ul></article>)}</div>
+    <div className="page-header"><p className="eyebrow">Reusable billing templates</p><h3>Setup library</h3><p className="muted">Create a setup by selecting items with quantities, then store one final GST-inclusive package price.</p></div>
+
+    <div className="panel setup-library-form">
+      <h4>Create standard setup</h4>
+      <div className="form-grid">
+        <input required placeholder="Setup name (e.g. 3KW On-grid)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        <input type="number" min="0" placeholder="Final setup price incl GST" value={form.finalPrice} onChange={(e) => setForm({ ...form, finalPrice: e.target.value })} />
+        <input type="number" min="0" step="0.01" placeholder="GST %" value={form.gstRate} onChange={(e) => setForm({ ...form, gstRate: e.target.value })} />
+      </div>
+
+      <div className="setup-item-summary">
+        <span>Final ₹{Number(form.finalPrice || 0).toFixed(2)} • Base ₹{calculateTaxableValue(Number(form.finalPrice || 0), Number(form.gstRate || 0)).toFixed(2)} • GST ₹{(Number(form.finalPrice || 0) - calculateTaxableValue(Number(form.finalPrice || 0), Number(form.gstRate || 0))).toFixed(2)}</span>
+      </div>
+
+      <div className="item-search-block">
+        <label className="muted">Add items to this setup</label>
+        <input placeholder="Search product name or category" value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} />
+      </div>
+
+      <div className="item-list">
+        {filteredItems.length === 0 ? <p className="muted empty-invoice-state">No items found.</p> : filteredItems.map((item) => (
+          <button key={item._id} className="item-chip" type="button" onClick={() => addSetupItem(item)}>
+            <span>{item.name}</span>
+            <small>₹{item.salePrice}</small>
+          </button>
+        ))}
+      </div>
+
+      <div className="setup-selected-items">
+        {selectedSetupItems.length === 0 ? (
+          <p className="muted">No items selected yet.</p>
+        ) : (
+          selectedSetupItems.map((entry) => (
+            <div key={entry.item} className="invoice-item-row setup-selected-item-row">
+              <div>
+                <strong>{entry.name}</strong>
+                <div className="muted">Qty based setup item</div>
+              </div>
+              <div className="invoice-item-actions">
+                <button className="btn small" type="button" onClick={() => updateSetupItemQty(entry.item, -1)}>-</button>
+                <span>{entry.quantity}</span>
+                <button className="btn small" type="button" onClick={() => updateSetupItemQty(entry.item, 1)}>+</button>
+              </div>
+              <button className="btn outline small" type="button" onClick={() => removeSetupItem(entry.item)}>Remove</button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <button className="btn primary" type="button" onClick={save}>Save standard setup</button>
+      {message && <p className="status-message">{message}</p>}
+    </div>
+
+    <div className="setup-library-grid">{setups.map((setup) => <article className="panel setup-card" key={setup._id}><div className="panel-header"><div><h4>{setup.name}</h4><p className="muted">{setup.description || 'Standard installation package'}</p></div><button className="btn outline" type="button" onClick={() => remove(setup._id)}>Delete</button></div><ul><li><strong>{setup.name}</strong> <span>Final ₹{Number(setup.finalPrice || 0).toFixed(2)} • Base ₹{calculateTaxableValue(Number(setup.finalPrice || 0), Number(setup.gstRate || 0)).toFixed(2)} • GST {Number((Number(setup.finalPrice || 0) - calculateTaxableValue(Number(setup.finalPrice || 0), Number(setup.gstRate || 0))).toFixed(2))}</span></li>{(setup.items || []).length > 0 && (setup.items || []).map((item) => <li key={`${setup._id}-${item.item}`}>{item.name} <span>× {item.quantity}</span></li>)}</ul></article>)}</div>
   </div>;
 }
 
