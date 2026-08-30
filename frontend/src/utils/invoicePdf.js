@@ -104,17 +104,8 @@ export async function downloadInvoicePdf(invoice) {
   doc.line(marginLeft, y, pageWidth - marginRight, y);
   y += 4;
 
-  const displayItems = invoice.type === 'setup'
-    ? [{
-        name: invoice.setupName || 'Setup Package',
-        quantity: 1,
-        price: safeValue(invoice.grandTotal, 0),
-        sgstRate: 0,
-        cgstRate: 0,
-        igstRate: 0,
-        total: safeValue(invoice.grandTotal, 0)
-      }]
-    : (Array.isArray(invoice.items) && invoice.items.length ? invoice.items : []);
+  const setupRows = Array.isArray(invoice.items) && invoice.items.length ? invoice.items : [];
+  const displayItems = invoice.type === 'setup' ? setupRows : (Array.isArray(invoice.items) && invoice.items.length ? invoice.items : []);
 
   let subtotalValue = 0;
   let gstTotal = 0;
@@ -129,27 +120,27 @@ export async function downloadInvoicePdf(invoice) {
     const finalPrice = safeValue(item.price, 0);
     const taxRate = invoice.type === 'setup' ? 0 : getItemTaxRate(item);
     const taxableValue = invoice.type === 'setup'
-      ? safeValue(invoice.subtotal, 0)
+      ? safeValue(invoice.subtotal, 0) / Math.max(1, displayItems.length)
       : (taxRate > 0 ? Number((finalPrice / (1 + taxRate / 100)).toFixed(2)) : finalPrice);
     const lineTax = invoice.type === 'setup'
-      ? safeValue(invoice.gstAmount, 0)
+      ? safeValue(invoice.gstAmount, 0) / Math.max(1, displayItems.length)
       : Number((finalPrice * qty - taxableValue * qty).toFixed(2));
     const lineTotal = invoice.type === 'setup'
       ? safeValue(invoice.grandTotal, 0)
       : Number((finalPrice * qty).toFixed(2));
 
-    subtotalValue += invoice.type === 'setup' ? safeValue(invoice.subtotal, 0) : Number((taxableValue * qty).toFixed(2));
-    gstTotal += invoice.type === 'setup' ? safeValue(invoice.gstAmount, 0) : lineTax;
+    subtotalValue += invoice.type === 'setup' ? taxableValue : Number((taxableValue * qty).toFixed(2));
+    gstTotal += invoice.type === 'setup' ? lineTax : lineTax;
 
     doc.setFont(undefined, 'normal');
     doc.text(String(index + 1), marginLeft + 2, y);
     const itemName = String(item.name || 'Item').slice(0, 25);
     doc.text(itemName, marginLeft + 10, y);
     doc.text(String(qty), marginLeft + 95, y);
-    doc.text(`₹${finalPrice.toFixed(2)}`, marginLeft + 115, y);
-    doc.text(`₹${(taxableValue).toFixed(2)}`, marginLeft + 150, y);
-    doc.text(`₹${lineTax.toFixed(2)}`, marginLeft + 172, y);
-    doc.text(`₹${lineTotal.toFixed(2)}`, marginLeft + 193, y, { align: 'right' });
+    doc.text(invoice.type === 'setup' ? 'Included' : `₹${finalPrice.toFixed(2)}`, marginLeft + 115, y);
+    doc.text(invoice.type === 'setup' ? '—' : `₹${(taxableValue).toFixed(2)}`, marginLeft + 150, y);
+    doc.text(invoice.type === 'setup' ? '—' : `₹${lineTax.toFixed(2)}`, marginLeft + 172, y);
+    doc.text(invoice.type === 'setup' ? `₹${lineTotal.toFixed(2)}` : `₹${lineTotal.toFixed(2)}`, marginLeft + 193, y, { align: 'right' });
     y += 6;
   });
 
