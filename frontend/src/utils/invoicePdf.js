@@ -104,23 +104,42 @@ export async function downloadInvoicePdf(invoice) {
   doc.line(marginLeft, y, pageWidth - marginRight, y);
   y += 4;
 
-  const items = Array.isArray(invoice.items) && invoice.items.length ? invoice.items : [];
+  const displayItems = invoice.type === 'setup'
+    ? [{
+        name: invoice.setupName || 'Setup Package',
+        quantity: 1,
+        price: safeValue(invoice.grandTotal, 0),
+        sgstRate: 0,
+        cgstRate: 0,
+        igstRate: 0,
+        total: safeValue(invoice.grandTotal, 0)
+      }]
+    : (Array.isArray(invoice.items) && invoice.items.length ? invoice.items : []);
+
   let subtotalValue = 0;
   let gstTotal = 0;
 
-  items.forEach((item, index) => {
+  displayItems.forEach((item, index) => {
     if (y > 250) {
       doc.addPage();
       y = 20;
     }
+
     const qty = safeValue(item.quantity, 1);
     const finalPrice = safeValue(item.price, 0);
-    const taxRate = getItemTaxRate(item);
-    const taxableValue = taxRate > 0 ? Number((finalPrice / (1 + taxRate / 100)).toFixed(2)) : finalPrice;
-    const lineTax = Number((finalPrice * qty - taxableValue * qty).toFixed(2));
-    const lineTotal = Number((finalPrice * qty).toFixed(2));
-    subtotalValue += Number((taxableValue * qty).toFixed(2));
-    gstTotal += lineTax;
+    const taxRate = invoice.type === 'setup' ? 0 : getItemTaxRate(item);
+    const taxableValue = invoice.type === 'setup'
+      ? safeValue(invoice.subtotal, 0)
+      : (taxRate > 0 ? Number((finalPrice / (1 + taxRate / 100)).toFixed(2)) : finalPrice);
+    const lineTax = invoice.type === 'setup'
+      ? safeValue(invoice.gstAmount, 0)
+      : Number((finalPrice * qty - taxableValue * qty).toFixed(2));
+    const lineTotal = invoice.type === 'setup'
+      ? safeValue(invoice.grandTotal, 0)
+      : Number((finalPrice * qty).toFixed(2));
+
+    subtotalValue += invoice.type === 'setup' ? safeValue(invoice.subtotal, 0) : Number((taxableValue * qty).toFixed(2));
+    gstTotal += invoice.type === 'setup' ? safeValue(invoice.gstAmount, 0) : lineTax;
 
     doc.setFont(undefined, 'normal');
     doc.text(String(index + 1), marginLeft + 2, y);
