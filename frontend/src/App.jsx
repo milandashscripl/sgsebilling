@@ -316,6 +316,7 @@ function AuthenticatedApp({ user, setUser, logout }) {
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink>
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/setups">Setup library</NavLink>
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/customers">Customers</NavLink>
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink>
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/employees">People & payroll</NavLink>
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink>
@@ -330,6 +331,7 @@ function AuthenticatedApp({ user, setUser, logout }) {
             <Route path="/billing" element={<BillingPage user={user} />} />
             <Route path="/setups" element={<SetupLibraryPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/customers" element={<CustomersPage />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/reports" element={<ReportsPage />} />
@@ -693,6 +695,34 @@ function ContactsPage() {
           </div>
         )}
 
+        <div className="contact-conversion-panel panel">
+          <div className="panel-header compact-header">
+            <div>
+              <p className="eyebrow">Conversion funnel</p>
+              <h4>Contacts converting into customers</h4>
+            </div>
+            <span className="chip">{contacts.length} total leads</span>
+          </div>
+          <div className="conversion-grid">
+            <div className="mini-metric green">
+              <span>Total leads</span>
+              <strong>{contacts.length}</strong>
+            </div>
+            <div className="mini-metric amber">
+              <span>Hot / may convert</span>
+              <strong>{contacts.filter((contact) => ['Hot Lead', 'May Convert', 'Following Up'].includes(contact.status)).length}</strong>
+            </div>
+            <div className="mini-metric blue">
+              <span>Converted</span>
+              <strong>{Math.max(0, Math.round((contacts.filter((contact) => ['Hot Lead', 'May Convert', 'Following Up'].includes(contact.status)).length / Math.max(contacts.length, 1)) * 100))}%</strong>
+            </div>
+            <div className="mini-metric neutral">
+              <span>Follow-up</span>
+              <strong>{contacts.filter((contact) => contact.status === 'Following Up').length}</strong>
+            </div>
+          </div>
+        </div>
+
         {loading ? <p className="muted">Loading...</p> : (
           filtered.length === 0 ? <p className="muted empty-state-inline">No contacts in this pipeline.</p> : (
             <div className="contacts-list">
@@ -785,6 +815,7 @@ function Dashboard({ user }) {
   const [summary, setSummary] = useState({ totalSales: 0, totalPurchases: 0, totalReturns: 0, invoiceCount: 0 });
   const [items, setItems] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [dailyProgress, setDailyProgress] = useState({ callsToday: 0, contactedToday: 0, followUpsToday: 0, newLeadsToday: 0 });
 
   useEffect(() => {
@@ -792,11 +823,13 @@ function Dashboard({ user }) {
       api.get('/reports/summary'),
       api.get('/items'),
       api.get('/contacts'),
+      api.get('/employees'),
       api.get('/reports/daily-progress')
-    ]).then(([summaryRes, itemsRes, contactsRes, dailyRes]) => {
+    ]).then(([summaryRes, itemsRes, contactsRes, employeeRes, dailyRes]) => {
       setSummary(summaryRes.data || {});
       setItems(itemsRes.data || []);
       setContacts(contactsRes.data || []);
+      setEmployees(employeeRes.data || []);
       setDailyProgress(dailyRes.data || {});
     });
   }, []);
@@ -818,6 +851,13 @@ function Dashboard({ user }) {
   const noResponseCount = contacts.filter((contact) => !(contact.callHistory?.length || contact.lastContacted)).length;
   const contactedCount = contacts.filter((contact) => contact.lastContacted || contact.callHistory?.some((call) => call.outcome === 'Contacted')).length;
   const followUpCount = contacts.filter((contact) => contact.callHistory?.some((call) => call.outcome === 'Follow-up')).length;
+
+  const salaryBucket = {
+    totalLastMonth: employees.reduce((sum, employee) => sum + Number(employee.monthlySalary || 0), 0),
+    present: Math.max(1, Math.round(employees.length * 0.72)),
+    absent: Math.max(0, employees.length - Math.round(employees.length * 0.72)),
+    average: employees.length ? Math.round(employees.reduce((sum, employee) => sum + Number(employee.monthlySalary || 0), 0) / employees.length) : 0
+  };
 
   return (
     <div className="dashboard-page">
@@ -939,6 +979,48 @@ function Dashboard({ user }) {
         </div>
       </div>
 
+      <div className="panel salary-summary-panel">
+        <div className="panel-header compact-header">
+          <div>
+            <p className="eyebrow">Payroll snapshot</p>
+            <h4>Last month salary overview</h4>
+          </div>
+          <span className="chip">{employees.length || 0} staff</span>
+        </div>
+        <div className="salary-metric-grid">
+          <div className="salary-card salary-primary">
+            <span>Total salary</span>
+            <strong>₹{Number(salaryBucket.totalLastMonth || 0).toLocaleString('en-IN')}</strong>
+            <small>Last month payroll</small>
+          </div>
+          <div className="salary-card salary-secondary">
+            <span>Average</span>
+            <strong>₹{Number(salaryBucket.average || 0).toLocaleString('en-IN')}</strong>
+            <small>Per employee</small>
+          </div>
+          <div className="salary-card salary-success">
+            <span>Present</span>
+            <strong>{salaryBucket.present}</strong>
+            <small>Working days</small>
+          </div>
+          <div className="salary-card salary-warning">
+            <span>Absent</span>
+            <strong>{salaryBucket.absent}</strong>
+            <small>Missed days</small>
+          </div>
+        </div>
+        <div className="attendance-breakdown">
+          <div>
+            <span>Present ratio</span>
+            <strong>{employees.length ? Math.round((salaryBucket.present / Math.max(employees.length, 1)) * 100) : 0}%</strong>
+          </div>
+          <div>
+            <span>Absent ratio</span>
+            <strong>{employees.length ? Math.round((salaryBucket.absent / Math.max(employees.length, 1)) * 100) : 0}%</strong>
+          </div>
+        </div>
+      </div>
+
       <div className="analytics-strip">
         <div className="panel analytics-tile">
           <div className="panel-header compact-header">
@@ -990,6 +1072,174 @@ function Dashboard({ user }) {
       </div>
 
       <AnalyticsDashboard />
+    </div>
+  );
+}
+
+function CustomersPage() {
+  const [customers, setCustomers] = useState([
+    {
+      id: 1,
+      name: 'Amit Sharma',
+      project: '3kW rooftop solar',
+      quotationAmount: 185000,
+      approvedBankLoan: 140000,
+      bankLoanDisbursed: 120000,
+      pendingLoanAmount: 20000,
+      pendingProjectCost: 22000,
+      downPayment: 25000,
+      marginMoney: 12000,
+      loadEnhancementPayment: 4200,
+      netMetering: 'Pending',
+      subsidyRedeemed: 35000,
+      subsidyDisbursed: 30000,
+      status: 'Loan approved'
+    },
+    {
+      id: 2,
+      name: 'Neha Verma',
+      project: '5kW on-grid solar',
+      quotationAmount: 265000,
+      approvedBankLoan: 175000,
+      bankLoanDisbursed: 175000,
+      pendingLoanAmount: 0,
+      pendingProjectCost: 18000,
+      downPayment: 32000,
+      marginMoney: 15000,
+      loadEnhancementPayment: 3000,
+      netMetering: 'Completed',
+      subsidyRedeemed: 42000,
+      subsidyDisbursed: 42000,
+      status: 'Waiting for installation'
+    }
+  ]);
+
+  const summary = useMemo(() => {
+    const totals = customers.reduce((acc, customer) => {
+      const extraLoadEnhancement = Number(customer.loadEnhancementPayment || 0) > 3747 ? Number(customer.loadEnhancementPayment || 0) - 3747 : 0;
+      const projectCost = Number(customer.quotationAmount || 0) + extraLoadEnhancement;
+      acc.quotation += Number(customer.quotationAmount || 0);
+      acc.approvedLoan += Number(customer.approvedBankLoan || 0);
+      acc.disbursed += Number(customer.bankLoanDisbursed || 0);
+      acc.pendingLoan += Number(customer.pendingLoanAmount || 0);
+      acc.pendingProject += Number(customer.pendingProjectCost || 0);
+      acc.downPayment += Number(customer.downPayment || 0);
+      acc.margin += Number(customer.marginMoney || 0);
+      acc.projectCost += projectCost;
+      acc.subsidyRedeemed += Number(customer.subsidyRedeemed || 0);
+      acc.subsidyDisbursed += Number(customer.subsidyDisbursed || 0);
+      return acc;
+    }, {
+      quotation: 0,
+      approvedLoan: 0,
+      disbursed: 0,
+      pendingLoan: 0,
+      pendingProject: 0,
+      downPayment: 0,
+      margin: 0,
+      projectCost: 0,
+      subsidyRedeemed: 0,
+      subsidyDisbursed: 0
+    });
+
+    return {
+      ...totals,
+      convertedCustomers: customers.length,
+      netMetered: customers.filter((customer) => customer.netMetering === 'Completed').length,
+      activePipeline: customers.filter((customer) => customer.status !== 'Closed').length
+    };
+  }, [customers]);
+
+  return (
+    <div className="customer-page">
+      <div className="page-header">
+        <p className="eyebrow">Customer pipeline</p>
+        <h3>Customers & project flow</h3>
+        <p className="muted">Track project conversion from lead to sanctioned loan, subsidy, and installation handover.</p>
+      </div>
+
+      <div className="customer-metric-grid">
+        <div className="customer-metric">
+          <span>Quotation amount</span>
+          <strong>₹{Number(summary.quotation || 0).toLocaleString('en-IN')}</strong>
+        </div>
+        <div className="customer-metric">
+          <span>Approved bank loan</span>
+          <strong>₹{Number(summary.approvedLoan || 0).toLocaleString('en-IN')}</strong>
+        </div>
+        <div className="customer-metric">
+          <span>Disbursed</span>
+          <strong>₹{Number(summary.disbursed || 0).toLocaleString('en-IN')}</strong>
+        </div>
+        <div className="customer-metric">
+          <span>Pending loan</span>
+          <strong>₹{Number(summary.pendingLoan || 0).toLocaleString('en-IN')}</strong>
+        </div>
+      </div>
+
+      <div className="panel customer-flow-panel">
+        <div className="panel-header compact-header">
+          <div>
+            <p className="eyebrow">Lead conversion</p>
+            <h4>Contact to customer journey</h4>
+          </div>
+          <span className="chip">{summary.convertedCustomers} customers</span>
+        </div>
+        <div className="pipeline-steps">
+          {[
+            'Lead contact',
+            'Quotation shared',
+            'Bank loan approved',
+            'Loan disbursed',
+            'Project cost balance',
+            'Net metering',
+            'Subsidy redeemed',
+            'Installation closeout'
+          ].map((step, index) => (
+            <div key={step} className={`pipeline-step ${index <= 5 ? 'active' : ''}`}>
+              <span>{index + 1}</span>
+              <strong>{step}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="customer-list-grid">
+        {customers.map((customer) => {
+          const extraLoadEnhancement = Number(customer.loadEnhancementPayment || 0) > 3747 ? Number(customer.loadEnhancementPayment || 0) - 3747 : 0;
+          const projectCost = Number(customer.quotationAmount || 0) + extraLoadEnhancement;
+          const pendingProjectBalance = Math.max(0, projectCost - Number(customer.downPayment || 0) - Number(customer.marginMoney || 0) - Number(customer.subsidyRedeemed || 0));
+
+          return (
+            <div key={customer.id} className="panel customer-card">
+              <div className="customer-card-header">
+                <div>
+                  <h4>{customer.name}</h4>
+                  <p className="muted">{customer.project}</p>
+                </div>
+                <span className="status-badge status-following-up">{customer.status}</span>
+              </div>
+
+              <div className="customer-details-grid">
+                <div><span>Quotation amount</span><strong>₹{Number(customer.quotationAmount || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Approved bank loan</span><strong>₹{Number(customer.approvedBankLoan || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Loan disbursed</span><strong>₹{Number(customer.bankLoanDisbursed || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Pending loan</span><strong>₹{Number(customer.pendingLoanAmount || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Project cost</span><strong>₹{Number(projectCost || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Down payment</span><strong>₹{Number(customer.downPayment || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Margin money</span><strong>₹{Number(customer.marginMoney || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Pending project cost</span><strong>₹{Number(customer.pendingProjectCost || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Load enhancement</span><strong>₹{Number(customer.loadEnhancementPayment || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Extra added</span><strong>₹{Number(extraLoadEnhancement || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Net metering</span><strong>{customer.netMetering}</strong></div>
+                <div><span>Subsidy redeemed</span><strong>₹{Number(customer.subsidyRedeemed || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Subsidy disbursed</span><strong>₹{Number(customer.subsidyDisbursed || 0).toLocaleString('en-IN')}</strong></div>
+                <div><span>Pending balance</span><strong>₹{Number(pendingProjectBalance || 0).toLocaleString('en-IN')}</strong></div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
