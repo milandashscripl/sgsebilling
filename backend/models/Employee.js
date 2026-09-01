@@ -9,6 +9,7 @@ const employeeSchema = new mongoose.Schema({
   monthlySalary: { type: Number, default: 0 },
   monthlyAdvance: { type: Number, default: 0 },
   fuelAllowance: { type: Number, default: 0 },
+  homeRentAllowance: { type: Number, default: 0 },
   incentive: { type: Number, default: 0 },
   otherAllowance: { type: Number, default: 0 },
   personalDetails: {

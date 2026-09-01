@@ -25,10 +25,10 @@ const safeValue = (value, fallback = 0) => {
 export async function downloadInvoicePdf(invoice) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const marginLeft = 12;
-  const marginRight = 12;
+  const marginLeft = 14;
+  const marginRight = 14;
   const contentWidth = pageWidth - marginLeft - marginRight;
-  let y = 10;
+  let y = 14;
 
   let sellerLogo = invoice.sellerLogo || null;
   try {
@@ -41,41 +41,41 @@ export async function downloadInvoicePdf(invoice) {
     // ignore
   }
 
-  doc.setFillColor(11, 51, 86);
-  doc.rect(0, 0, pageWidth, 28, 'F');
+  doc.setFillColor(12, 74, 116);
+  doc.rect(0, 0, pageWidth, 34, 'F');
   if (sellerLogo) {
     const imgData = await loadImageAsDataUrl(sellerLogo).catch(() => null);
     if (imgData) {
       try {
-        doc.addImage(imgData, 'PNG', marginLeft, 5, 22, 22);
+        doc.addImage(imgData, 'PNG', marginLeft, 7, 20, 20);
       } catch {
-        try { doc.addImage(imgData, 'JPEG', marginLeft, 5, 22, 22); } catch {}
+        try { doc.addImage(imgData, 'JPEG', marginLeft, 7, 20, 20); } catch {}
       }
     }
   }
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(17);
+  doc.setFontSize(20);
   doc.setFont(undefined, 'bold');
-  doc.text(invoice.sellerName || 'SGSE Billing', marginLeft + 28, 15);
-  doc.setFontSize(8.3);
+  doc.text(invoice.sellerName || 'SGSE Billing', marginLeft + 26, 17);
+  doc.setFontSize(8.5);
   doc.setFont(undefined, 'normal');
   const sellerAddress = invoice.sellerAddress || 'Business address';
-  const sellerAddressLines = doc.splitTextToSize(sellerAddress, contentWidth - 35);
-  doc.text(sellerAddressLines, marginLeft + 28, 21);
+  const sellerAddressLines = doc.splitTextToSize(sellerAddress, contentWidth - 28);
+  doc.text(sellerAddressLines, marginLeft + 26, 24);
 
-  y = 35;
-  doc.setDrawColor(217, 226, 233);
+  y = 40;
+  doc.setDrawColor(220, 226, 233);
   doc.setFillColor(247, 250, 253);
-  doc.roundedRect(marginLeft, y, contentWidth, 22, 3, 3, 'F');
+  doc.roundedRect(marginLeft, y, contentWidth, 24, 3, 3, 'F');
   doc.setTextColor(21, 42, 59);
   doc.setFont(undefined, 'bold');
-  doc.text('Tax Invoice', marginLeft + 4, y + 7);
+  doc.text('Tax Invoice', marginLeft + 4, y + 8);
   doc.setFont(undefined, 'normal');
-  doc.setFontSize(8.2);
-  doc.text(`Invoice No: ${invoice.invoiceNumber || 'N/A'}`, pageWidth - marginRight - 55, y + 6, { align: 'right' });
-  doc.text(`Nature: ${invoice.natureOfSupply || 'B2B'}`, pageWidth - marginRight - 55, y + 11, { align: 'right' });
-  doc.text(`Date: ${invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}`, pageWidth - marginRight - 55, y + 16, { align: 'right' });
+  doc.setFontSize(8.3);
+  doc.text(`Invoice No: ${invoice.invoiceNumber || 'N/A'}`, pageWidth - marginRight - 60, y + 7, { align: 'right' });
+  doc.text(`Nature: ${invoice.natureOfSupply || 'B2B'}`, pageWidth - marginRight - 60, y + 12, { align: 'right' });
+  doc.text(`Date: ${invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}`, pageWidth - marginRight - 60, y + 17, { align: 'right' });
   y += 30;
 
   doc.setTextColor(20, 20, 20);
@@ -83,12 +83,11 @@ export async function downloadInvoicePdf(invoice) {
   doc.setFont(undefined, 'bold');
   const invoiceTitle = invoice.type === 'purchase' ? 'PURCHASE INVOICE' : invoice.type === 'setup' ? 'SETUP BILL' : invoice.type === 'return' ? 'RETURN INVOICE' : 'GST INVOICE';
   doc.text(invoiceTitle, marginLeft, y);
-  y += 8;
+  y += 7;
 
   doc.setDrawColor(220, 228, 236);
   doc.setFillColor(245, 249, 252);
-  doc.roundedRect(marginLeft, y, contentWidth, 28, 3, 3, 'F');
-  doc.setTextColor(30, 50, 72);
+  doc.roundedRect(marginLeft, y, contentWidth, 26, 3, 3, 'F');
   doc.setFont(undefined, 'bold');
   doc.text('Bill To', marginLeft + 5, y + 7);
   doc.setFont(undefined, 'normal');
@@ -97,14 +96,14 @@ export async function downloadInvoicePdf(invoice) {
   const billToGstin = invoice.partyGSTIN || 'GSTIN: Not provided';
   const billToLines = doc.splitTextToSize(billToName, 62);
   doc.text(billToLines, marginLeft + 5, y + 13);
-  doc.text(billToPhone, marginLeft + 5, y + 18 + (billToLines.length - 1) * 3.5);
+  if (billToPhone) doc.text(billToPhone, marginLeft + 5, y + 18 + (billToLines.length - 1) * 3.5);
   doc.text(billToGstin, pageWidth - marginRight - 52, y + 13, { align: 'right' });
-  y += 33 + Math.max(0, billToLines.length - 1) * 2;
+  y += 32 + Math.max(0, billToLines.length - 1) * 2;
 
   doc.setTextColor(20, 20, 20);
   doc.setFont(undefined, 'bold');
   doc.setFontSize(8.2);
-  const tableX = [marginLeft + 2, marginLeft + 62, marginLeft + 96, marginLeft + 128, marginLeft + 164];
+  const tableX = [marginLeft + 2, marginLeft + 62, marginLeft + 97, marginLeft + 128, marginLeft + 167];
   const headers = ['Item', 'Qty', 'Base', 'GST', 'Amount'];
   headers.forEach((header, index) => {
     doc.text(header, tableX[index], y);
@@ -122,7 +121,7 @@ export async function downloadInvoicePdf(invoice) {
   let gstTotal = 0;
 
   displayItems.forEach((item, index) => {
-    if (y > 245) {
+    if (y > 246) {
       doc.addPage();
       y = 18;
     }
@@ -139,7 +138,7 @@ export async function downloadInvoicePdf(invoice) {
 
     doc.setFont(undefined, 'normal');
     const itemName = String(item.name || 'Item');
-    const itemLines = doc.splitTextToSize(itemName, 55);
+    const itemLines = doc.splitTextToSize(itemName, 52);
     const linesToRender = itemLines.slice(0, 2);
     doc.text(String(index + 1), marginLeft + 2, y + 3);
     linesToRender.forEach((line, lineIndex) => {
@@ -162,15 +161,15 @@ export async function downloadInvoicePdf(invoice) {
   const grandTotal = safeValue(invoice.grandTotal, subtotalFromInvoice + gstFromInvoice);
 
   doc.setFillColor(244, 248, 252);
-  doc.roundedRect(pageWidth - marginRight - 72, y, 72, 28, 2, 2, 'F');
+  doc.roundedRect(pageWidth - marginRight - 76, y, 76, 30, 2, 2, 'F');
   doc.setFont(undefined, 'bold');
-  doc.text('Taxable', pageWidth - marginRight - 63, y + 7);
+  doc.text('Taxable', pageWidth - marginRight - 68, y + 7);
   doc.text(`₹${subtotalFromInvoice.toFixed(2)}`, pageWidth - marginRight, y + 7, { align: 'right' });
-  doc.text('GST', pageWidth - marginRight - 63, y + 13);
+  doc.text('GST', pageWidth - marginRight - 68, y + 13);
   doc.text(`₹${gstFromInvoice.toFixed(2)}`, pageWidth - marginRight, y + 13, { align: 'right' });
-  doc.text('TOTAL', pageWidth - marginRight - 63, y + 20);
-  doc.text(`₹${grandTotal.toFixed(2)}`, pageWidth - marginRight, y + 20, { align: 'right' });
-  y += 34;
+  doc.text('TOTAL', pageWidth - marginRight - 68, y + 21);
+  doc.text(`₹${grandTotal.toFixed(2)}`, pageWidth - marginRight, y + 21, { align: 'right' });
+  y += 38;
 
   doc.setFont(undefined, 'normal');
   doc.setFontSize(8);

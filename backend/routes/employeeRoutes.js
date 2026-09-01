@@ -41,6 +41,7 @@ router.post('/', auth, async (req, res) => {
       monthlySalary: Number(req.body.monthlySalary || 0),
       monthlyAdvance: Number(req.body.monthlyAdvance || 0),
       fuelAllowance: Number(req.body.fuelAllowance || 0),
+      homeRentAllowance: Number(req.body.homeRentAllowance || 0),
       incentive: Number(req.body.incentive || 0),
       otherAllowance: Number(req.body.otherAllowance || 0),
       personalDetails: req.body.personalDetails || {},
@@ -59,6 +60,7 @@ router.put('/:id', auth, async (req, res) => {
       monthlySalary: Number(req.body.monthlySalary || 0),
       monthlyAdvance: Number(req.body.monthlyAdvance || 0),
       fuelAllowance: Number(req.body.fuelAllowance || 0),
+      homeRentAllowance: Number(req.body.homeRentAllowance || 0),
       incentive: Number(req.body.incentive || 0),
       otherAllowance: Number(req.body.otherAllowance || 0),
       personalDetails: req.body.personalDetails || {},
@@ -113,9 +115,14 @@ router.get('/:id/payslip', auth, async (req, res) => {
     const manualBonus = Number(adjustments.bonus || 0);
     const manualIncentive = Number(adjustments.incentive || 0);
     const manualDeduction = Number(adjustments.deduction || 0);
-    const allowances = Number(employee.fuelAllowance || 0) + Number(employee.incentive || 0) + Number(employee.otherAllowance || 0) + manualBonus + manualIncentive;
-    const gross = earnedSalary + allowances;
-    const netPay = Math.max(0, gross - manualAdvance - manualDeduction);
+    const fuelAllowance = Number(employee.fuelAllowance || 0);
+    const homeRentAllowance = Number(employee.homeRentAllowance || 0);
+    const allowances = fuelAllowance + homeRentAllowance + Number(employee.incentive || 0) + Number(employee.otherAllowance || 0) + manualBonus + manualIncentive;
+    const basicSalary = earnedSalary;
+    const totalEarnings = basicSalary + fuelAllowance + homeRentAllowance + manualBonus + manualIncentive;
+    const gross = totalEarnings;
+    const totalDeductions = manualAdvance + manualDeduction;
+    const netPay = Math.max(0, gross - totalDeductions);
     res.json({
       employee,
       month: range.month,
@@ -124,13 +131,18 @@ router.get('/:id/payslip', auth, async (req, res) => {
       halfday,
       absent,
       payableDays,
-      earnedSalary,
+      basicSalary,
+      fuelAllowance,
+      homeRentAllowance,
+      earnedSalary: basicSalary,
       allowances,
+      totalEarnings,
       gross,
       advance: manualAdvance,
       bonus: manualBonus,
       incentive: manualIncentive,
       deduction: manualDeduction,
+      totalDeductions,
       adjustmentNote: adjustments.note || '',
       netPay,
       records
