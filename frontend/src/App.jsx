@@ -42,7 +42,7 @@ const emptyCategoryForm = {
   description: ''
 };
 
-const LEAD_STATUS_OPTIONS = ['Not Yet Called', 'No Response', 'Hot Lead', 'Warm Lead', 'Cool Lead', 'May Convert', 'Following Up', 'Not Interested'];
+const LEAD_STATUS_OPTIONS = ['Not Yet Called', 'No Response', 'Hot Lead', 'Warm Lead', 'Cool Lead', 'Immediate', 'May Convert', 'Following Up', 'Converted', 'Blacklisted', 'Not Interested'];
 
 const toLocalDateTimeValue = (date = new Date()) => {
   const pad = (value) => String(value).padStart(2, '0');
@@ -536,6 +536,18 @@ function ContactsPage() {
 
   const cancelCall = () => setCallForm({ contactId: null, note: '', outcome: 'Contacted', leadStage: 'Warm Lead', timestamp: '' });
 
+  const updateContactStatus = async (id, status) => {
+    const contact = contacts.find((item) => (item._id === id || item.id === id));
+    if (!contact) return;
+    try {
+      await api.put(`/contacts/${id}`, { ...contact, status });
+      setMessage(status === 'Converted' ? 'Contact converted to customer' : status === 'Blacklisted' ? 'Contact marked as blacklisted' : 'Lead updated');
+      await loadContacts();
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Unable to update lead status');
+    }
+  };
+
   const derived = useMemo(() => {
     const counts = {
       all: contacts.length,
@@ -543,10 +555,13 @@ function ContactsPage() {
       hot: contacts.filter(c => c.status === 'Hot Lead').length,
       warm: contacts.filter(c => c.status === 'Warm Lead').length,
       cool: contacts.filter(c => c.status === 'Cool Lead').length,
+      immediate: contacts.filter(c => c.status === 'Immediate').length,
+      blacklisted: contacts.filter(c => c.status === 'Blacklisted').length,
       notinterested: contacts.filter(c => c.status === 'Not Interested').length,
       no_response: contacts.filter(c => c.status === 'No Response' || !c.callHistory || c.callHistory.length === 0).length,
       may_convert: contacts.filter(c => c.status === 'May Convert').length,
-      following_up: contacts.filter(c => c.status === 'Following Up').length
+      following_up: contacts.filter(c => c.status === 'Following Up').length,
+      converted: contacts.filter(c => c.status === 'Converted').length
     };
 
     const duplicateConsumerNumbers = new Set(
@@ -577,10 +592,13 @@ function ContactsPage() {
       if (statusTab === 'hot' && c.status !== 'Hot Lead') return false;
       if (statusTab === 'warm' && c.status !== 'Warm Lead') return false;
       if (statusTab === 'cool' && c.status !== 'Cool Lead') return false;
+      if (statusTab === 'immediate' && c.status !== 'Immediate') return false;
+      if (statusTab === 'blacklisted' && c.status !== 'Blacklisted') return false;
       if (statusTab === 'notinterested' && c.status !== 'Not Interested') return false;
       if (statusTab === 'no_response' && c.status !== 'No Response' && c.callHistory && c.callHistory.length) return false;
       if (statusTab === 'may_convert' && c.status !== 'May Convert') return false;
       if (statusTab === 'following_up' && c.status !== 'Following Up') return false;
+      if (statusTab === 'converted' && c.status !== 'Converted') return false;
       if (selectedCaller && (c.callerName || 'Not assigned') !== selectedCaller) return false;
       return true;
     });
@@ -590,7 +608,7 @@ function ContactsPage() {
       if (statusTab === 'no_response') return contact.status === 'No Response' || !contact.callHistory || contact.callHistory.length === 0;
       if (statusTab === 'duplicates') return duplicateContacts.includes(contact);
       if (statusTab === 'similars') return similarContacts.includes(contact);
-      const status = { hot: 'Hot Lead', warm: 'Warm Lead', cool: 'Cool Lead', notinterested: 'Not Interested' }[statusTab];
+      const status = { hot: 'Hot Lead', warm: 'Warm Lead', cool: 'Cool Lead', immediate: 'Immediate', blacklisted: 'Blacklisted', notinterested: 'Not Interested', converted: 'Converted' }[statusTab];
       if (statusTab === 'may_convert') return contact.status === 'May Convert';
       if (statusTab === 'following_up') return contact.status === 'Following Up';
       return !status || contact.status === status;
@@ -666,10 +684,13 @@ function ContactsPage() {
           <button className={statusTab==='hot'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('hot')}>Hot ({counts.hot})</button>
           <button className={statusTab==='warm'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('warm')}>Warm ({counts.warm})</button>
           <button className={statusTab==='cool'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('cool')}>Cool ({counts.cool})</button>
+          <button className={statusTab==='immediate'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('immediate')}>Immediate ({counts.immediate})</button>
           <button className={statusTab==='notinterested'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('notinterested')}>Not interested ({counts.notinterested})</button>
+          <button className={statusTab==='blacklisted'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('blacklisted')}>Blacklisted ({counts.blacklisted})</button>
           <button className={statusTab==='no_response'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('no_response')}>No response ({counts.no_response})</button>
           <button className={statusTab==='may_convert'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('may_convert')}>May convert ({counts.may_convert})</button>
           <button className={statusTab==='following_up'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('following_up')}>Following up ({counts.following_up})</button>
+          <button className={statusTab==='converted'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('converted')}>Converted ({counts.converted})</button>
           <button className={statusTab==='duplicates'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('duplicates')}>Duplicate consumers ({duplicateContacts.length})</button>
           <button className={statusTab==='similars'?'btn primary':'btn outline'} onClick={()=>handleStatusTabChange('similars')}>Similar names / mobiles ({similarContacts.length})</button>
           <input className="search-field" placeholder="Search caller, customer or number" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} />
@@ -788,6 +809,8 @@ function ContactsPage() {
                       ) : (
                         <div className="inline-actions">
                           <button className="btn primary" onClick={()=>logCall(c)}>Log call</button>
+                          <button className="btn secondary" type="button" onClick={() => updateContactStatus(id, 'Converted')}>Convert to customer</button>
+                          <button className="btn outline" type="button" onClick={() => updateContactStatus(id, 'Blacklisted')}>Blacklist</button>
                         </div>
                       )}
                     </div>
@@ -1077,6 +1100,7 @@ function Dashboard({ user }) {
 }
 
 function CustomersPage() {
+  const [convertedContacts, setConvertedContacts] = useState([]);
   const [customers, setCustomers] = useState([
     {
       id: 1,
@@ -1114,8 +1138,35 @@ function CustomersPage() {
     }
   ]);
 
+  useEffect(() => {
+    api.get('/contacts')
+      .then((res) => {
+        const converted = (res.data || []).filter((contact) => contact.status === 'Converted').map((contact, index) => ({
+          id: `converted-${contact._id || index}`,
+          name: contact.name || 'Converted customer',
+          project: 'Solar project',
+          quotationAmount: 0,
+          approvedBankLoan: 0,
+          bankLoanDisbursed: 0,
+          pendingLoanAmount: 0,
+          pendingProjectCost: 0,
+          downPayment: 0,
+          marginMoney: 0,
+          loadEnhancementPayment: 0,
+          netMetering: 'Pending',
+          subsidyRedeemed: 0,
+          subsidyDisbursed: 0,
+          status: 'Converted'
+        }));
+        setConvertedContacts(converted);
+      })
+      .catch(() => setConvertedContacts([]));
+  }, []);
+
+  const customerRows = useMemo(() => [...convertedContacts, ...customers], [convertedContacts, customers]);
+
   const summary = useMemo(() => {
-    const totals = customers.reduce((acc, customer) => {
+    const totals = customerRows.reduce((acc, customer) => {
       const extraLoadEnhancement = Number(customer.loadEnhancementPayment || 0) > 3747 ? Number(customer.loadEnhancementPayment || 0) - 3747 : 0;
       const projectCost = Number(customer.quotationAmount || 0) + extraLoadEnhancement;
       acc.quotation += Number(customer.quotationAmount || 0);
@@ -1205,7 +1256,7 @@ function CustomersPage() {
       </div>
 
       <div className="customer-list-grid">
-        {customers.map((customer) => {
+        {customerRows.map((customer) => {
           const extraLoadEnhancement = Number(customer.loadEnhancementPayment || 0) > 3747 ? Number(customer.loadEnhancementPayment || 0) - 3747 : 0;
           const projectCost = Number(customer.quotationAmount || 0) + extraLoadEnhancement;
           const pendingProjectBalance = Math.max(0, projectCost - Number(customer.downPayment || 0) - Number(customer.marginMoney || 0) - Number(customer.subsidyRedeemed || 0));
