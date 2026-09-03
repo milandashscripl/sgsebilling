@@ -1112,11 +1112,12 @@ function Dashboard({ user }) {
 }
 
 function CustomersPage() {
-  const CUSTOMER_STAGES = ['Documents review', 'PMGSY entry', 'Quotation', 'Agreement uploaded', 'Bank loan pending', 'Loan disbursed', 'Installation pending', 'Load enhancement', 'Inspection pending', 'Subsidy redeemed', 'Subsidy disbursed', 'Amount pending', 'Closed'];
+  const CUSTOMER_STAGES = ['Project costing', 'Quotation', 'Documents review', 'PMGSY registration', 'Agreement uploaded', 'Bank loan pending', 'Bank loan disbursed', 'Installation pending', 'Load enhancement', 'Inspection pending', 'Subsidy redeemed', 'Subsidy disbursed', 'Amount pending', 'Closed'];
   const REQUIRED_DOCUMENTS = ['Aadhaar', 'PAN', 'Latest electricity bill', 'Bank passbook', 'Email ID', 'Mobile number'];
   const [convertedContacts, setConvertedContacts] = useState([]);
   const [customerStorageReady, setCustomerStorageReady] = useState(false);
-  const [customerForm, setCustomerForm] = useState({ name: '', mobile: '', project: '', pmgsyId: '', systemCapacity: '', inverterModel: '', installationDate: '', warrantyExpiry: '', nextServiceDate: '', quotationAmount: '', approvedBankLoan: '', bankLoanDisbursed: '', disbursementType: 'partial', downPayment: '', marginMoney: '', loadEnhancementPayment: '', inspectionStatus: 'Pending', subsidyRedeemed: '', subsidyDisbursed: '', pendingAmount: '', stage: 'Documents review', documents: Object.fromEntries(REQUIRED_DOCUMENTS.map((document) => [document, 'provided'])) });
+  const [showDirectCustomer, setShowDirectCustomer] = useState(false);
+  const [customerForm, setCustomerForm] = useState({ name: '', mobile: '', project: '', pmgsyId: '', systemCapacity: '', inverterModel: '', installationDate: '', warrantyExpiry: '', nextServiceDate: '', quotationAmount: '', approvedBankLoan: '', bankLoanDisbursed: '', disbursementType: 'partial', downPayment: '', marginMoney: '', loadEnhancementPayment: '', inspectionStatus: 'Pending', subsidyRedeemed: '', subsidyDisbursed: '', pendingAmount: '', stage: 'Project costing', documents: Object.fromEntries(REQUIRED_DOCUMENTS.map((document) => [document, 'provided'])) });
   const [customers, setCustomers] = useState([
     {
       id: 1,
@@ -1133,7 +1134,8 @@ function CustomersPage() {
       netMetering: 'Pending',
       subsidyRedeemed: 35000,
       subsidyDisbursed: 30000,
-      status: 'Loan approved'
+      status: 'Bank loan pending',
+      stage: 'Bank loan pending'
     },
     {
       id: 2,
@@ -1150,7 +1152,8 @@ function CustomersPage() {
       netMetering: 'Completed',
       subsidyRedeemed: 42000,
       subsidyDisbursed: 42000,
-      status: 'Waiting for installation'
+      status: 'Installation pending',
+      stage: 'Installation pending'
     }
   ]);
 
@@ -1161,6 +1164,8 @@ function CustomersPage() {
           id: `converted-${contact._id || index}`,
           name: contact.name || 'Converted customer',
           project: 'Solar project',
+          mobile: contact.contactNumber || '',
+          stage: 'Project costing',
           quotationAmount: 0,
           approvedBankLoan: 0,
           bankLoanDisbursed: 0,
@@ -1196,7 +1201,12 @@ function CustomersPage() {
     if (!customerForm.name || !customerForm.mobile) return;
     const nextCustomer = { ...customerForm, id: `customer-${Date.now()}`, status: customerForm.stage };
     setCustomers((current) => [...current, nextCustomer]);
+    setShowDirectCustomer(false);
     setCustomerForm((current) => ({ ...current, name: '', mobile: '', project: '', pmgsyId: '', quotationAmount: '' }));
+  };
+  const updateCustomerStage = (customerId, stage) => {
+    setCustomers((current) => current.map((customer) => customer.id === customerId ? { ...customer, stage, status: stage } : customer));
+    setConvertedContacts((current) => current.map((customer) => customer.id === customerId ? { ...customer, stage, status: stage } : customer));
   };
   const downloadQuotation = (customer) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -1255,8 +1265,9 @@ function CustomersPage() {
         <p className="muted">Track project conversion from lead to sanctioned loan, subsidy, and installation handover.</p>
       </div>
 
-      <form className="panel customer-intake-panel" onSubmit={addCustomer}>
-        <div className="panel-header compact-header"><div><p className="eyebrow">Guided onboarding</p><h4>Add customer and project status</h4></div><span className="chip">12 stages</span></div>
+      <div className="customer-toolbar"><div><p className="muted">Customers move through one controlled project pipeline. Converted contacts appear here automatically.</p></div><button className="btn primary" type="button" onClick={() => setShowDirectCustomer(true)}>Add direct customer</button></div>
+      {showDirectCustomer && <form className="panel customer-intake-panel" onSubmit={addCustomer}>
+        <div className="panel-header compact-header"><div><p className="eyebrow">Direct customer</p><h4>Start a new project</h4></div><button className="btn outline" type="button" onClick={() => setShowDirectCustomer(false)}>Close</button></div>
         <div className="form-grid">
           <label>Customer name<input required value={customerForm.name} onChange={(event) => updateCustomerForm('name', event.target.value)} /></label>
           <label>Mobile number<input required value={customerForm.mobile} onChange={(event) => updateCustomerForm('mobile', event.target.value)} /></label>
@@ -1278,8 +1289,8 @@ function CustomersPage() {
           <label>Subsidy disbursed<input type="number" min="0" value={customerForm.subsidyDisbursed} onChange={(event) => updateCustomerForm('subsidyDisbursed', event.target.value)} /></label>
         </div>
         <div className="document-checklist"><strong>Document review</strong>{REQUIRED_DOCUMENTS.map((document) => <label key={document}><span>{document}</span><select value={customerForm.documents[document]} onChange={(event) => updateCustomerForm('documents', { ...customerForm.documents, [document]: event.target.value })}><option value="provided">Provided</option><option value="missing">Missing</option><option value="error">Error</option></select></label>)}</div>
-        <button className="btn primary" type="submit">Add customer to pipeline</button>
-      </form>
+        <button className="btn primary" type="submit">Create project</button>
+      </form>}
 
       <div className="customer-metric-grid">
         <div className="customer-metric">
@@ -1310,16 +1321,9 @@ function CustomersPage() {
         </div>
         <div className="pipeline-steps">
           {[
-            'Lead contact',
-            'Quotation shared',
-            'Bank loan approved',
-            'Loan disbursed',
-            'Project cost balance',
-            'Net metering',
-            'Subsidy redeemed',
-            'Installation closeout'
+            'Project costing', 'Quotation', 'Documents', 'PMGSY', 'Agreement', 'Loan pending', 'Loan disbursed', 'Installation', 'Load enhancement', 'Inspection', 'Subsidy redeemed', 'Subsidy disbursed', 'Pending amount'
           ].map((step, index) => (
-            <div key={step} className={`pipeline-step ${index <= 5 ? 'active' : ''}`}>
+            <div key={step} className={`pipeline-step ${index <= 2 ? 'active' : ''}`}>
               <span>{index + 1}</span>
               <strong>{step}</strong>
             </div>
@@ -1363,6 +1367,9 @@ function CustomersPage() {
                 <div><span>Subsidy disbursed</span><strong>₹{Number(customer.subsidyDisbursed || 0).toLocaleString('en-IN')}</strong></div>
                 <div><span>Pending balance</span><strong>₹{Number(pendingProjectBalance || 0).toLocaleString('en-IN')}</strong></div>
               </div>
+              <div className="customer-stage-control"><label>Project stage<select value={customer.stage || CUSTOMER_STAGES[0]} onChange={(event) => updateCustomerStage(customer.id, event.target.value)}>{CUSTOMER_STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select></label><span className="muted">{Math.max(1, CUSTOMER_STAGES.indexOf(customer.stage || CUSTOMER_STAGES[0]) + 1)} of {CUSTOMER_STAGES.length}</span></div>
+              <div className="customer-progress" aria-label={`Stage ${customer.stage || CUSTOMER_STAGES[0]} of ${CUSTOMER_STAGES.length}`}><span style={{ width: `${(Math.max(0, CUSTOMER_STAGES.indexOf(customer.stage || CUSTOMER_STAGES[0])) / (CUSTOMER_STAGES.length - 1)) * 100}%` }} /></div>
+              <div className="customer-record-strip"><strong>Documents</strong>{REQUIRED_DOCUMENTS.map((document) => <span key={document} className={`document-status ${customer.documents?.[document] || 'pending'}`}>{document}: {customer.documents?.[document] || 'pending'}</span>)}</div>
             </div>
           );
         })}
