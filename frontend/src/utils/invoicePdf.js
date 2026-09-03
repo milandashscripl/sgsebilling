@@ -28,8 +28,16 @@ export async function downloadInvoicePdf(invoice) {
   const marginLeft = 14;
   const marginRight = 14;
   const contentWidth = pageWidth - marginLeft - marginRight;
+  const pageHeight = doc.internal.pageSize.getHeight();
   const formatMoney = (value) => `₹${safeValue(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   let y = 14;
+
+  doc.setDrawColor(20, 42, 61);
+  doc.setLineWidth(0.8);
+  doc.roundedRect(8, 8, pageWidth - 16, pageHeight - 16, 2, 2, 'S');
+  doc.setDrawColor(236, 156, 54);
+  doc.setLineWidth(0.35);
+  doc.roundedRect(10.5, 10.5, pageWidth - 21, pageHeight - 21, 1.5, 1.5, 'S');
 
   let sellerLogo = invoice.sellerLogo || null;
   try {
@@ -96,6 +104,14 @@ export async function downloadInvoicePdf(invoice) {
   doc.setLineWidth(0.2);
   y += 7;
 
+  doc.setFillColor(20, 42, 61);
+  doc.roundedRect(marginLeft, y, contentWidth, 6, 1, 1, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(7.5);
+  doc.text('CUSTOMER & BILLING DETAILS', marginLeft + 3, y + 4.2);
+  y += 8;
+  doc.setTextColor(20, 20, 20);
+
   doc.setDrawColor(220, 228, 236);
   doc.setFillColor(249, 250, 251);
   doc.roundedRect(marginLeft, y, contentWidth, 26, 2, 2, 'FD');
@@ -116,6 +132,8 @@ export async function downloadInvoicePdf(invoice) {
   doc.setFontSize(8.2);
   const tableX = [marginLeft + 5, marginLeft + 103, marginLeft + 122, marginLeft + 148, pageWidth - marginRight - 5];
   const headers = ['Item', 'Qty', 'Base', 'GST', 'Amount'];
+  doc.setFillColor(236, 156, 54);
+  doc.roundedRect(marginLeft, y - 7, contentWidth, 2, 1, 1, 'F');
   doc.setFillColor(20, 42, 61);
   doc.rect(marginLeft, y - 5, contentWidth, 10, 'F');
   doc.setTextColor(255, 255, 255);
@@ -202,6 +220,12 @@ export async function downloadInvoicePdf(invoice) {
   doc.line(pageWidth - marginRight - 52, y - 3, pageWidth - marginRight, y - 3);
   doc.text('Authorized Signatory', pageWidth - marginRight - 28, y, { align: 'right' });
   doc.text(`For ${invoice.sellerName || 'SGSE Billing'}`, pageWidth - marginRight - 28, y + 6, { align: 'right' });
+  doc.setDrawColor(20, 42, 61);
+  doc.line(marginLeft, pageHeight - 22, pageWidth - marginRight, pageHeight - 22);
+  doc.setFontSize(7);
+  doc.setTextColor(94, 111, 131);
+  doc.text('Thank you for choosing us', marginLeft, pageHeight - 16);
+  doc.text(`${invoice.invoiceNumber || 'Invoice'}  |  Computer-generated document`, pageWidth - marginRight, pageHeight - 16, { align: 'right' });
 
   doc.save(`${invoice.invoiceNumber || 'gst-invoice'}.pdf`);
 }

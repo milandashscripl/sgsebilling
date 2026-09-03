@@ -3410,11 +3410,23 @@ function EmployeesPage() {
     const margin = 16;
     const pageWidth = doc.internal.pageSize.getWidth();
     const contentWidth = pageWidth - margin * 2;
+    const pageHeight = doc.internal.pageSize.getHeight();
     const employee = payslip.employee || {};
     const personalDetails = employee.personalDetails || {};
     const money = (value) => `₹${Math.round(Number(value || 0)).toLocaleString('en-IN')}`;
     const valueOrDash = (value) => value || '—';
     let y = 14;
+
+    doc.setDrawColor(20, 42, 61);
+    doc.setLineWidth(0.8);
+    doc.roundedRect(8, 8, pageWidth - 16, pageHeight - 16, 2, 2, 'S');
+    doc.setDrawColor(236, 156, 54);
+    doc.setLineWidth(0.35);
+    doc.roundedRect(10.5, 10.5, pageWidth - 21, pageHeight - 21, 1.5, 1.5, 'S');
+    doc.setFillColor(20, 42, 61);
+    doc.roundedRect(margin, 14, contentWidth, 26, 2, 2, 'F');
+    doc.setFillColor(236, 156, 54);
+    doc.rect(margin, 37.5, contentWidth, 2.5, 'F');
 
     if (shopLogo) {
       try {
@@ -3427,24 +3439,25 @@ function EmployeesPage() {
             reader.onerror = reject;
             reader.readAsDataURL(blob);
           });
-          doc.addImage(dataUrl, 'PNG', margin, 8, 18, 18);
+          doc.addImage(dataUrl, 'PNG', margin + 5, 18, 18, 18);
         }
       } catch {
         // Keep the payslip usable when a shop logo cannot be fetched.
       }
     }
 
-    doc.setTextColor(20, 20, 20);
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
-    doc.text(shopName, pageWidth / 2, y, { align: 'center' });
+    doc.text(shopName, pageWidth / 2, 23, { align: 'center' });
     doc.setFontSize(8);
     doc.setFont(undefined, 'normal');
-    doc.text(doc.splitTextToSize(shopAddress, 90), pageWidth / 2, y + 5, { align: 'center' });
-    y += 18;
+    doc.text(doc.splitTextToSize(shopAddress, 90), pageWidth / 2, 29, { align: 'center' });
+    y = 47;
+    doc.setTextColor(20, 42, 61);
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
-    doc.text(`Payslip - ${payslip.month}`, pageWidth / 2, y, { align: 'center' });
+    doc.text(`SALARY SLIP  |  ${payslip.month}`, pageWidth / 2, y, { align: 'center' });
     y += 6;
 
     const drawTable = (rows, widths, rowHeight = 7) => {
@@ -3464,6 +3477,13 @@ function EmployeesPage() {
       });
     };
 
+    doc.setFillColor(20, 42, 61);
+    doc.roundedRect(margin, y, contentWidth, 6, 1, 1, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7.5);
+    doc.text('EMPLOYEE & ATTENDANCE DETAILS', margin + 3, y + 4.2);
+    y += 8;
+    doc.setTextColor(20, 20, 20);
     drawTable([
       ['Employee Name', valueOrDash(employee.name), 'Total Working Days', String(payslip.daysInMonth || 0)],
       ['Employee ID', valueOrDash(employee.employeeId), 'LOP Days', String(payslip.absent || 0)],
@@ -3474,7 +3494,14 @@ function EmployeesPage() {
     ], [34, 45, 37, contentWidth - 116]);
     y += 5;
 
+    doc.setFillColor(20, 42, 61);
+    doc.roundedRect(margin, y, contentWidth, 6, 1, 1, 'F');
+    doc.setTextColor(255, 255, 255);
     doc.setFont(undefined, 'bold');
+    doc.setFontSize(7.5);
+    doc.text('EARNINGS & DEDUCTIONS', margin + 3, y + 4.2);
+    y += 8;
+    doc.setTextColor(20, 20, 20);
     doc.setFontSize(8);
     drawTable([
       ['Earnings', '', 'Deductions', ''],
@@ -3494,6 +3521,8 @@ function EmployeesPage() {
 
     doc.setFont(undefined, 'normal');
     doc.setFontSize(7.5);
+    doc.setDrawColor(236, 156, 54);
+    doc.line(margin, y - 5, pageWidth - margin, y - 5);
     doc.line(margin, y, margin + 42, y);
     doc.line(pageWidth - margin - 42, y, pageWidth - margin, y);
     doc.text('Employer Signature', margin + 21, y + 5, { align: 'center' });
@@ -3503,6 +3532,12 @@ function EmployeesPage() {
       doc.setFontSize(7);
       doc.text(`Note: ${payslip.adjustmentNote}`, margin, y);
     }
+    doc.setDrawColor(20, 42, 61);
+    doc.line(margin, pageHeight - 22, pageWidth - margin, pageHeight - 22);
+    doc.setFontSize(7);
+    doc.setTextColor(94, 111, 131);
+    doc.text('Computer-generated salary slip', margin, pageHeight - 16);
+    doc.text(`${shopName}  |  Confidential`, pageWidth - margin, pageHeight - 16, { align: 'right' });
 
     doc.save(`${employee.name.replace(/\s+/g, '-').toLowerCase()}-${payslip.month}-payslip.pdf`);
   };
