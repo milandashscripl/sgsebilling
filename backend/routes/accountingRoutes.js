@@ -13,7 +13,7 @@ const getAccountBalance = async (accountId, openingBalance, userId) => {
   const [incomeTotal, expenseTotal, expenseOutflow] = await Promise.all([
     Transaction.aggregate([matchStage, { $match: { type: 'income' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
     Transaction.aggregate([matchStage, { $match: { type: 'expense' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
-    Expense.aggregate([{ $match: { $or: [{ accountId }, { accountId: id }] } }, { $group: { _id: null, total: { $sum: '$amount' } } }])
+    Expense.aggregate([{ $match: { createdBy: userId, $or: [{ accountId }, { accountId: id }] } }, { $group: { _id: null, total: { $sum: '$amount' } } }])
   ]);
 
   return openingBalance + (incomeTotal[0]?.total || 0) - (expenseTotal[0]?.total || 0) - (expenseOutflow[0]?.total || 0);
@@ -38,7 +38,7 @@ router.post('/transfer', auth, async (req, res) => {
   try {
     const { fromAccountId, toAccountId, amount, note } = req.body;
     const amt = Number(amount || 0);
-    if (!amt || amt <= 0) return res.status(400).json({ message: 'Enter a valid amount' });
+    if (!Number.isFinite(amt) || amt <= 0) return res.status(400).json({ message: 'Enter a valid amount' });
     if (!fromAccountId || !toAccountId) return res.status(400).json({ message: 'Select both accounts' });
     if (fromAccountId === toAccountId) return res.status(400).json({ message: 'Source and destination must differ' });
 
@@ -75,7 +75,7 @@ router.post('/accounts/:id/deposit', auth, async (req, res) => {
     const account = await Account.findOne({ _id: req.params.id, createdBy: req.user._id });
     if (!account) return res.status(404).json({ message: 'Account not found' });
     const amount = Number(req.body.amount || 0);
-    if (!amount || amount <= 0) return res.status(400).json({ message: 'Enter a valid amount' });
+    if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ message: 'Enter a valid amount' });
     await Transaction.create({
       date: new Date().toISOString().slice(0, 10),
       accountId: account._id,
@@ -95,10 +95,13 @@ router.post('/accounts/:id/deposit', auth, async (req, res) => {
 
 router.post('/accounts', auth, async (req, res) => {
   try {
+    if (!String(req.body.name || '').trim()) return res.status(400).json({ message: 'Account name is required' });
+    const openingBalance = Number(req.body.openingBalance || 0);
+    if (!Number.isFinite(openingBalance) || openingBalance < 0) return res.status(400).json({ message: 'Opening balance must be zero or greater' });
     const account = await Account.create({
       name: req.body.name,
       type: req.body.type || 'cash',
-      openingBalance: Number(req.body.openingBalance || 0),
+      openingBalance,
       notes: req.body.notes || '',
       createdBy: req.user._id
     });
@@ -121,11 +124,14 @@ router.post('/transactions', auth, async (req, res) => {
   try {
     const account = await Account.findOne({ _id: req.body.accountId, createdBy: req.user._id });
     if (!account) return res.status(400).json({ message: 'Select an account belonging to this shop' });
+    const amount = Number(req.body.amount || 0);
+    if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ message: 'Enter a valid amount' });
+    if (!['income', 'expense'].includes(req.body.type || 'income')) return res.status(400).json({ message: 'Transaction type must be income or expense' });
     const transaction = await Transaction.create({
       date: req.body.date || new Date().toISOString().slice(0, 10),
       accountId: req.body.accountId,
       type: req.body.type || 'income',
-      amount: Number(req.body.amount || 0),
+      amount,
       paymentMethod: req.body.paymentMethod || 'cash',
       reference: req.body.reference || '',
       note: req.body.note || '',
@@ -178,10 +184,12 @@ router.post('/expenses', auth, async (req, res) => {
   try {
     const account = await Account.findOne({ _id: req.body.accountId, createdBy: req.user._id });
     if (!account) return res.status(400).json({ message: 'Select an account belonging to this shop' });
+    const amount = Number(req.body.amount || 0);
+    if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ message: 'Enter a valid amount' });
     const expense = await Expense.create({
       date: req.body.date || new Date().toISOString().slice(0, 10),
       category: req.body.category || 'General',
-      amount: Number(req.body.amount || 0),
+      amount,
       accountId: req.body.accountId,
       paymentMethod: req.body.paymentMethod || 'cash',
       note: req.body.note || '',
@@ -205,8 +213,8 @@ router.delete('/expenses/:id', auth, async (req, res) => {
 
 router.get('/summary', auth, async (req, res) => {
   try {
-    const [incomeTotalAgg, expenseTotalAgg, accountsData, paymentMethodIncome, paymentMethodExpense, receivablesAgg] = await Promise.all([
-      Transaction.aggregate([{ $match: { createdBy: req.user._id } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+    const [transactionTotals, expenseTotalAgg, accountsData, paymentMethodIncome, paymentMethodExpense, receivablesAgg] = await Promise.all([
+      Transaction.aggregate([{ $match: { createdBy: req.user._id } }, { $group: { _id: '$type', total: { $sum: '$amount' } } }]),
       Expense.aggregate([{ $match: { createdBy: req.user._id } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
       Account.find({ createdBy: req.user._id }).sort({ name: 1 }).lean(),
       Transaction.aggregate([{ $match: { createdBy: req.user._id } }, { $group: { _id: '$paymentMethod', total: { $sum: '$amount' } } }]),
@@ -234,9 +242,9 @@ router.get('/summary', auth, async (req, res) => {
 
     res.json({
       accounts,
-      incomeTotal: incomeTotalAgg[0]?.total || 0,
-      expenseTotal: expenseTotalAgg[0]?.total || 0,
-      netCash: (incomeTotalAgg[0]?.total || 0) - (expenseTotalAgg[0]?.total || 0),
+      incomeTotal: transactionTotals.find((entry) => entry._id === 'income')?.total || 0,
+      expenseTotal: (transactionTotals.find((entry) => entry._id === 'expense')?.total || 0) + (expenseTotalAgg[0]?.total || 0),
+      netCash: (transactionTotals.find((entry) => entry._id === 'income')?.total || 0) - (transactionTotals.find((entry) => entry._id === 'expense')?.total || 0) - (expenseTotalAgg[0]?.total || 0),
       receivables: receivablesAgg[0]?.total || 0,
       paymentMethods
     });

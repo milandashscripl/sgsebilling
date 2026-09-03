@@ -706,6 +706,13 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .accounting-action-grid .panel { display: grid; gap: 10px; }
 .accounting-action-grid h4 { margin: 0; }
 .accounting-action-grid p { margin: 0; }
+.solar-finance-panel { display: grid; gap: 12px; border-top: 3px solid #ec9c36; }
+.solar-finance-panel > .panel-header > strong { color: #16406E; font-size: 1.1rem; }
+.solar-cost-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.solar-cost-grid > div { display: grid; gap: 5px; padding: 12px; border-radius: 12px; background: rgba(236,156,54,0.08); }
+.solar-cost-grid span { color: var(--text-muted); font-size: 0.78rem; }
+.solar-cost-grid strong { color: #1B2A3B; }
+@media (max-width: 800px) { .solar-cost-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .panel { padding: 20px; border-radius: 24px; }
 .page-header { display: flex; flex-direction: column; gap: 8px; padding: 18px 0; }
 .contacts-panel { padding: 24px; border-radius: 26px; background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,250,255,0.92)); border: 1px solid rgba(63,154,232,0.14); }

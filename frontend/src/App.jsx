@@ -2635,6 +2635,14 @@ function AccountingPage() {
     });
   })();
 
+  const solarCostSummary = ['Equipment', 'Installation', 'Transport', 'Labour', 'Maintenance'].map((category) => ({
+    category,
+    total: transactionHistory
+      .filter((entry) => entry.type === 'expense' && String(entry.kind || '').toLowerCase().includes(category.toLowerCase()))
+      .reduce((total, entry) => total + Number(entry.amount || 0), 0)
+  }));
+  const solarTrackedCost = solarCostSummary.reduce((total, entry) => total + entry.total, 0);
+
   return (
     <div className="accounting-page">
       <h3>Accounting and daily cash book</h3>
@@ -2645,6 +2653,17 @@ function AccountingPage() {
         <div className="stat-card"><h4>Expense total</h4><p>₹{(summary.expenseTotal || 0).toLocaleString()}</p></div>
         <div className="stat-card stat-purchases"><h4>Net cash movement</h4><p>₹{(summary.netCash || 0).toLocaleString()}</p><span>Income less expenses</span></div>
         <div className="stat-card stat-returns"><h4>Receivables</h4><p>₹{(summary.receivables || 0).toLocaleString()}</p><span>Outstanding invoices</span></div>
+      </div>
+
+      <div className="panel solar-finance-panel">
+        <div className="panel-header compact-header">
+          <div><p className="eyebrow">Solar project finance</p><h4>Cost watch</h4></div>
+          <strong>₹{solarTrackedCost.toLocaleString('en-IN')}</strong>
+        </div>
+        <div className="solar-cost-grid">
+          {solarCostSummary.map((entry) => <div key={entry.category}><span>{entry.category}</span><strong>₹{entry.total.toLocaleString('en-IN')}</strong></div>)}
+        </div>
+        <p className="muted">Use these category names in expense entries to track project profitability and service costs.</p>
       </div>
 
       <div className="panel acct-balances-panel">
@@ -2734,7 +2753,7 @@ function AccountingPage() {
             <option value="income">Income</option>
             <option value="expense">Expense</option>
           </select>
-          <input placeholder="Amount" value={transactionForm.amount} onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })} />
+          <input type="number" min="0.01" step="0.01" placeholder="Amount" value={transactionForm.amount} onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })} />
           <select value={transactionForm.paymentMethod} onChange={(e) => setTransactionForm({ ...transactionForm, paymentMethod: e.target.value })}>
             <option value="cash">Cash</option>
             <option value="phonepe">PhonePe</option>
