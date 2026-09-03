@@ -151,13 +151,13 @@ export async function downloadInvoicePdf(invoice) {
     subtotalValue += invoice.type === 'setup' ? 0 : Number((taxableValue * qty).toFixed(2));
     gstTotal += invoice.type === 'setup' ? 0 : lineTax;
 
+    const itemName = String(item.name || 'Item');
+    const itemLines = doc.splitTextToSize(itemName, 52);
+    const linesToRender = itemLines.slice(0, 2);
     doc.setFillColor(index % 2 === 0 ? 248 : 255, index % 2 === 0 ? 250 : 255, index % 2 === 0 ? 252 : 255);
     const rowHeight = 6 + Math.max(0, linesToRender.length - 1) * 4;
     doc.rect(marginLeft, y - 2, contentWidth, rowHeight, 'F');
     doc.setFont(undefined, 'normal');
-    const itemName = String(item.name || 'Item');
-    const itemLines = doc.splitTextToSize(itemName, 52);
-    const linesToRender = itemLines.slice(0, 2);
     doc.text(String(index + 1), marginLeft + 5, y + 3);
     linesToRender.forEach((line, lineIndex) => {
       doc.text(line, marginLeft + 13, y + 3 + (lineIndex * 4));

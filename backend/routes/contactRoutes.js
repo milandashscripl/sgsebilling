@@ -6,11 +6,19 @@ const router = express.Router();
 
 const normalizeValue = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 
-const findDuplicateConsumer = async (consumerNumber, userId, contactId = null) => {
-  const normalized = normalizeValue(consumerNumber);
+const findDuplicateValue = async (field, value, userId, contactId = null) => {
+  const normalized = normalizeValue(value);
   if (!normalized) return null;
-  const contacts = await Contact.find({ createdBy: userId, consumerNumber: { $nin: ['', null] } }).select('consumerNumber').lean();
-  return contacts.find((contact) => normalizeValue(contact.consumerNumber) === normalized && String(contact._id) !== String(contactId)) || null;
+  const contacts = await Contact.find({ createdBy: userId, [field]: { $nin: ['', null] } }).select(`${field} name`).lean();
+  return contacts.find((contact) => normalizeValue(contact[field]) === normalized && String(contact._id) !== String(contactId)) || null;
+};
+
+const rejectDuplicateNumbers = async (body, userId, contactId = null) => {
+  const duplicateConsumer = await findDuplicateValue('consumerNumber', body.consumerNumber, userId, contactId);
+  if (duplicateConsumer) return `Consumer number already exists on contact ${duplicateConsumer.consumerNumber}`;
+  const duplicateContact = await findDuplicateValue('contactNumber', body.contactNumber, userId, contactId);
+  if (duplicateContact) return `Contact number already exists on contact ${duplicateContact.contactNumber}`;
+  return null;
 };
 
 router.get('/', auth, async (req, res) => {
@@ -76,8 +84,8 @@ const sanitizeCsvValue = (value) => String(value || '').replace(/,/g, ' ').repla
 
 router.post('/', auth, async (req, res) => {
   try {
-    const duplicate = await findDuplicateConsumer(req.body.consumerNumber, req.user._id);
-    if (duplicate) return res.status(409).json({ message: `Consumer number already exists on contact ${duplicate.consumerNumber}` });
+    const duplicateMessage = await rejectDuplicateNumbers(req.body, req.user._id);
+    if (duplicateMessage) return res.status(409).json({ message: duplicateMessage });
     const contact = await Contact.create({
       name: req.body.name,
       callerName: req.body.callerName || '',
@@ -127,8 +135,8 @@ router.post('/:contactId/calls', auth, async (req, res) => {
 
 router.put('/:contactId', auth, async (req, res) => {
   try {
-    const duplicate = await findDuplicateConsumer(req.body.consumerNumber, req.user._id, req.params.contactId);
-    if (duplicate) return res.status(409).json({ message: `Consumer number already exists on contact ${duplicate.consumerNumber}` });
+    const duplicateMessage = await rejectDuplicateNumbers(req.body, req.user._id, req.params.contactId);
+    if (duplicateMessage) return res.status(409).json({ message: duplicateMessage });
     const contact = await Contact.findOneAndUpdate(
       { _id: req.params.contactId, createdBy: req.user._id },
       {

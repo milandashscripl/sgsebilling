@@ -35,6 +35,16 @@
   100% { transform: translateY(0); }
 }
 
+@keyframes stageReveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes progressSweep {
+  from { transform: scaleX(0); transform-origin: left; }
+  to { transform: scaleX(1); transform-origin: left; }
+}
+
 /* Apply animations to elements */
 .calling-list-item { animation: slideInUp 0.4s ease-out; }
 .panel, .contact-card, .stat-card, .invoice-preview-panel, .quick-panel { animation: fadeIn 0.35s ease-out; }
@@ -182,6 +192,16 @@ html { scroll-behavior: smooth; }
 
 /* Page transition effects */
 .page-transition { animation: fadeIn 0.3s ease-out; }
+
+.customer-intake-panel { animation: stageReveal 0.5s ease both; }
+.customer-intake-panel .form-grid > label { animation: stageReveal 0.4s ease both; }
+.customer-intake-panel .form-grid > label:nth-child(2n) { animation-delay: 0.05s; }
+.customer-intake-panel .form-grid > label:nth-child(3n) { animation-delay: 0.1s; }
+.pipeline-step.active::after { animation: progressSweep 0.7s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
 
 /* Improve all clickable elements */
 button, a, [role="button"] { transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); }

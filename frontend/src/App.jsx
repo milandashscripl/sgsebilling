@@ -484,6 +484,18 @@ function ContactsPage() {
 
   const save = async (e) => {
     e && e.preventDefault();
+    const normalizedContact = normalizeContactValue(form.contactNumber);
+    const normalizedConsumer = normalizeContactValue(form.consumerNumber);
+    const duplicate = contacts.find((contact) => contact.id !== editingId && (
+      (normalizedContact && normalizeContactValue(contact.contactNumber) === normalizedContact) ||
+      (normalizedConsumer && normalizeContactValue(contact.consumerNumber) === normalizedConsumer)
+    ));
+    if (duplicate) {
+      setMessage(normalizeContactValue(duplicate.contactNumber) === normalizedContact
+        ? 'Contact number already exists. Use a unique number.'
+        : 'Consumer number already exists. Use a unique number.');
+      return;
+    }
     try {
       const payload = { ...form, lastContacted: form.markContacted ? new Date().toISOString() : null };
       if (editingId) {
@@ -1100,7 +1112,11 @@ function Dashboard({ user }) {
 }
 
 function CustomersPage() {
+  const CUSTOMER_STAGES = ['Documents review', 'PMGSY entry', 'Quotation', 'Agreement uploaded', 'Bank loan pending', 'Loan disbursed', 'Installation pending', 'Load enhancement', 'Inspection pending', 'Subsidy redeemed', 'Subsidy disbursed', 'Amount pending', 'Closed'];
+  const REQUIRED_DOCUMENTS = ['Aadhaar', 'PAN', 'Latest electricity bill', 'Bank passbook', 'Email ID', 'Mobile number'];
   const [convertedContacts, setConvertedContacts] = useState([]);
+  const [customerStorageReady, setCustomerStorageReady] = useState(false);
+  const [customerForm, setCustomerForm] = useState({ name: '', mobile: '', project: '', pmgsyId: '', systemCapacity: '', inverterModel: '', installationDate: '', warrantyExpiry: '', nextServiceDate: '', quotationAmount: '', approvedBankLoan: '', bankLoanDisbursed: '', disbursementType: 'partial', downPayment: '', marginMoney: '', loadEnhancementPayment: '', inspectionStatus: 'Pending', subsidyRedeemed: '', subsidyDisbursed: '', pendingAmount: '', stage: 'Documents review', documents: Object.fromEntries(REQUIRED_DOCUMENTS.map((document) => [document, 'provided'])) });
   const [customers, setCustomers] = useState([
     {
       id: 1,
@@ -1163,7 +1179,37 @@ function CustomersPage() {
       .catch(() => setConvertedContacts([]));
   }, []);
 
+  useEffect(() => {
+    try {
+      const savedCustomers = JSON.parse(localStorage.getItem('sgse-customers') || 'null');
+      if (Array.isArray(savedCustomers)) setCustomers(savedCustomers);
+    } catch { }
+    setCustomerStorageReady(true);
+  }, []);
+  useEffect(() => { if (customerStorageReady) localStorage.setItem('sgse-customers', JSON.stringify(customers)); }, [customers, customerStorageReady]);
+
   const customerRows = useMemo(() => [...convertedContacts, ...customers], [convertedContacts, customers]);
+
+  const updateCustomerForm = (field, value) => setCustomerForm((current) => ({ ...current, [field]: value }));
+  const addCustomer = (event) => {
+    event.preventDefault();
+    if (!customerForm.name || !customerForm.mobile) return;
+    const nextCustomer = { ...customerForm, id: `customer-${Date.now()}`, status: customerForm.stage };
+    setCustomers((current) => [...current, nextCustomer]);
+    setCustomerForm((current) => ({ ...current, name: '', mobile: '', project: '', pmgsyId: '', quotationAmount: '' }));
+  };
+  const downloadQuotation = (customer) => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.setFillColor(20, 42, 61); doc.rect(0, 0, pageWidth, 34, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.text('SOLAR PROJECT QUOTATION', 16, 16);
+    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.text('SGSE Billing', 16, 23); doc.text(new Date().toLocaleDateString('en-IN'), pageWidth - 16, 23, { align: 'right' });
+    doc.setTextColor(20, 42, 61); doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text('Customer details', 16, 48);
+    doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.text(`Name: ${customer.name}`, 16, 56); doc.text(`Mobile: ${customer.mobile || '—'}`, 16, 63); doc.text(`Project: ${customer.project || 'Solar project'}`, 16, 70); doc.text(`PMGSY ID: ${customer.pmgsyId || '—'}`, 16, 77);
+    doc.setFillColor(244, 247, 249); doc.roundedRect(16, 88, pageWidth - 32, 24, 2, 2, 'F'); doc.setFont(undefined, 'bold'); doc.text('Estimated project amount', 22, 98); doc.setFontSize(16); doc.text(`₹${Number(customer.quotationAmount || 0).toLocaleString('en-IN')}`, pageWidth - 22, 101, { align: 'right' });
+    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.text('This quotation is subject to site verification, applicable subsidy, and final agreement terms.', 16, 130); doc.line(pageWidth - 58, 160, pageWidth - 16, 160); doc.text('Authorized signatory', pageWidth - 37, 166, { align: 'center' });
+    doc.save(`${String(customer.name || 'customer').replace(/\s+/g, '-').toLowerCase()}-quotation.pdf`);
+  };
 
   const summary = useMemo(() => {
     const totals = customerRows.reduce((acc, customer) => {
@@ -1208,6 +1254,32 @@ function CustomersPage() {
         <h3>Customers & project flow</h3>
         <p className="muted">Track project conversion from lead to sanctioned loan, subsidy, and installation handover.</p>
       </div>
+
+      <form className="panel customer-intake-panel" onSubmit={addCustomer}>
+        <div className="panel-header compact-header"><div><p className="eyebrow">Guided onboarding</p><h4>Add customer and project status</h4></div><span className="chip">12 stages</span></div>
+        <div className="form-grid">
+          <label>Customer name<input required value={customerForm.name} onChange={(event) => updateCustomerForm('name', event.target.value)} /></label>
+          <label>Mobile number<input required value={customerForm.mobile} onChange={(event) => updateCustomerForm('mobile', event.target.value)} /></label>
+          <label>Project<input value={customerForm.project} onChange={(event) => updateCustomerForm('project', event.target.value)} placeholder="3kW rooftop solar" /></label>
+          <label>PMGSY entry ID<input value={customerForm.pmgsyId} onChange={(event) => updateCustomerForm('pmgsyId', event.target.value)} /></label>
+          <label>System capacity<input value={customerForm.systemCapacity} onChange={(event) => updateCustomerForm('systemCapacity', event.target.value)} placeholder="3 kW" /></label>
+          <label>Inverter model<input value={customerForm.inverterModel} onChange={(event) => updateCustomerForm('inverterModel', event.target.value)} /></label>
+          <label>Installation date<input type="date" value={customerForm.installationDate} onChange={(event) => updateCustomerForm('installationDate', event.target.value)} /></label>
+          <label>Warranty expiry<input type="date" value={customerForm.warrantyExpiry} onChange={(event) => updateCustomerForm('warrantyExpiry', event.target.value)} /></label>
+          <label>Next service date<input type="date" value={customerForm.nextServiceDate} onChange={(event) => updateCustomerForm('nextServiceDate', event.target.value)} /></label>
+          <label>Current stage<select value={customerForm.stage} onChange={(event) => updateCustomerForm('stage', event.target.value)}>{CUSTOMER_STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select></label>
+          <label>Quotation amount<input type="number" min="0" value={customerForm.quotationAmount} onChange={(event) => updateCustomerForm('quotationAmount', event.target.value)} /></label>
+          <label>Approved bank loan<input type="number" min="0" value={customerForm.approvedBankLoan} onChange={(event) => updateCustomerForm('approvedBankLoan', event.target.value)} /></label>
+          <label>Loan disbursed<input type="number" min="0" value={customerForm.bankLoanDisbursed} onChange={(event) => updateCustomerForm('bankLoanDisbursed', event.target.value)} /></label>
+          <label>Disbursement<select value={customerForm.disbursementType} onChange={(event) => updateCustomerForm('disbursementType', event.target.value)}><option value="partial">Partial</option><option value="complete">Complete</option></select></label>
+          <label>Load enhancement payment<input type="number" min="0" value={customerForm.loadEnhancementPayment} onChange={(event) => updateCustomerForm('loadEnhancementPayment', event.target.value)} /></label>
+          <label>Pending amount<input type="number" min="0" value={customerForm.pendingAmount} onChange={(event) => updateCustomerForm('pendingAmount', event.target.value)} /></label>
+          <label>Subsidy redeemed<input type="number" min="0" value={customerForm.subsidyRedeemed} onChange={(event) => updateCustomerForm('subsidyRedeemed', event.target.value)} /></label>
+          <label>Subsidy disbursed<input type="number" min="0" value={customerForm.subsidyDisbursed} onChange={(event) => updateCustomerForm('subsidyDisbursed', event.target.value)} /></label>
+        </div>
+        <div className="document-checklist"><strong>Document review</strong>{REQUIRED_DOCUMENTS.map((document) => <label key={document}><span>{document}</span><select value={customerForm.documents[document]} onChange={(event) => updateCustomerForm('documents', { ...customerForm.documents, [document]: event.target.value })}><option value="provided">Provided</option><option value="missing">Missing</option><option value="error">Error</option></select></label>)}</div>
+        <button className="btn primary" type="submit">Add customer to pipeline</button>
+      </form>
 
       <div className="customer-metric-grid">
         <div className="customer-metric">
@@ -1268,10 +1340,14 @@ function CustomersPage() {
                   <h4>{customer.name}</h4>
                   <p className="muted">{customer.project}</p>
                 </div>
-                <span className="status-badge status-following-up">{customer.status}</span>
+                <div className="inline-actions"><span className="status-badge status-following-up">{customer.status}</span><button className="btn outline" type="button" onClick={() => downloadQuotation(customer)}>Quotation PDF</button></div>
               </div>
 
               <div className="customer-details-grid">
+                <div><span>System</span><strong>{customer.systemCapacity || '—'}</strong></div>
+                <div><span>Inverter</span><strong>{customer.inverterModel || '—'}</strong></div>
+                <div><span>Warranty till</span><strong>{customer.warrantyExpiry || '—'}</strong></div>
+                <div><span>Next service</span><strong>{customer.nextServiceDate || '—'}</strong></div>
                 <div><span>Quotation amount</span><strong>₹{Number(customer.quotationAmount || 0).toLocaleString('en-IN')}</strong></div>
                 <div><span>Approved bank loan</span><strong>₹{Number(customer.approvedBankLoan || 0).toLocaleString('en-IN')}</strong></div>
                 <div><span>Loan disbursed</span><strong>₹{Number(customer.bankLoanDisbursed || 0).toLocaleString('en-IN')}</strong></div>
