@@ -3307,10 +3307,12 @@ function EmployeesPage() {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const margin = 16;
     const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 16;
-
-    doc.setFillColor(11, 82, 131);
-    doc.rect(0, 0, pageWidth, 34, 'F');
+    const contentWidth = pageWidth - margin * 2;
+    const employee = payslip.employee || {};
+    const personalDetails = employee.personalDetails || {};
+    const money = (value) => `₹${Math.round(Number(value || 0)).toLocaleString('en-IN')}`;
+    const valueOrDash = (value) => value || '—';
+    let y = 14;
 
     if (shopLogo) {
       try {
@@ -3326,100 +3328,81 @@ function EmployeesPage() {
           doc.addImage(dataUrl, 'PNG', margin, 8, 18, 18);
         }
       } catch {
-        // ignore logo fetch issues and keep the branded header without breaking PDF generation
+        // Keep the payslip usable when a shop logo cannot be fetched.
       }
     }
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
-    doc.setFont(undefined, 'bold');
-    doc.text(shopName, margin + 24, 19);
-    doc.setFontSize(8.5);
-    doc.setFont(undefined, 'normal');
-    const shopAddressLines = doc.splitTextToSize(shopAddress, pageWidth - margin * 2 - 26);
-    doc.text(shopAddressLines, margin + 24, 25);
-
-    y = 44;
     doc.setTextColor(20, 20, 20);
-    doc.setFontSize(15);
+    doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
-    doc.text('MONTHLY PAYSLIP', margin, y);
+    doc.text(shopName, pageWidth / 2, y, { align: 'center' });
+    doc.setFontSize(8);
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(9);
-    doc.text(`Month: ${payslip.month}`, pageWidth - margin - 28, y, { align: 'right' });
-    y += 8;
-
-    doc.setDrawColor(218, 226, 233);
-    doc.setFillColor(247, 250, 253);
-    doc.roundedRect(margin, y, pageWidth - margin * 2, 28, 3, 3, 'F');
+    doc.text(doc.splitTextToSize(shopAddress, 90), pageWidth / 2, y + 5, { align: 'center' });
+    y += 18;
+    doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
-    doc.text('Employee', margin + 5, y + 8);
-    doc.setFont(undefined, 'normal');
-    const employeeLabel = `${payslip.employee.name} • ${payslip.employee.employeeId} • ${payslip.employee.role}`;
-    const employeeLines = doc.splitTextToSize(employeeLabel, pageWidth - margin * 2 - 140);
-    doc.text(employeeLines, margin + 5, y + 13);
-    doc.text(`Phone: ${payslip.employee.phone || '—'}`, margin + 5, y + 20);
-    doc.text(`Department / Role: ${payslip.employee.role || 'Staff'}`, pageWidth - margin - 62, y + 14, { align: 'right' });
-    y += 36;
+    doc.text(`Payslip - ${payslip.month}`, pageWidth / 2, y, { align: 'center' });
+    y += 6;
 
-    const metrics = [
-      ['Present', String(payslip.present || 0)],
-      ['Half days', String(payslip.halfday || 0)],
-      ['Absent', String(payslip.absent || 0)],
-      ['Net Pay', `₹${Math.round(payslip.netPay || 0).toLocaleString()}`]
-    ];
+    const drawTable = (rows, widths, rowHeight = 7) => {
+      const startX = margin;
+      rows.forEach((row, rowIndex) => {
+        let x = startX;
+        row.forEach((cell, cellIndex) => {
+          const width = widths[cellIndex];
+          doc.setFillColor(rowIndex === 0 ? 238 : 255, rowIndex === 0 ? 242 : 255, rowIndex === 0 ? 245 : 255);
+          doc.rect(x, y, width, rowHeight, 'FD');
+          doc.setFont(undefined, rowIndex === 0 ? 'bold' : 'normal');
+          doc.setFontSize(rowIndex === 0 ? 7.5 : 7.2);
+          doc.text(String(cell), x + (cellIndex % 2 ? width - 2 : 2), y + 4.6, { align: cellIndex % 2 ? 'right' : 'left' });
+          x += width;
+        });
+        y += rowHeight;
+      });
+    };
 
-    metrics.forEach(([label, value], index) => {
-      const boxX = margin + (index % 2) * 92;
-      const boxY = y + Math.floor(index / 2) * 20;
-      doc.setFillColor(index === 3 ? 216 : 246, index === 3 ? 237 : 248, index === 3 ? 228 : 252);
-      doc.roundedRect(boxX, boxY, 80, 15, 2, 2, 'F');
-      doc.setFont(undefined, 'bold');
-      doc.setTextColor(index === 3 ? 16 : 31, index === 3 ? 94 : 50, index === 3 ? 72 : 72);
-      doc.text(label, boxX + 4, boxY + 6);
-      doc.setFont(undefined, 'normal');
-      doc.text(String(value), boxX + 72, boxY + 6, { align: 'right' });
-    });
-    y += 46;
+    drawTable([
+      ['Employee Name', valueOrDash(employee.name), 'Total Working Days', String(payslip.daysInMonth || 0)],
+      ['Employee ID', valueOrDash(employee.employeeId), 'LOP Days', String(payslip.absent || 0)],
+      ['Designation', valueOrDash(employee.role), 'Paid Days', String(payslip.payableDays || 0)],
+      ['Department', '—', 'Bank Name', valueOrDash(personalDetails.bankName)],
+      ['Date of Joining', valueOrDash(employee.joiningDate), 'Bank A/c No.', valueOrDash(personalDetails.accountNumber)],
+      ['Gross Salary', money(employee.monthlySalary), 'UAN', '—']
+    ], [34, 45, 37, contentWidth - 116]);
+    y += 5;
 
-    const summaryRows = [
-      ['Earned salary', `₹${Math.round(payslip.earnedSalary || 0).toLocaleString()}`],
-      ['Allowances', `₹${Math.round(payslip.allowances || 0).toLocaleString()}`],
-      ['Bonus / Incentive', `₹${Math.round((payslip.bonus || 0) + (payslip.incentive || 0)).toLocaleString()}`],
-      ['Advance / Deduction', `-₹${Math.round((payslip.advance || 0) + (payslip.deduction || 0)).toLocaleString()}`],
-      ['Net payable', `₹${Math.round(payslip.netPay || 0).toLocaleString()}`]
-    ];
-
-    doc.setDrawColor(214, 223, 233);
-    summaryRows.forEach(([label, value], index) => {
-      const rowY = y + index * 8;
-      doc.setFillColor(index % 2 === 0 ? 249 : 255, index % 2 === 0 ? 251 : 255, index % 2 === 0 ? 253 : 255);
-      doc.rect(margin, rowY - 3, pageWidth - margin * 2, 7, 'F');
-      doc.setTextColor(20, 20, 20);
-      doc.text(label, margin + 5, rowY);
-      doc.text(String(value), pageWidth - margin - 8, rowY, { align: 'right' });
-    });
-    y += summaryRows.length * 8 + 10;
-
-    doc.setFillColor(239, 248, 244);
-    doc.roundedRect(margin, y, pageWidth - margin * 2, 22, 3, 3, 'F');
     doc.setFont(undefined, 'bold');
-    doc.text('Net Payable', margin + 5, y + 8);
-    doc.text(`₹${Math.round(payslip.netPay || 0).toLocaleString()}`, pageWidth - margin - 10, y + 8, { align: 'right' });
-    y += 30;
+    doc.setFontSize(8);
+    drawTable([
+      ['Earnings', '', 'Deductions', ''],
+      ['Basic Salary', money(payslip.basicSalary), 'EPF', '—'],
+      ['House Rent Allowances', money(payslip.homeRentAllowance), 'Health Insurance/ESI', '—'],
+      ['Conveyance Allowance', money(payslip.fuelAllowance), 'Professional Tax', '—'],
+      ['Medical Allowances', money(0), 'Advance', money(payslip.advance)],
+      ['Special Allowances', money(Number(employee.otherAllowance || 0) + Number(payslip.bonus || 0) + Number(payslip.incentive || 0)), 'Other Deduction', money(payslip.deduction)],
+      ['Gross Salary', money(payslip.gross), 'Total Deduction', money(payslip.totalDeductions)]
+    ], [34, 45, 37, contentWidth - 116]);
+
+    y += 2;
+    drawTable([['Net Pay', money(payslip.netPay), '', '']], [34, 45, 37, contentWidth - 116]);
+    y += 3;
+    drawTable([['Total Deduction', money(payslip.totalDeductions), '', '']], [34, 45, 37, contentWidth - 116]);
+    y += 18;
 
     doc.setFont(undefined, 'normal');
-    const noteText = payslip.adjustmentNote || 'No manual adjustments recorded for this month.';
-    const noteLines = doc.splitTextToSize(`Notes: ${noteText}`, pageWidth - margin * 2 - 10);
-    doc.setDrawColor(218, 226, 233);
-    doc.roundedRect(margin, y, pageWidth - margin * 2, Math.max(16, noteLines.length * 4 + 4), 2, 2, 'S');
-    doc.text(noteLines, margin + 4, y + 5);
-    y += noteLines.length * 4 + 16;
+    doc.setFontSize(7.5);
+    doc.line(margin, y, margin + 42, y);
+    doc.line(pageWidth - margin - 42, y, pageWidth - margin, y);
+    doc.text('Employer Signature', margin + 21, y + 5, { align: 'center' });
+    doc.text('Employee Signature', pageWidth - margin - 21, y + 5, { align: 'center' });
+    y += 13;
+    if (payslip.adjustmentNote) {
+      doc.setFontSize(7);
+      doc.text(`Note: ${payslip.adjustmentNote}`, margin, y);
+    }
 
-    doc.text('Authorized Signatory', pageWidth - margin - 30, y, { align: 'right' });
-    doc.text(shopName, pageWidth - margin - 30, y + 5, { align: 'right' });
-
-    doc.save(`${payslip.employee.name.replace(/\s+/g, '-').toLowerCase()}-${payslip.month}-payslip.pdf`);
+    doc.save(`${employee.name.replace(/\s+/g, '-').toLowerCase()}-${payslip.month}-payslip.pdf`);
   };
 
   return <div className="employees-page">
