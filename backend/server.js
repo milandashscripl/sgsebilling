@@ -127,12 +127,18 @@ const connectToDatabase = async () => {
 
   try {
     if (mongoose.connection.readyState === 1) {
-      const existingAdmin = await User.findOne({ email: 'admin@example.com' });
-      if (!existingAdmin) {
+      const adminEmail = 'suryagharsolarenergy@gmail.com';
+      const existingAdmin = await User.findOne({ email: adminEmail });
+      if (existingAdmin) {
+        if (existingAdmin.role !== 'admin') {
+          existingAdmin.role = 'admin';
+          await existingAdmin.save();
+        }
+      } else {
         const hashed = await bcrypt.hash('123456', 10);
         await User.create({
-          name: 'Admin',
-          email: 'admin@example.com',
+          name: 'Surya Ghar Solar Energy',
+          email: adminEmail,
           password: hashed,
           role: 'admin'
         });

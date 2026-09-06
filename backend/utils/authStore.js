@@ -5,14 +5,19 @@ function createAuthStore() {
   let nextId = 1;
 
   const seedDefaultAdmin = async () => {
-    const existing = users.find((user) => user.email === 'admin@example.com');
+    const adminEmail = 'suryagharsolarenergy@gmail.com';
+    const existing = users.find((user) => user.email === adminEmail);
+    if (existing) {
+      existing.role = 'admin';
+      return existing;
+    }
     if (existing) return existing;
 
     const hashed = await bcrypt.hash('123456', 10);
     const admin = {
       id: nextId++,
-      name: 'Admin',
-      email: 'admin@example.com',
+      name: 'Surya Ghar Solar Energy',
+      email: adminEmail,
       password: hashed,
       role: 'admin',
       shopName: 'SGSE Billing',

@@ -53,7 +53,7 @@ router.post('/register', async (req, res) => {
         name,
         email,
         password: hashed,
-        role: role === 'admin' ? 'admin' : 'user',
+        role: 'user',
         shopName: shopName || 'SGSE Billing',
         shopAddress: shopAddress || '',
         shopGSTIN: shopGSTIN || '',
