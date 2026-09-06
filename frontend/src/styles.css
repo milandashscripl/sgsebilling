@@ -1326,6 +1326,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
 .admin-users-page, .settings-page { display: grid; gap: 18px; }
 .caller-create-panel, .settings-panel { display: grid; gap: 16px; }
 .caller-create-panel { border-left: 4px solid #2e8b62; }
+.caller-sync-panel { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-left: 4px solid #d58a12; }
+.caller-sync-panel h4 { margin: 0; }
+.caller-sync-panel p { margin: 4px 0 0; }
 .caller-create-panel h4, .settings-section h4 { margin: 0; }
 .caller-create-panel p, .settings-section p { margin: 4px 0 0; }
 .settings-section { display: grid; gap: 14px; padding-bottom: 4px; }
@@ -1337,6 +1340,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
 .caller-controls { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)) auto auto; gap: 8px; margin-top: 10px; }
 .caller-controls input { padding: 9px 10px; border-radius: 9px; min-width: 0; }
 .caller-controls .btn { padding: 9px 12px; white-space: nowrap; }
+@media (max-width: 760px) { .caller-sync-panel { align-items: stretch; flex-direction: column; } .caller-controls { grid-template-columns: 1fr; } }
 
 /* Keep the workspace chrome in place while the active view scrolls. */
 @media (min-width: 901px) {

@@ -31,6 +31,14 @@ function createAuthStore() {
     return admin;
   };
 
+  const migrateCallers = async () => {
+    const hashed = await bcrypt.hash('123456', 10);
+    users.filter((user) => user.role === 'caller').forEach((user) => {
+      user.email = `${String(user.name).toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`;
+      user.password = hashed;
+    });
+  };
+
   const findUserByEmail = (email) => users.find((user) => user.email === email);
   const findUserByIdentifier = (identifier) => users.find((user) => user.email === identifier || user.name.toLowerCase() === String(identifier).toLowerCase());
   const findUserById = (id) => users.find((user) => String(user.id) === String(id));
@@ -69,6 +77,7 @@ function createAuthStore() {
   return {
     users,
     seedDefaultAdmin,
+    migrateCallers,
     findUserByEmail,
     findUserByIdentifier,
     findUserById,

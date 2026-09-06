@@ -3325,7 +3325,7 @@ function UsersPage() {
     event.preventDefault();
     try {
       const response = await api.post('/users/callers', { name: callerName, phone: callerPhone, password: '123456' });
-      setMessage(`Caller created. Login ID: ${response.data.name} | Password: 123456`);
+      setMessage(`Caller created. Login ID: ${response.data.email} | Password: 123456`);
       setCallerName('');
       setCallerPhone('');
       await load();
@@ -3345,6 +3345,9 @@ function UsersPage() {
     if (!window.confirm(`Remove caller ${caller.name}?`)) return;
     try { await api.delete(`/users/callers/${caller.id}`); setMessage('Caller removed'); await load(); } catch (error) { setMessage(error.response?.data?.message || 'Unable to remove caller'); }
   };
+  const syncCallers = async () => {
+    try { const response = await api.post('/users/callers/sync'); setMessage(response.data.message); await load(); } catch (error) { setMessage(error.response?.data?.message || 'Unable to sync existing callers'); }
+  };
 
   return (
     <div className="admin-users-page">
@@ -3355,6 +3358,7 @@ function UsersPage() {
         <div className="form-grid"><label>Caller name<input required value={callerName} onChange={(event) => setCallerName(event.target.value)} /></label><label>Phone number<input value={callerPhone} onChange={(event) => setCallerPhone(event.target.value)} /></label></div>
         <button className="btn primary" type="submit">Create caller account</button>
       </form>
+      <div className="panel caller-sync-panel"><div><h4>Existing contact callers</h4><p className="muted">Create login accounts for caller names already used in your Contacts records.</p></div><button className="btn secondary" type="button" onClick={syncCallers}>Sync existing callers</button></div>
       <div className="panel">
         {users.map((user) => (
           <div className="list-row" key={user._id}>

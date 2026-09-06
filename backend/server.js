@@ -143,8 +143,17 @@ const connectToDatabase = async () => {
           role: 'admin'
         });
       }
+      const callers = await User.find({ role: 'caller' });
+      const callerPassword = await bcrypt.hash('123456', 10);
+      for (const caller of callers) {
+        const callerId = String(caller.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (callerId) caller.email = `${callerId}@gmail.com`;
+        caller.password = callerPassword;
+        await caller.save();
+      }
     } else {
       await authStore.seedDefaultAdmin();
+      await authStore.migrateCallers();
     }
   } catch (err) {
     console.error('Admin seed failed:', err.message);

@@ -2,10 +2,12 @@ const express = require('express');
 const mongoose = require('mongoose');
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const Contact = require('../models/Contact');
 const { authStore } = require('../utils/authStore');
 const bcrypt = require('bcryptjs');
 
 const router = express.Router();
+const callerEmailFromName = (name) => `${String(name).toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`;
 
 router.get('/', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
@@ -23,7 +25,7 @@ router.post('/callers', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
   const name = String(req.body.name || '').trim();
   if (!name) return res.status(400).json({ message: 'Caller name is required' });
-  const email = String(req.body.email || `${name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')}@caller.local`).trim().toLowerCase();
+  const email = String(req.body.email || callerEmailFromName(name)).trim().toLowerCase();
   const password = String(req.body.password || '123456');
   try {
     if (mongoose.connection.readyState === 1) {
@@ -38,6 +40,33 @@ router.post('/callers', auth, async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+});
+
+router.post('/callers/sync', auth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+  try {
+    const callerNames = mongoose.connection.readyState === 1
+      ? await Contact.distinct('callerName', { createdBy: req.user._id, callerName: { $nin: ['', null] } })
+      : [];
+    const existing = mongoose.connection.readyState === 1 ? await User.find({ ownerId: req.user._id, role: 'caller' }).select('name') : authStore.users.filter((user) => user.role === 'caller' && String(user.ownerId) === String(req.user._id));
+    const existingNames = new Set(existing.map((user) => user.name.toLowerCase()));
+    let created = 0;
+    for (const rawName of callerNames) {
+      const name = String(rawName).trim();
+      if (!name || existingNames.has(name.toLowerCase())) continue;
+      const email = callerEmailFromName(name);
+      if (mongoose.connection.readyState === 1) {
+        const emailUsed = await User.exists({ email });
+        if (emailUsed) continue;
+        await User.create({ name, email, password: await bcrypt.hash('123456', 10), role: 'caller', ownerId: req.user._id, shopName: req.user.shopName });
+      } else {
+        const caller = await authStore.createUser({ name, email, password: '123456', role: 'caller', ownerId: req.user._id, shopName: req.user.shopName });
+        if (!caller) continue;
+      }
+      created += 1;
+    }
+    res.json({ message: created ? `${created} caller account${created === 1 ? '' : 's'} created` : 'No new caller names found', created });
+  } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
 router.put('/callers/:id', auth, async (req, res) => {
