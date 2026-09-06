@@ -4,6 +4,9 @@ const Contact = require('../models/Contact');
 
 const router = express.Router();
 const contactOwnerId = (req) => req.user.role === 'caller' ? req.user.ownerId : req.user._id;
+const contactFilterFor = (req) => req.user.role === 'caller'
+  ? { createdBy: contactOwnerId(req), callerName: req.user.name }
+  : { createdBy: contactOwnerId(req) };
 
 const normalizeValue = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -24,7 +27,7 @@ const rejectDuplicateNumbers = async (body, userId, contactId = null) => {
 
 router.get('/', auth, async (req, res) => {
   try {
-    const filter = { createdBy: contactOwnerId(req) };
+    const filter = contactFilterFor(req);
     const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : null;
     const toDate = req.query.toDate ? new Date(req.query.toDate) : null;
 
@@ -45,7 +48,7 @@ router.get('/', auth, async (req, res) => {
 
 router.get('/export', auth, async (req, res) => {
   try {
-    const filter = { createdBy: contactOwnerId(req) };
+    const filter = contactFilterFor(req);
     const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : null;
     const toDate = req.query.toDate ? new Date(req.query.toDate) : null;
 
@@ -85,11 +88,11 @@ const sanitizeCsvValue = (value) => String(value || '').replace(/,/g, ' ').repla
 
 router.post('/', auth, async (req, res) => {
   try {
-    const duplicateMessage = await rejectDuplicateNumbers(req.body, req.user._id);
+    const duplicateMessage = await rejectDuplicateNumbers(req.body, contactOwnerId(req));
     if (duplicateMessage) return res.status(409).json({ message: duplicateMessage });
     const contact = await Contact.create({
       name: req.body.name,
-      callerName: req.body.callerName || '',
+      callerName: req.user.role === 'caller' ? req.user.name : req.body.callerName || '',
       contactNumber: req.body.contactNumber,
       consumerNumber: req.body.consumerNumber || '',
       status: req.body.status || 'Warm Lead',
@@ -136,13 +139,13 @@ router.post('/:contactId/calls', auth, async (req, res) => {
 
 router.put('/:contactId', auth, async (req, res) => {
   try {
-    const duplicateMessage = await rejectDuplicateNumbers(req.body, req.user._id, req.params.contactId);
+    const duplicateMessage = await rejectDuplicateNumbers(req.body, contactOwnerId(req), req.params.contactId);
     if (duplicateMessage) return res.status(409).json({ message: duplicateMessage });
     const contact = await Contact.findOneAndUpdate(
       { _id: req.params.contactId, createdBy: contactOwnerId(req) },
       {
         name: req.body.name,
-        callerName: req.body.callerName || '',
+        callerName: req.user.role === 'caller' ? req.user.name : req.body.callerName || '',
         contactNumber: req.body.contactNumber,
         consumerNumber: req.body.consumerNumber || '',
         status: req.body.status || 'Warm Lead',

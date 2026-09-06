@@ -317,7 +317,7 @@ function AuthenticatedApp({ user, setUser, logout }) {
         </aside>
         <main className="content">
           <Routes>
-            <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/contacts" element={<ContactsPage user={user} />} />
             {user.role !== 'caller' && <><Route path="/dashboard" element={<Dashboard user={user} />} /><Route path="/items" element={<ItemsPage />} /><Route path="/stock" element={<StockPage />} /><Route path="/billing" element={<BillingPage user={user} />} /><Route path="/setups" element={<SetupLibraryPage />} /><Route path="/customers" element={<CustomersPage user={user} />} /><Route path="/accounting" element={<AccountingPage />} /><Route path="/employees" element={<EmployeesPage />} /><Route path="/reports" element={<ReportsPage />} /><Route path="/profile" element={<ShopProfilePage user={user} setUser={setUser} />} /></>}
             {user.role === 'admin' && <><Route path="/users" element={<UsersPage />} /><Route path="/settings" element={<WebAppSettingsPage />} /></>}
             <Route path="*" element={<Navigate to={user.role === 'caller' ? '/contacts' : '/dashboard'} replace />} />
@@ -436,7 +436,7 @@ function Register({ setUser }) {
   );
 }
 
-function ContactsPage() {
+function ContactsPage({ user }) {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Not Yet Called', review: '', nextFollowUp: '', markContacted: false });
@@ -448,8 +448,9 @@ function ContactsPage() {
   const [selectedCaller, setSelectedCaller] = useState(null);
   const [visibleContacts, setVisibleContacts] = useState(20);
   const [expandedContactId, setExpandedContactId] = useState(null);
+  const [callerOptions, setCallerOptions] = useState([]);
 
-  const quickCallerNames = useMemo(() => ['Owner', 'Sales Team', 'Support Team', 'Field Agent'], []);
+  const quickCallerNames = useMemo(() => user?.role === 'caller' ? [user.name] : callerOptions, [callerOptions, user]);
 
   const loadContacts = async () => {
     setLoading(true);
@@ -462,6 +463,14 @@ function ContactsPage() {
   };
 
   useEffect(() => { loadContacts(); }, []);
+  useEffect(() => {
+    if (user?.role === 'caller') {
+      setCallerOptions([user.name]);
+      setForm((current) => ({ ...current, callerName: user.name }));
+      return;
+    }
+    if (user?.role === 'admin') api.get('/users').then((res) => setCallerOptions((res.data || []).filter((account) => account.role === 'caller').map((account) => account.name))).catch(() => setCallerOptions([]));
+  }, [user]);
 
   const reset = () => { setForm({ name: '', callerName: '', contactNumber: '', consumerNumber: '', status: 'Not Yet Called', review: '', nextFollowUp: '', markContacted: false }); setEditingId(null); };
 
@@ -480,7 +489,7 @@ function ContactsPage() {
       return;
     }
     try {
-      const payload = { ...form, lastContacted: form.markContacted ? new Date().toISOString() : null };
+      const payload = { ...form, callerName: user?.role === 'caller' ? user.name : form.callerName, lastContacted: form.markContacted ? new Date().toISOString() : null };
       if (editingId) {
         await api.put(`/contacts/${editingId}`, payload);
         setMessage('Contact updated');
@@ -627,11 +636,12 @@ function ContactsPage() {
   const { counts, duplicateContacts, similarContacts, filtered, tabContacts, callerList } = derived;
 
   return (
-    <div className="contacts-page">
+    <div className={`contacts-page ${user?.role === 'caller' ? 'caller-workspace' : ''}`}>
       <div className="page-header contacts-header">
         <div>
           <p className="eyebrow">Sales pipeline</p>
           <h3>Contacts & calls</h3>
+          {user?.role === 'caller' && <p className="caller-queue-note">Your assigned queue, ready for today&apos;s calls.</p>}
         </div>
         <div className="contacts-summary-grid">
           <div className="mini-stat">
@@ -649,12 +659,14 @@ function ContactsPage() {
         </div>
       </div>
 
+      {user?.role === 'caller' && <div className="caller-queue-banner"><div className="caller-queue-mark">{(user.name || 'C').slice(0, 1).toUpperCase()}</div><div><span>Caller workspace</span><strong>{user.name}</strong><small>Only contacts assigned to you are shown here.</small></div><span className="status-badge status-following-up">Assigned only</span></div>}
+
       {message && <p className="status-message">{message}</p>}
 
       <div className="panel">
         <h4>{editingId ? 'Edit contact' : 'Add contact'}</h4>
         <form className="form-grid" onSubmit={save}>
-          <label>Caller name<input value={form.callerName} onChange={(e) => setForm((current) => ({ ...current, callerName: e.target.value }))} /></label>
+          <label>Assign caller<select value={user?.role === 'caller' ? user.name : form.callerName} disabled={user?.role === 'caller'} onChange={(e) => setForm((current) => ({ ...current, callerName: e.target.value }))}><option value="">Unassigned</option>{quickCallerNames.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
           <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {quickCallerNames.map((name) => (
               <button key={name} className="btn outline" type="button" onClick={() => assignQuickCaller(name)}>{name}</button>

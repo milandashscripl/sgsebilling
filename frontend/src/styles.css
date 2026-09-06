@@ -1340,6 +1340,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
 .caller-controls { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)) auto auto; gap: 8px; margin-top: 10px; }
 .caller-controls input { padding: 9px 10px; border-radius: 9px; min-width: 0; }
 .caller-controls .btn { padding: 9px 12px; white-space: nowrap; }
+.caller-workspace .contact-stream-panel { border-top: 4px solid #2e8b62; }
+.caller-queue-note { margin: 5px 0 0; color: #60756a; font-size: 0.9rem; }
+.caller-queue-banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid rgba(46,139,98,0.18); border-radius: 16px; background: linear-gradient(105deg, #edf8ed, #fffdf3); box-shadow: 0 8px 20px rgba(31,91,67,0.06); }
+.caller-queue-mark { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 14px; background: #2e8b62; color: #fff; font-weight: 800; }
+.caller-queue-banner > div:nth-child(2) { display: grid; gap: 2px; flex: 1; }
+.caller-queue-banner span:first-child { color: #2e8b62; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.caller-queue-banner strong { color: #173126; }
+.caller-queue-banner small { color: #60756a; }
 @media (max-width: 760px) { .caller-sync-panel { align-items: stretch; flex-direction: column; } .caller-controls { grid-template-columns: 1fr; } }
 
 /* Keep the workspace chrome in place while the active view scrolls. */
