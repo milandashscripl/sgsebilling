@@ -180,10 +180,10 @@ function App() {
   if (loading) return (
     <div className="loading">
       <div className="loading-shell">
-        <span className="spinner" aria-hidden="true" />
+        <div className="loading-orbit" aria-hidden="true"><span /><span /><span /></div>
         <div>
-          <strong>Loading SGSE Billing...</strong>
-          <small>Syncing your dashboard and stock data</small>
+          <strong>Preparing your workspace</strong>
+          <small>Syncing dashboard and stock data</small>
         </div>
       </div>
     </div>
@@ -973,9 +973,9 @@ function Dashboard({ user }) {
 
       <div className="dashboard-panels-grid">
         <div className="panel quick-panel low-stock-panel">
-          <div className="panel-header compact-header">
-            <h4>Low stock alert</h4>
-            <span className="stock-alert-badge">{lowStockItems.length}</span>
+          <div className="panel-header compact-header low-stock-heading">
+            <div><p className="eyebrow">Inventory watch</p><h4>Low stock alert</h4></div>
+            <div className="low-stock-heading-meta"><span className="stock-alert-badge">{lowStockItems.length}</span>{lowStockItems.length > 1 && <small>Swipe to review</small>}</div>
           </div>
           {lowStockItems.length === 0 ? (
             <p className="muted">No urgent stock issues.</p>
@@ -1236,13 +1236,13 @@ function CustomersPage({ user }) {
   const downloadQuotation = (customer) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
-    const line = (label, value, x, y) => { doc.setFont(undefined, 'bold'); doc.text(`${label}:`, x, y); doc.setFont(undefined, 'normal'); doc.text(String(value || '—'), x + 27, y); };
+    const line = (label, value, x, y, width = 55) => { doc.setFont(undefined, 'bold'); doc.text(`${label}:`, x, y); doc.setFont(undefined, 'normal'); doc.text(doc.splitTextToSize(String(value || '—'), width), x + 27, y); };
     const shopName = user?.shopName || 'SGSE Billing';
     doc.setFillColor(18, 58, 43); doc.rect(0, 0, pageWidth, 38, 'F');
     doc.setTextColor(255, 255, 255); doc.setFontSize(19); doc.setFont(undefined, 'bold'); doc.text(shopName, 16, 14);
-    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.text(user?.shopAddress || user?.address || 'Solar energy solutions', 16, 21); doc.text(`Phone: ${user?.phone || '—'}  GSTIN: ${user?.shopGSTIN || '—'}`, 16, 27); doc.text(new Date().toLocaleDateString('en-IN'), pageWidth - 16, 27, { align: 'right' });
+    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.text(doc.splitTextToSize(user?.shopAddress || user?.address || 'Solar energy solutions', 110), 16, 21); doc.text(`Phone: ${user?.phone || '—'}  GSTIN: ${user?.shopGSTIN || '—'}`, 16, 31); doc.text(`Quote: Q-${Date.now().toString().slice(-6)}`, pageWidth - 16, 21, { align: 'right' }); doc.text(new Date().toLocaleDateString('en-IN'), pageWidth - 16, 31, { align: 'right' });
     doc.setTextColor(18, 58, 43); doc.setFontSize(15); doc.setFont(undefined, 'bold'); doc.text('SOLAR PROJECT QUOTATION', 16, 52);
-    doc.setFontSize(10); doc.setFont(undefined, 'normal'); line('Customer', customer.name, 16, 63); line('Mobile', customer.mobile, 16, 70); line('Aadhaar', customer.aadharNumber, 16, 77); line('Address', customer.address, 16, 84); line('Pincode', customer.pincode, 110, 63); line('Location', customer.locationLat && customer.locationLng ? `${customer.locationLat}, ${customer.locationLng}` : '', 110, 70); line('Project', customer.project || 'Solar project', 110, 77);
+    doc.setFontSize(10); doc.setFont(undefined, 'normal'); line('Customer', customer.name, 16, 63); line('Mobile', customer.mobile, 16, 70); line('Aadhaar', customer.aadharNumber, 16, 77); line('Address', customer.address, 16, 84, 65); line('Pincode', customer.pincode, 110, 63, 55); line('Location', customer.locationLat && customer.locationLng ? `${customer.locationLat}, ${customer.locationLng}` : '', 110, 70, 55); line('Project', customer.project || 'Solar project', 110, 77, 55);
     doc.setFillColor(245, 249, 241); doc.roundedRect(16, 94, pageWidth - 32, 26, 2, 2, 'F'); doc.setFont(undefined, 'bold'); doc.text('Quotation amount', 22, 105); doc.setFontSize(17); doc.text(`₹${Number(customer.quotationAmount || 0).toLocaleString('en-IN')}`, pageWidth - 22, 108, { align: 'right' });
     doc.setFontSize(11); doc.text('Proposed equipment and services', 16, 134); doc.setFontSize(9); doc.setFont(undefined, 'normal');
     [['Solar panels', customer.panelBrand], ['Inverter', customer.inverterModel], ['Earthing', `₹${Number(customer.earthingAmount || 0).toLocaleString('en-IN')}`], ['DC wire', `₹${Number(customer.dcWireAmount || 0).toLocaleString('en-IN')}`], ['AC wire', `₹${Number(customer.acWireAmount || 0).toLocaleString('en-IN')}`]].forEach(([label, value], index) => { const y = 143 + index * 7; doc.text(label, 20, y); doc.text(String(value || 'Included / to be confirmed'), pageWidth - 20, y, { align: 'right' }); });
