@@ -1315,6 +1315,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
 .topbar p { font-size: 0.82rem; color: #5E6F83; margin: 2px 0 0; }
 .transaction-history-panel { background: linear-gradient(145deg, rgba(255,255,255,0.98), rgba(235,246,255,0.92)); border-color: rgba(24,111,175,0.16); }
 .transaction-history-row { padding: 14px 4px; border-bottom-color: rgba(24,111,175,0.1); }
+.history-search { width: min(100%, 460px); margin: 2px 0 4px auto; padding: 10px 12px; }
+.transaction-description { margin-top: 4px; color: #315d78; font-size: 0.82rem; line-height: 1.4; }
 .transaction-values { display: grid; justify-items: end; gap: 3px; min-width: 150px; }
 .transaction-values span { color: #5E6F83; font-size: 0.78rem; }
 .money-in { color: #19704a; }

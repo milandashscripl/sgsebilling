@@ -2538,6 +2538,7 @@ function AccountingPage() {
   const [message, setMessage] = useState('');
   const [accountingPageSize, setAccountingPageSize] = useState(20);
   const [accountingPage, setAccountingPage] = useState(0);
+  const [historySearch, setHistorySearch] = useState('');
 
   const load = async () => {
     try {
@@ -2629,12 +2630,12 @@ function AccountingPage() {
       const rows = transactionHistory.map((entry) => [
         entry.date,
         entry.accountName,
-        entry.kind,
-        entry.reference || entry.note || '',
+        entry.type === 'income' ? 'Income' : 'Expense',
+        entry.description,
         entry.type === 'income' ? Number(entry.amount || 0) : -(Number(entry.amount || 0)),
         Number(entry.balanceAfter || 0)
       ].map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','));
-      const csv = ['date,account,entry,reference,change,balanceAfter', ...rows].join('\n');
+      const csv = ['date,account,type,description,change,balanceAfter', ...rows].join('\n');
       const url = window.URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
       const link = document.createElement('a');
       link.href = url;
@@ -2685,7 +2686,7 @@ function AccountingPage() {
       doc.text(`₹${Number(entry.balanceAfter || 0).toLocaleString()}`, pageWidth - margin - 2, y, { align: 'right' });
       y += lineHeight;
       doc.setFontSize(8);
-      doc.text(`${entry.kind} • ${entry.reference || entry.note || 'No reference'} • ${entry.type === 'income' ? '+' : '-'}₹${Number(entry.amount || 0).toLocaleString()}`, margin + 2, y);
+      doc.text(`${entry.type === 'income' ? 'Income' : 'Expense'} • ${entry.description} • ${entry.type === 'income' ? '+' : '-'}₹${Number(entry.amount || 0).toLocaleString()}`, margin + 2, y);
       y += 4;
       doc.setFontSize(10);
     });
@@ -2697,16 +2698,22 @@ function AccountingPage() {
     const openingBalances = Object.fromEntries(accounts.map((account) => [account._id, Number(account.openingBalance || 0)]));
     const runningBalances = { ...openingBalances };
     const entries = [
-      ...transactions.map((entry) => ({ ...entry, kind: entry.reference || entry.note || 'Transaction', accountKey: String(entry.accountId || '') })),
+      ...transactions.map((entry) => ({ ...entry, kind: 'Transaction', accountKey: String(entry.accountId || '') })),
       ...expenses.map((entry) => ({ ...entry, kind: entry.category || 'Expense', type: 'expense', accountKey: String(entry.accountId || '') }))
-    ].sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
-    return entries.map((entry) => {
+    ].sort((a, b) => new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
+    const chronological = entries.map((entry) => {
       const amount = Number(entry.amount || 0);
       const account = accounts.find((item) => String(item._id) === (String(entry.accountKey || '')));
       runningBalances[entry.accountKey] = (runningBalances[entry.accountKey] || 0) + (entry.type === 'income' ? amount : -amount);
-      return { ...entry, accountName: account?.name || 'Unassigned account', balanceAfter: runningBalances[entry.accountKey] || 0 };
+      const description = [entry.customerName, entry.reference, entry.category, entry.note].filter(Boolean).join(' • ') || entry.kind;
+      return { ...entry, accountName: account?.name || 'Unassigned account', description, balanceAfter: runningBalances[entry.accountKey] || 0 };
     });
+    return chronological.reverse();
   })();
+  const filteredTransactionHistory = transactionHistory.filter((entry) => {
+    const query = historySearch.trim().toLowerCase();
+    return !query || `${entry.description} ${entry.accountName} ${entry.paymentMethod || ''}`.toLowerCase().includes(query);
+  });
 
   const solarCostSummary = ['Equipment', 'Installation', 'Transport', 'Labour', 'Maintenance'].map((category) => ({
     category,
@@ -2853,24 +2860,26 @@ function AccountingPage() {
       </div>
 
       <div className="panel transaction-history-panel">
-        <div className="panel-header">
-          <div><h4>Complete account history</h4><p className="muted">Every income, expense, and transfer in date order. Balance is shown after each entry.</p></div>
+          <div className="panel-header">
+          <div><h4>Complete account history</h4><p className="muted">Latest entries first. Balances are calculated from opening balance in chronological order.</p></div>
           <strong>{transactionHistory.length} entries</strong>
         </div>
-        {transactionHistory.slice(accountingPage * accountingPageSize, (accountingPage + 1) * accountingPageSize).map((entry) => (
+        <input className="history-search" placeholder="Search customer, reference, note, or account" value={historySearch} onChange={(e) => { setHistorySearch(e.target.value); setAccountingPage(0); }} />
+        {filteredTransactionHistory.slice(accountingPage * accountingPageSize, (accountingPage + 1) * accountingPageSize).map((entry) => (
           <div className="list-row transaction-history-row" key={`${entry.kind}-${entry._id}`}>
             <div>
-              <strong>{entry.reference || entry.note || entry.kind}</strong>
-              <div className="muted">{entry.date} • {entry.accountName} • {entry.kind} • {entry.paymentMethod || 'cash'}</div>
+              <strong>{entry.description}</strong>
+              <div className="transaction-description">{entry.note || entry.reference || 'No additional description'}</div>
+              <div className="muted">{entry.date} • {entry.accountName} • {entry.type === 'income' ? 'Income' : 'Expense'} • {entry.paymentMethod || 'cash'}</div>
             </div>
             <div className="transaction-values"><strong className={entry.type === 'income' ? 'money-in' : 'money-out'}>{entry.type === 'income' ? '+' : '-'} ₹{Number(entry.amount || 0).toLocaleString()}</strong><span>Balance ₹{Number(entry.balanceAfter || 0).toLocaleString()}</span></div>
           </div>
         ))}
         <div className="table-controls">
           <label>Rows per page<select value={accountingPageSize} onChange={(e) => { setAccountingPageSize(Number(e.target.value)); setAccountingPage(0); }}><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="100">100</option></select></label>
-          <span className="muted">Showing {transactionHistory.length ? accountingPage * accountingPageSize + 1 : 0}-{Math.min((accountingPage + 1) * accountingPageSize, transactionHistory.length)} of {transactionHistory.length}</span>
+          <span className="muted">Showing {filteredTransactionHistory.length ? accountingPage * accountingPageSize + 1 : 0}-{Math.min((accountingPage + 1) * accountingPageSize, filteredTransactionHistory.length)} of {filteredTransactionHistory.length}</span>
           <button className="btn outline" disabled={accountingPage === 0} onClick={() => setAccountingPage((page) => page - 1)}>Previous</button>
-          <button className="btn outline" disabled={(accountingPage + 1) * accountingPageSize >= transactionHistory.length} onClick={() => setAccountingPage((page) => page + 1)}>Next</button>
+          <button className="btn outline" disabled={(accountingPage + 1) * accountingPageSize >= filteredTransactionHistory.length} onClick={() => setAccountingPage((page) => page + 1)}>Next</button>
         </div>
       </div>
     </div>
