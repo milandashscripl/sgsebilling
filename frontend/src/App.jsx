@@ -1210,6 +1210,20 @@ function CustomersPage({ user }) {
   useEffect(() => { if (customerStorageReady) localStorage.setItem('sgse-customers', JSON.stringify(customers)); }, [customers, customerStorageReady]);
 
   const customerRows = useMemo(() => [...convertedContacts, ...customers], [convertedContacts, customers]);
+  const serviceRadar = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return customerRows
+      .flatMap((customer) => [
+        customer.nextServiceDate ? { customer, date: customer.nextServiceDate, label: 'Service due', tone: 'service' } : null,
+        customer.warrantyExpiry ? { customer, date: customer.warrantyExpiry, label: 'Warranty review', tone: 'warranty' } : null,
+        customer.installationDate ? { customer, date: customer.installationDate, label: 'Installation', tone: 'install' } : null
+      ].filter(Boolean))
+      .map((entry) => ({ ...entry, days: Math.ceil((new Date(entry.date) - today) / 86400000) }))
+      .filter((entry) => !Number.isNaN(entry.days) && entry.days >= -1 && entry.days <= 45)
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 6);
+  }, [customerRows]);
 
   const updateCustomerForm = (field, value) => setCustomerForm((current) => ({ ...current, [field]: value }));
   const resetCustomerForm = () => {
@@ -1228,6 +1242,11 @@ function CustomersPage({ user }) {
     setCustomerForm((current) => ({ ...current, ...customer, documents: { ...current.documents, ...(customer.documents || {}) } }));
     setEditingCustomerId(customer.id);
     setShowDirectCustomer(true);
+  };
+  const deleteCustomer = (customer) => {
+    if (String(customer.id).startsWith('converted-')) return;
+    if (!window.confirm(`Delete the project record for ${customer.name || 'this customer'}?`)) return;
+    setCustomers((current) => current.filter((entry) => entry.id !== customer.id));
   };
   const updateCustomerStage = (customerId, stage) => {
     setCustomers((current) => current.map((customer) => customer.id === customerId ? { ...customer, stage, status: stage } : customer));
@@ -1295,7 +1314,7 @@ function CustomersPage({ user }) {
         <p className="muted">Track project conversion from lead to sanctioned loan, subsidy, and installation handover.</p>
       </div>
 
-      <div className="customer-toolbar"><div><p className="muted">Customers move through one controlled project pipeline. Converted contacts appear here automatically.</p></div><button className="btn primary" type="button" onClick={() => setShowDirectCustomer(true)}>Add direct customer</button></div>
+      <div className="customer-toolbar"><div><p className="muted">Customers move through one controlled project pipeline. Converted contacts appear here automatically.</p></div><button className="btn primary" type="button" onClick={() => { resetCustomerForm(); setShowDirectCustomer(true); }}>Add direct customer</button></div>
       {showDirectCustomer && <form className="panel customer-intake-panel" onSubmit={addCustomer}>
         <div className="panel-header compact-header"><div><p className="eyebrow">Customer record</p><h4>{editingCustomerId ? 'Edit customer project' : 'Start a new project'}</h4></div><button className="btn outline" type="button" onClick={() => { setShowDirectCustomer(false); resetCustomerForm(); }}>Close</button></div>
         <div className="form-grid">
@@ -1350,6 +1369,11 @@ function CustomersPage({ user }) {
         </div>
       </div>
 
+      <div className="panel service-radar-panel">
+        <div className="panel-header compact-header"><div><p className="eyebrow">Retention desk</p><h4>Service radar</h4></div><span className="chip">Next 45 days</span></div>
+        {serviceRadar.length === 0 ? <p className="muted">No installation, service, or warranty dates need attention soon.</p> : <div className="service-radar-list">{serviceRadar.map((entry, index) => <div className="service-radar-item" key={`${entry.customer.id}-${entry.label}-${index}`}><span className={`service-radar-icon ${entry.tone}`}>{entry.tone === 'service' ? 'S' : entry.tone === 'warranty' ? 'W' : 'I'}</span><div><strong>{entry.customer.name}</strong><small>{entry.label} • {new Date(entry.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</small></div><b>{entry.days < 0 ? 'Overdue' : entry.days === 0 ? 'Today' : `${entry.days}d`}</b></div>)}</div>}
+      </div>
+
       <div className="panel customer-flow-panel">
         <div className="panel-header compact-header">
           <div>
@@ -1383,7 +1407,7 @@ function CustomersPage({ user }) {
                   <h4>{customer.name}</h4>
                   <p className="muted">{customer.project}</p>
                 </div>
-                <div className="inline-actions"><span className="status-badge status-following-up">{customer.status}</span><button className="btn outline" type="button" onClick={() => editCustomer(customer)}>Edit</button><button className="btn outline" type="button" onClick={() => downloadQuotation(customer)}>Quotation PDF</button></div>
+                <div className="inline-actions"><span className="status-badge status-following-up">{customer.status}</span><button className="btn outline" type="button" onClick={() => editCustomer(customer)}>Edit</button><button className="btn outline" type="button" onClick={() => downloadQuotation(customer)}>Quotation PDF</button>{!String(customer.id).startsWith('converted-') && <button className="btn danger-outline" type="button" onClick={() => deleteCustomer(customer)}>Delete</button>}</div>
               </div>
 
               <div className="customer-details-grid">
