@@ -84,7 +84,12 @@ router.post('/register', async (req, res) => {
         shopGSTIN: user.shopGSTIN,
         shopLogoUrl: user.shopLogoUrl,
         phone: user.phone,
-        address: user.address
+        address: user.address,
+        proprietorName: user.proprietorName,
+        bankName: user.bankName,
+        accountNumber: user.accountNumber,
+        ifscCode: user.ifscCode,
+        accountHolderName: user.accountHolderName
       }
     });
   } catch (error) {
@@ -124,7 +129,12 @@ router.post('/login', async (req, res) => {
         shopGSTIN: user.shopGSTIN,
         shopLogoUrl: user.shopLogoUrl,
         phone: user.phone,
-        address: user.address
+        address: user.address,
+        proprietorName: user.proprietorName,
+        bankName: user.bankName,
+        accountNumber: user.accountNumber,
+        ifscCode: user.ifscCode,
+        accountHolderName: user.accountHolderName
       }
     });
   } catch (error) {
@@ -145,7 +155,12 @@ router.put('/me', auth, async (req, res) => {
       shopGSTIN: req.body.shopGSTIN || req.user.shopGSTIN,
       shopLogoUrl: req.body.shopLogoUrl || req.user.shopLogoUrl,
       phone: req.body.phone || req.user.phone,
-      address: req.body.address || req.user.address
+      address: req.body.address || req.user.address,
+      proprietorName: req.body.proprietorName || req.user.proprietorName,
+      bankName: req.body.bankName || req.user.bankName,
+      accountNumber: req.body.accountNumber || req.user.accountNumber,
+      ifscCode: req.body.ifscCode || req.user.ifscCode,
+      accountHolderName: req.body.accountHolderName || req.user.accountHolderName
     };
 
     let updatedUser;
@@ -170,7 +185,12 @@ router.put('/me', auth, async (req, res) => {
         shopGSTIN: updatedUser.shopGSTIN,
         shopLogoUrl: updatedUser.shopLogoUrl,
         phone: updatedUser.phone,
-        address: updatedUser.address
+        address: updatedUser.address,
+        proprietorName: updatedUser.proprietorName,
+        bankName: updatedUser.bankName,
+        accountNumber: updatedUser.accountNumber,
+        ifscCode: updatedUser.ifscCode,
+        accountHolderName: updatedUser.accountHolderName
       }
     });
   } catch (error) {

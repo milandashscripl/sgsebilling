@@ -128,6 +128,23 @@ export default function AnalyticsDashboard() {
     }
   };
 
+  const exportAnalyticsCsv = () => {
+    const rows = [
+      ['Metric', 'Value'],
+      ['Sales', reports.totalSales || 0],
+      ['Purchases', reports.totalPurchases || 0],
+      ['Returns', reports.totalReturns || 0],
+      ['Income', accounting.incomeTotal || 0],
+      ['Expenses', accounting.expenseTotal || 0]
+    ].map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','));
+    const url = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analytics_${fromDate || 'start'}_${toDate || 'end'}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="analytics-shell">
       <div className="panel analytics-filter-panel">
@@ -139,6 +156,7 @@ export default function AnalyticsDashboard() {
           <button className="btn secondary" type="button" onClick={applyFilter}>Apply</button>
         </div>
         <div className="analytics-filter-action">
+          <button className="btn secondary" type="button" onClick={exportAnalyticsCsv}>Export analytics</button>
           <button className="btn outline" type="button" onClick={exportInvoicesCsv}>Export CSV</button>
         </div>
       </div>

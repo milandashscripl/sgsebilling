@@ -10,7 +10,12 @@ const userSchema = new mongoose.Schema({
   shopGSTIN: { type: String, default: '' },
   shopLogoUrl: { type: String, default: '' },
   phone: { type: String, default: '' },
-  address: { type: String, default: '' }
+  address: { type: String, default: '' },
+  proprietorName: { type: String, default: '' },
+  bankName: { type: String, default: '' },
+  accountNumber: { type: String, default: '' },
+  ifscCode: { type: String, default: '' },
+  accountHolderName: { type: String, default: '' }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

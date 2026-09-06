@@ -331,7 +331,7 @@ function AuthenticatedApp({ user, setUser, logout }) {
             <Route path="/billing" element={<BillingPage user={user} />} />
             <Route path="/setups" element={<SetupLibraryPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
-            <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/customers" element={<CustomersPage user={user} />} />
             <Route path="/accounting" element={<AccountingPage />} />
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/reports" element={<ReportsPage />} />
@@ -980,7 +980,7 @@ function Dashboard({ user }) {
           {lowStockItems.length === 0 ? (
             <p className="muted">No urgent stock issues.</p>
           ) : (
-            <ul className="alert-list">
+            <ul className="alert-list horizontal-alert-list">
               {lowStockItems.map((item) => (
                 <li key={item._id}>
                   <div className="alert-item-name">
@@ -1126,13 +1126,14 @@ function Dashboard({ user }) {
   );
 }
 
-function CustomersPage() {
+function CustomersPage({ user }) {
   const CUSTOMER_STAGES = ['Project costing', 'Quotation', 'Documents review', 'PMGSY registration', 'Agreement uploaded', 'Bank loan pending', 'Bank loan disbursed', 'Installation pending', 'Load enhancement', 'Inspection pending', 'Subsidy redeemed', 'Subsidy disbursed', 'Amount pending', 'Closed'];
   const REQUIRED_DOCUMENTS = ['Aadhaar', 'PAN', 'Latest electricity bill', 'Bank passbook', 'Email ID', 'Mobile number'];
   const [convertedContacts, setConvertedContacts] = useState([]);
   const [customerStorageReady, setCustomerStorageReady] = useState(false);
   const [showDirectCustomer, setShowDirectCustomer] = useState(false);
-  const [customerForm, setCustomerForm] = useState({ name: '', mobile: '', project: '', pmgsyId: '', systemCapacity: '', inverterModel: '', installationDate: '', warrantyExpiry: '', nextServiceDate: '', quotationAmount: '', approvedBankLoan: '', bankLoanDisbursed: '', disbursementType: 'partial', downPayment: '', marginMoney: '', loadEnhancementPayment: '', inspectionStatus: 'Pending', subsidyRedeemed: '', subsidyDisbursed: '', pendingAmount: '', stage: 'Project costing', documents: Object.fromEntries(REQUIRED_DOCUMENTS.map((document) => [document, 'provided'])) });
+  const [editingCustomerId, setEditingCustomerId] = useState(null);
+  const [customerForm, setCustomerForm] = useState({ name: '', mobile: '', aadharNumber: '', address: '', pincode: '', locationLat: '', locationLng: '', project: '', pmgsyId: '', systemCapacity: '', panelBrand: '', inverterModel: '', installationDate: '', warrantyExpiry: '', nextServiceDate: '', quotationAmount: '', approvedBankLoan: '', bankLoanDisbursed: '', disbursementType: 'partial', downPayment: '', marginMoney: '', loadEnhancementPayment: '', earthingAmount: '', dcWireAmount: '', acWireAmount: '', inspectionStatus: 'Pending', subsidyRedeemed: '', subsidyDisbursed: '', pendingAmount: '', stage: 'Project costing', documents: Object.fromEntries(REQUIRED_DOCUMENTS.map((document) => [document, 'provided'])) });
   const [customers, setCustomers] = useState([
     {
       id: 1,
@@ -1211,13 +1212,22 @@ function CustomersPage() {
   const customerRows = useMemo(() => [...convertedContacts, ...customers], [convertedContacts, customers]);
 
   const updateCustomerForm = (field, value) => setCustomerForm((current) => ({ ...current, [field]: value }));
+  const resetCustomerForm = () => {
+    setCustomerForm({ name: '', mobile: '', aadharNumber: '', address: '', pincode: '', locationLat: '', locationLng: '', project: '', pmgsyId: '', systemCapacity: '', panelBrand: '', inverterModel: '', installationDate: '', warrantyExpiry: '', nextServiceDate: '', quotationAmount: '', approvedBankLoan: '', bankLoanDisbursed: '', disbursementType: 'partial', downPayment: '', marginMoney: '', loadEnhancementPayment: '', earthingAmount: '', dcWireAmount: '', acWireAmount: '', inspectionStatus: 'Pending', subsidyRedeemed: '', subsidyDisbursed: '', pendingAmount: '', stage: 'Project costing', documents: Object.fromEntries(REQUIRED_DOCUMENTS.map((document) => [document, 'provided'])) });
+    setEditingCustomerId(null);
+  };
   const addCustomer = (event) => {
     event.preventDefault();
     if (!customerForm.name || !customerForm.mobile) return;
-    const nextCustomer = { ...customerForm, id: `customer-${Date.now()}`, status: customerForm.stage };
-    setCustomers((current) => [...current, nextCustomer]);
+    const nextCustomer = { ...customerForm, id: editingCustomerId || `customer-${Date.now()}`, status: customerForm.stage };
+    setCustomers((current) => editingCustomerId ? current.map((customer) => customer.id === editingCustomerId ? nextCustomer : customer) : [...current, nextCustomer]);
     setShowDirectCustomer(false);
-    setCustomerForm((current) => ({ ...current, name: '', mobile: '', project: '', pmgsyId: '', quotationAmount: '' }));
+    resetCustomerForm();
+  };
+  const editCustomer = (customer) => {
+    setCustomerForm((current) => ({ ...current, ...customer, documents: { ...current.documents, ...(customer.documents || {}) } }));
+    setEditingCustomerId(customer.id);
+    setShowDirectCustomer(true);
   };
   const updateCustomerStage = (customerId, stage) => {
     setCustomers((current) => current.map((customer) => customer.id === customerId ? { ...customer, stage, status: stage } : customer));
@@ -1226,13 +1236,18 @@ function CustomersPage() {
   const downloadQuotation = (customer) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
-    doc.setFillColor(20, 42, 61); doc.rect(0, 0, pageWidth, 34, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.text('SOLAR PROJECT QUOTATION', 16, 16);
-    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.text('SGSE Billing', 16, 23); doc.text(new Date().toLocaleDateString('en-IN'), pageWidth - 16, 23, { align: 'right' });
-    doc.setTextColor(20, 42, 61); doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text('Customer details', 16, 48);
-    doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.text(`Name: ${customer.name}`, 16, 56); doc.text(`Mobile: ${customer.mobile || '—'}`, 16, 63); doc.text(`Project: ${customer.project || 'Solar project'}`, 16, 70); doc.text(`PMGSY ID: ${customer.pmgsyId || '—'}`, 16, 77);
-    doc.setFillColor(244, 247, 249); doc.roundedRect(16, 88, pageWidth - 32, 24, 2, 2, 'F'); doc.setFont(undefined, 'bold'); doc.text('Estimated project amount', 22, 98); doc.setFontSize(16); doc.text(`₹${Number(customer.quotationAmount || 0).toLocaleString('en-IN')}`, pageWidth - 22, 101, { align: 'right' });
-    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.text('This quotation is subject to site verification, applicable subsidy, and final agreement terms.', 16, 130); doc.line(pageWidth - 58, 160, pageWidth - 16, 160); doc.text('Authorized signatory', pageWidth - 37, 166, { align: 'center' });
+    const line = (label, value, x, y) => { doc.setFont(undefined, 'bold'); doc.text(`${label}:`, x, y); doc.setFont(undefined, 'normal'); doc.text(String(value || '—'), x + 27, y); };
+    const shopName = user?.shopName || 'SGSE Billing';
+    doc.setFillColor(18, 58, 43); doc.rect(0, 0, pageWidth, 38, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(19); doc.setFont(undefined, 'bold'); doc.text(shopName, 16, 14);
+    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.text(user?.shopAddress || user?.address || 'Solar energy solutions', 16, 21); doc.text(`Phone: ${user?.phone || '—'}  GSTIN: ${user?.shopGSTIN || '—'}`, 16, 27); doc.text(new Date().toLocaleDateString('en-IN'), pageWidth - 16, 27, { align: 'right' });
+    doc.setTextColor(18, 58, 43); doc.setFontSize(15); doc.setFont(undefined, 'bold'); doc.text('SOLAR PROJECT QUOTATION', 16, 52);
+    doc.setFontSize(10); doc.setFont(undefined, 'normal'); line('Customer', customer.name, 16, 63); line('Mobile', customer.mobile, 16, 70); line('Aadhaar', customer.aadharNumber, 16, 77); line('Address', customer.address, 16, 84); line('Pincode', customer.pincode, 110, 63); line('Location', customer.locationLat && customer.locationLng ? `${customer.locationLat}, ${customer.locationLng}` : '', 110, 70); line('Project', customer.project || 'Solar project', 110, 77);
+    doc.setFillColor(245, 249, 241); doc.roundedRect(16, 94, pageWidth - 32, 26, 2, 2, 'F'); doc.setFont(undefined, 'bold'); doc.text('Quotation amount', 22, 105); doc.setFontSize(17); doc.text(`₹${Number(customer.quotationAmount || 0).toLocaleString('en-IN')}`, pageWidth - 22, 108, { align: 'right' });
+    doc.setFontSize(11); doc.text('Proposed equipment and services', 16, 134); doc.setFontSize(9); doc.setFont(undefined, 'normal');
+    [['Solar panels', customer.panelBrand], ['Inverter', customer.inverterModel], ['Earthing', `₹${Number(customer.earthingAmount || 0).toLocaleString('en-IN')}`], ['DC wire', `₹${Number(customer.dcWireAmount || 0).toLocaleString('en-IN')}`], ['AC wire', `₹${Number(customer.acWireAmount || 0).toLocaleString('en-IN')}`]].forEach(([label, value], index) => { const y = 143 + index * 7; doc.text(label, 20, y); doc.text(String(value || 'Included / to be confirmed'), pageWidth - 20, y, { align: 'right' }); });
+    doc.setFont(undefined, 'bold'); doc.text('Vendor account details', 16, 184); doc.setFontSize(9); doc.setFont(undefined, 'normal'); line('Proprietor', user?.proprietorName, 16, 192); line('Bank', user?.bankName, 16, 199); line('Account', user?.accountNumber, 110, 192); line('IFSC', user?.ifscCode, 110, 199);
+    doc.setFontSize(8); doc.text('This quotation is subject to site verification and final agreement terms.', 16, 220); doc.line(pageWidth - 62, 252, pageWidth - 16, 252); doc.text('Authorized signatory', pageWidth - 39, 258, { align: 'center' });
     doc.save(`${String(customer.name || 'customer').replace(/\s+/g, '-').toLowerCase()}-quotation.pdf`);
   };
 
@@ -1282,13 +1297,19 @@ function CustomersPage() {
 
       <div className="customer-toolbar"><div><p className="muted">Customers move through one controlled project pipeline. Converted contacts appear here automatically.</p></div><button className="btn primary" type="button" onClick={() => setShowDirectCustomer(true)}>Add direct customer</button></div>
       {showDirectCustomer && <form className="panel customer-intake-panel" onSubmit={addCustomer}>
-        <div className="panel-header compact-header"><div><p className="eyebrow">Direct customer</p><h4>Start a new project</h4></div><button className="btn outline" type="button" onClick={() => setShowDirectCustomer(false)}>Close</button></div>
+        <div className="panel-header compact-header"><div><p className="eyebrow">Customer record</p><h4>{editingCustomerId ? 'Edit customer project' : 'Start a new project'}</h4></div><button className="btn outline" type="button" onClick={() => { setShowDirectCustomer(false); resetCustomerForm(); }}>Close</button></div>
         <div className="form-grid">
           <label>Customer name<input required value={customerForm.name} onChange={(event) => updateCustomerForm('name', event.target.value)} /></label>
           <label>Mobile number<input required value={customerForm.mobile} onChange={(event) => updateCustomerForm('mobile', event.target.value)} /></label>
+          <label>Aadhaar number<input value={customerForm.aadharNumber} onChange={(event) => updateCustomerForm('aadharNumber', event.target.value)} /></label>
+          <label>Pincode<input value={customerForm.pincode} onChange={(event) => updateCustomerForm('pincode', event.target.value)} /></label>
+          <label>Customer address<textarea value={customerForm.address} onChange={(event) => updateCustomerForm('address', event.target.value)} /></label>
+          <label>Location latitude<input value={customerForm.locationLat} onChange={(event) => updateCustomerForm('locationLat', event.target.value)} /></label>
+          <label>Location longitude<input value={customerForm.locationLng} onChange={(event) => updateCustomerForm('locationLng', event.target.value)} /></label>
           <label>Project<input value={customerForm.project} onChange={(event) => updateCustomerForm('project', event.target.value)} placeholder="3kW rooftop solar" /></label>
           <label>PMGSY entry ID<input value={customerForm.pmgsyId} onChange={(event) => updateCustomerForm('pmgsyId', event.target.value)} /></label>
           <label>System capacity<input value={customerForm.systemCapacity} onChange={(event) => updateCustomerForm('systemCapacity', event.target.value)} placeholder="3 kW" /></label>
+          <label>Panel brand<input value={customerForm.panelBrand} onChange={(event) => updateCustomerForm('panelBrand', event.target.value)} /></label>
           <label>Inverter model<input value={customerForm.inverterModel} onChange={(event) => updateCustomerForm('inverterModel', event.target.value)} /></label>
           <label>Installation date<input type="date" value={customerForm.installationDate} onChange={(event) => updateCustomerForm('installationDate', event.target.value)} /></label>
           <label>Warranty expiry<input type="date" value={customerForm.warrantyExpiry} onChange={(event) => updateCustomerForm('warrantyExpiry', event.target.value)} /></label>
@@ -1299,12 +1320,15 @@ function CustomersPage() {
           <label>Loan disbursed<input type="number" min="0" value={customerForm.bankLoanDisbursed} onChange={(event) => updateCustomerForm('bankLoanDisbursed', event.target.value)} /></label>
           <label>Disbursement<select value={customerForm.disbursementType} onChange={(event) => updateCustomerForm('disbursementType', event.target.value)}><option value="partial">Partial</option><option value="complete">Complete</option></select></label>
           <label>Load enhancement payment<input type="number" min="0" value={customerForm.loadEnhancementPayment} onChange={(event) => updateCustomerForm('loadEnhancementPayment', event.target.value)} /></label>
+          <label>Earthing amount<input type="number" min="0" value={customerForm.earthingAmount} onChange={(event) => updateCustomerForm('earthingAmount', event.target.value)} /></label>
+          <label>DC wire amount<input type="number" min="0" value={customerForm.dcWireAmount} onChange={(event) => updateCustomerForm('dcWireAmount', event.target.value)} /></label>
+          <label>AC wire amount<input type="number" min="0" value={customerForm.acWireAmount} onChange={(event) => updateCustomerForm('acWireAmount', event.target.value)} /></label>
           <label>Pending amount<input type="number" min="0" value={customerForm.pendingAmount} onChange={(event) => updateCustomerForm('pendingAmount', event.target.value)} /></label>
           <label>Subsidy redeemed<input type="number" min="0" value={customerForm.subsidyRedeemed} onChange={(event) => updateCustomerForm('subsidyRedeemed', event.target.value)} /></label>
           <label>Subsidy disbursed<input type="number" min="0" value={customerForm.subsidyDisbursed} onChange={(event) => updateCustomerForm('subsidyDisbursed', event.target.value)} /></label>
         </div>
         <div className="document-checklist"><strong>Document review</strong>{REQUIRED_DOCUMENTS.map((document) => <label key={document}><span>{document}</span><select value={customerForm.documents[document]} onChange={(event) => updateCustomerForm('documents', { ...customerForm.documents, [document]: event.target.value })}><option value="provided">Provided</option><option value="missing">Missing</option><option value="error">Error</option></select></label>)}</div>
-        <button className="btn primary" type="submit">Create project</button>
+        <button className="btn primary" type="submit">{editingCustomerId ? 'Save customer changes' : 'Create project'}</button>
       </form>}
 
       <div className="customer-metric-grid">
@@ -1359,12 +1383,15 @@ function CustomersPage() {
                   <h4>{customer.name}</h4>
                   <p className="muted">{customer.project}</p>
                 </div>
-                <div className="inline-actions"><span className="status-badge status-following-up">{customer.status}</span><button className="btn outline" type="button" onClick={() => downloadQuotation(customer)}>Quotation PDF</button></div>
+                <div className="inline-actions"><span className="status-badge status-following-up">{customer.status}</span><button className="btn outline" type="button" onClick={() => editCustomer(customer)}>Edit</button><button className="btn outline" type="button" onClick={() => downloadQuotation(customer)}>Quotation PDF</button></div>
               </div>
 
               <div className="customer-details-grid">
                 <div><span>System</span><strong>{customer.systemCapacity || '—'}</strong></div>
+                <div><span>Panel brand</span><strong>{customer.panelBrand || '—'}</strong></div>
                 <div><span>Inverter</span><strong>{customer.inverterModel || '—'}</strong></div>
+                <div><span>Mobile</span><strong>{customer.mobile || '—'}</strong></div>
+                <div><span>Location</span><strong>{customer.locationLat && customer.locationLng ? `${customer.locationLat}, ${customer.locationLng}` : '—'}</strong></div>
                 <div><span>Warranty till</span><strong>{customer.warrantyExpiry || '—'}</strong></div>
                 <div><span>Next service</span><strong>{customer.nextServiceDate || '—'}</strong></div>
                 <div><span>Quotation amount</span><strong>₹{Number(customer.quotationAmount || 0).toLocaleString('en-IN')}</strong></div>
@@ -2481,7 +2508,7 @@ function AccountingPage() {
   const [expenses, setExpenses] = useState([]);
   const [summary, setSummary] = useState({ accounts: [], paymentMethods: [], incomeTotal: 0, expenseTotal: 0, netCash: 0, receivables: 0 });
   const [accountForm, setAccountForm] = useState({ name: '', type: 'cash', openingBalance: '0', notes: '' });
-  const [transactionForm, setTransactionForm] = useState({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '', date: toLocalDateTimeValue() });
+  const [transactionForm, setTransactionForm] = useState({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', customerName: '', reference: '', note: '', date: toLocalDateTimeValue() });
   const [transferForm, setTransferForm] = useState({ fromAccountId: '', toAccountId: '', amount: '', note: '' });
   const [depositForm, setDepositForm] = useState({ accountId: '', amount: '', paymentMethod: 'cash', reference: '', note: '' });
   const [message, setMessage] = useState('');
@@ -2530,7 +2557,7 @@ function AccountingPage() {
         amount: Number(transactionForm.amount || 0),
         date: transactionForm.date || toLocalDateTimeValue()
       });
-      setTransactionForm({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', reference: '', note: '', date: toLocalDateTimeValue() });
+      setTransactionForm({ accountId: '', type: 'income', amount: '', paymentMethod: 'cash', customerName: '', reference: '', note: '', date: toLocalDateTimeValue() });
       setMessage('Transaction saved');
       await load();
     } catch (error) {
@@ -2776,6 +2803,7 @@ function AccountingPage() {
             <option value="expense">Expense</option>
           </select>
           <input type="number" min="0.01" step="0.01" placeholder="Amount" value={transactionForm.amount} onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })} />
+          <input placeholder="Customer / project (optional)" value={transactionForm.customerName} onChange={(e) => setTransactionForm({ ...transactionForm, customerName: e.target.value })} />
           <select value={transactionForm.paymentMethod} onChange={(e) => setTransactionForm({ ...transactionForm, paymentMethod: e.target.value })}>
             <option value="cash">Cash</option>
             <option value="phonepe">PhonePe</option>
@@ -3222,7 +3250,7 @@ function ReportsPage() {
 }
 
 function ShopProfilePage({ user, setUser }) {
-  const [form, setForm] = useState({ name: user.name || '', shopName: user.shopName || '', shopAddress: user.shopAddress || '', shopGSTIN: user.shopGSTIN || '', phone: user.phone || '', address: user.address || '', shopLogoUrl: user.shopLogoUrl || '' });
+  const [form, setForm] = useState({ name: user.name || '', shopName: user.shopName || '', shopAddress: user.shopAddress || '', shopGSTIN: user.shopGSTIN || '', phone: user.phone || '', address: user.address || '', proprietorName: user.proprietorName || user.name || '', bankName: user.bankName || '', accountNumber: user.accountNumber || '', ifscCode: user.ifscCode || '', accountHolderName: user.accountHolderName || '', shopLogoUrl: user.shopLogoUrl || '' });
   const [logoFile, setLogoFile] = useState(null);
   const [message, setMessage] = useState('');
 
@@ -3253,6 +3281,11 @@ function ShopProfilePage({ user, setUser }) {
         <label>Shop name<input value={form.shopName} onChange={(e) => setForm({ ...form, shopName: e.target.value })} /></label>
         <label>Business phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
         <label>GSTIN<input value={form.shopGSTIN} onChange={(e) => setForm({ ...form, shopGSTIN: e.target.value })} /></label>
+        <label>Proprietor name<input value={form.proprietorName} onChange={(e) => setForm({ ...form, proprietorName: e.target.value })} /></label>
+        <label>Bank name<input value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} /></label>
+        <label>Account holder<input value={form.accountHolderName} onChange={(e) => setForm({ ...form, accountHolderName: e.target.value })} /></label>
+        <label>Account number<input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} /></label>
+        <label>IFSC code<input value={form.ifscCode} onChange={(e) => setForm({ ...form, ifscCode: e.target.value })} /></label>
         <label>Invoice address<textarea value={form.shopAddress} onChange={(e) => setForm({ ...form, shopAddress: e.target.value })} /></label>
         <label>Personal address<textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
         <label className="logo-upload-field">Shop logo<input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />{logoFile && <small>{logoFile.name}</small>}</label>

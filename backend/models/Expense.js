@@ -6,6 +6,7 @@ const expenseSchema = new mongoose.Schema({
   amount: { type: Number, default: 0 },
   accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' },
   paymentMethod: { type: String, default: 'cash' },
+  customerName: { type: String, default: '' },
   note: { type: String, default: '' },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });

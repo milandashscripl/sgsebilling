@@ -133,6 +133,7 @@ router.post('/transactions', auth, async (req, res) => {
       type: req.body.type || 'income',
       amount,
       paymentMethod: req.body.paymentMethod || 'cash',
+      customerName: req.body.customerName || '',
       reference: req.body.reference || '',
       note: req.body.note || '',
       createdBy: req.user._id
@@ -192,6 +193,7 @@ router.post('/expenses', auth, async (req, res) => {
       amount,
       accountId: req.body.accountId,
       paymentMethod: req.body.paymentMethod || 'cash',
+      customerName: req.body.customerName || '',
       note: req.body.note || '',
       createdBy: req.user._id
     });

@@ -569,7 +569,9 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .accent-highlight { background: linear-gradient(135deg, rgba(76,175,80,0.12), rgba(255,255,255,0.9)); }
 .dashboard-panels-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; }
 .quick-panel { display: grid; gap: 12px; min-height: 180px; }
-.alert-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.alert-list { list-style: none; padding: 0 0 8px; margin: 0; display: grid; gap: 10px; }
+.horizontal-alert-list { display: flex; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.horizontal-alert-list li { flex: 0 0 min(290px, 82%); scroll-snap-align: start; }
 .alert-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: linear-gradient(135deg, rgba(255, 200, 87, 0.12), rgba(255,255,255,0.92)); border: 1px solid rgba(225, 165, 31, 0.18); border-left: 4px solid #d58a12; border-radius: 14px; padding: 12px 14px; box-shadow: 0 8px 18px rgba(214, 145, 29, 0.08); }
 .alert-item-name { display: flex; align-items: center; gap: 10px; }
 .alert-item-name strong { display: block; color: #1d3557; }

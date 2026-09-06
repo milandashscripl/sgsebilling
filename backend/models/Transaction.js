@@ -6,6 +6,7 @@ const transactionSchema = new mongoose.Schema({
   type: { type: String, enum: ['income', 'expense'], default: 'income' },
   amount: { type: Number, default: 0 },
   paymentMethod: { type: String, default: 'cash' },
+  customerName: { type: String, default: '' },
   reference: { type: String, default: '' },
   note: { type: String, default: '' },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
