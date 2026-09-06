@@ -873,6 +873,7 @@ function Dashboard({ user }) {
   const netSales = (summary.totalSales || 0) - (summary.totalReturns || 0);
   const marginRate = summary.totalSales ? Math.max(0, Math.min(100, ((summary.totalSales - summary.totalPurchases) / Math.max(summary.totalSales, 1)) * 100)) : 0;
   const inventoryValue = items.reduce((sum, item) => sum + Number(item.stock || 0) * Number(item.salePrice || 0), 0);
+  const totalStockUnits = items.reduce((sum, item) => sum + Number(item.stock || 0), 0);
 
   const callerBreakdown = contacts.reduce((acc, contact) => {
     const callerName = (contact.callerName || 'Unassigned').trim() || 'Unassigned';
@@ -897,12 +898,26 @@ function Dashboard({ user }) {
   return (
     <div className="dashboard-page">
       <div className="dashboard-hero">
-        <div>
+        <div className="dashboard-hero-copy">
           <p className="eyebrow">Performance overview</p>
           <h3>Dashboard</h3>
+          <p className="dashboard-hero-subtitle">A clear view of revenue, stock, people, and today&apos;s follow-through.</p>
         </div>
-        <div className="dashboard-hero-pill">
-          Welcome {user.name}
+        <div className="dashboard-hero-side">
+          <div className="dashboard-hero-pill">Welcome {user.name}</div>
+          <div className="dashboard-health-status"><span className="health-dot" />Operations are on track</div>
+        </div>
+      </div>
+
+      <div className="dashboard-command-strip">
+        <div className="command-strip-heading">
+          <span className="command-strip-kicker">Business health</span>
+          <strong>Keep the important numbers close</strong>
+        </div>
+        <div className="command-strip-metrics">
+          <div><span>Catalog items</span><strong>{items.length}</strong></div>
+          <div><span>Units in stock</span><strong>{totalStockUnits.toLocaleString('en-IN')}</strong></div>
+          <div><span>Open contacts</span><strong>{contacts.length}</strong></div>
         </div>
       </div>
 
@@ -928,7 +943,7 @@ function Dashboard({ user }) {
             <span className="stat-trend up">Live</span>
           </div>
           <p><AnimatedNumber value={summary.totalSales || 0} prefix="₹" /></p>
-          <span>Current period</span>
+          <span>Gross revenue this period</span>
         </div>
         <div className="stat-card stat-purchases">
           <div className="stat-card-header">
@@ -936,7 +951,7 @@ function Dashboard({ user }) {
             <span className="stat-trend neutral">Stock</span>
           </div>
           <p><AnimatedNumber value={summary.totalPurchases || 0} prefix="₹" /></p>
-          <span>Inbound stock</span>
+          <span>Value received into stock</span>
         </div>
         <div className="stat-card stat-returns">
           <div className="stat-card-header">
@@ -944,7 +959,7 @@ function Dashboard({ user }) {
             <span className="stat-trend down">Watch</span>
           </div>
           <p><AnimatedNumber value={summary.totalReturns || 0} prefix="₹" /></p>
-          <span>Returned value</span>
+          <span>Value flowing back</span>
         </div>
         <div className="stat-card stat-invoices">
           <div className="stat-card-header">
@@ -952,7 +967,7 @@ function Dashboard({ user }) {
             <span className="stat-trend up">Value</span>
           </div>
           <p><AnimatedNumber value={inventoryValue} prefix="₹" /></p>
-          <span>Stock holding</span>
+          <span>Estimated sale value on hand</span>
         </div>
       </div>
 
