@@ -27,6 +27,7 @@ function createAuthStore() {
   };
 
   const findUserByEmail = (email) => users.find((user) => user.email === email);
+  const findUserByIdentifier = (identifier) => users.find((user) => user.email === identifier || user.name.toLowerCase() === String(identifier).toLowerCase());
   const findUserById = (id) => users.find((user) => String(user.id) === String(id));
 
   const updateUserById = async (id, updates) => {
@@ -36,7 +37,7 @@ function createAuthStore() {
     return user;
   };
 
-  const createUser = async ({ name, email, password, role, shopName = 'SGSE Billing', shopAddress = '', shopGSTIN = '', shopLogoUrl = '', phone = '', address = '' }) => {
+  const createUser = async ({ name, email, password, role, ownerId = null, shopName = 'SGSE Billing', shopAddress = '', shopGSTIN = '', shopLogoUrl = '', phone = '', address = '' }) => {
     const existing = findUserByEmail(email);
     if (existing) return null;
 
@@ -46,13 +47,15 @@ function createAuthStore() {
       name,
       email,
       password: hashed,
-      role: role === 'admin' ? 'admin' : 'user',
+      role: role === 'admin' ? 'admin' : role === 'caller' ? 'caller' : 'user',
+      ownerId,
       shopName,
       shopAddress,
       shopGSTIN,
       shopLogoUrl,
       phone,
-      address
+      address,
+      appSettings: {}
     };
     users.push(user);
     return user;
@@ -62,6 +65,7 @@ function createAuthStore() {
     users,
     seedDefaultAdmin,
     findUserByEmail,
+    findUserByIdentifier,
     findUserById,
     createUser
   };

@@ -99,12 +99,13 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, identifier, password } = req.body;
+    const loginId = String(identifier || email || '').trim();
     let user;
 
     user = mongoose.connection.readyState === 1
-      ? await User.findOne({ email })
-      : authStore.findUserByEmail(email);
+      ? await User.findOne({ $or: [{ email: loginId.toLowerCase() }, { name: loginId }] })
+      : authStore.findUserByIdentifier(loginId);
 
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
@@ -124,6 +125,7 @@ router.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        ownerId: user.ownerId ? String(user.ownerId) : null,
         shopName: user.shopName,
         shopAddress: user.shopAddress,
         shopGSTIN: user.shopGSTIN,

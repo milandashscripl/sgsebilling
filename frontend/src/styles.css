@@ -252,6 +252,8 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 
 @media (max-width: 760px) {
   .document-checklist { grid-template-columns: 1fr; }
+  .settings-toggle-grid { grid-template-columns: 1fr; }
+  .caller-create-panel .form-grid { grid-template-columns: 1fr; }
   .customer-card-header { flex-direction: column; }
   .customer-card-header .inline-actions { justify-content: flex-start; width: 100%; }
   .customer-list-grid { grid-template-columns: 1fr; }
@@ -1321,6 +1323,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
 .transaction-values span { color: #5E6F83; font-size: 0.78rem; }
 .money-in { color: #19704a; }
 .money-out { color: #b4433a; }
+.admin-users-page, .settings-page { display: grid; gap: 18px; }
+.caller-create-panel, .settings-panel { display: grid; gap: 16px; }
+.caller-create-panel { border-left: 4px solid #2e8b62; }
+.caller-create-panel h4, .settings-section h4 { margin: 0; }
+.caller-create-panel p, .settings-section p { margin: 4px 0 0; }
+.settings-section { display: grid; gap: 14px; padding-bottom: 4px; }
+.settings-section + .settings-section { padding-top: 16px; border-top: 1px solid var(--panel-border); }
+.settings-toggle-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.settings-toggle-grid label { display: flex; align-items: center; gap: 9px; padding: 13px 14px; border: 1px solid rgba(31,91,67,0.12); border-radius: 12px; background: #f6faf4; color: #31533d; font-weight: 700; }
+.settings-toggle-grid input { width: 18px; height: 18px; min-height: 0; padding: 0; accent-color: #2e8b62; }
+.admin-user-main { display: grid; gap: 4px; width: 100%; }
+.caller-controls { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)) auto auto; gap: 8px; margin-top: 10px; }
+.caller-controls input { padding: 9px 10px; border-radius: 9px; min-width: 0; }
+.caller-controls .btn { padding: 9px 12px; white-space: nowrap; }
 
 /* Keep the workspace chrome in place while the active view scrolls. */
 @media (min-width: 901px) {

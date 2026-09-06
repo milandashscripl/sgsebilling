@@ -28,6 +28,7 @@ const auth = async (req, res, next) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      ownerId: user.ownerId ? String(user.ownerId) : null,
       shopName: user.shopName || '',
       shopAddress: user.shopAddress || '',
       shopGSTIN: user.shopGSTIN || '',
@@ -35,6 +36,9 @@ const auth = async (req, res, next) => {
       phone: user.phone || '',
       address: user.address || ''
     };
+    if (req.user.role === 'caller' && req.baseUrl !== '/api/contacts' && req.baseUrl !== '/api/auth') {
+      return res.status(403).json({ message: 'Caller accounts can access Contacts only' });
+    }
     next();
   } catch (error) {
     res.status(401).json({ message: 'Unauthorized' });

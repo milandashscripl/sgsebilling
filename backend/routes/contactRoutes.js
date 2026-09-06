@@ -3,6 +3,7 @@ const auth = require('../middleware/auth');
 const Contact = require('../models/Contact');
 
 const router = express.Router();
+const contactOwnerId = (req) => req.user.role === 'caller' ? req.user.ownerId : req.user._id;
 
 const normalizeValue = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -23,7 +24,7 @@ const rejectDuplicateNumbers = async (body, userId, contactId = null) => {
 
 router.get('/', auth, async (req, res) => {
   try {
-    const filter = { createdBy: req.user._id };
+    const filter = { createdBy: contactOwnerId(req) };
     const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : null;
     const toDate = req.query.toDate ? new Date(req.query.toDate) : null;
 
@@ -44,7 +45,7 @@ router.get('/', auth, async (req, res) => {
 
 router.get('/export', auth, async (req, res) => {
   try {
-    const filter = { createdBy: req.user._id };
+    const filter = { createdBy: contactOwnerId(req) };
     const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : null;
     const toDate = req.query.toDate ? new Date(req.query.toDate) : null;
 
@@ -97,7 +98,7 @@ router.post('/', auth, async (req, res) => {
       followUpCount: Number(req.body.followUpCount || 0),
       lastContacted: req.body.lastContacted || null,
       nextFollowUp: req.body.nextFollowUp || null,
-      createdBy: req.user._id
+      createdBy: contactOwnerId(req)
     });
     res.status(201).json({ ...contact.toObject(), id: String(contact._id) });
   } catch (error) {
@@ -107,7 +108,7 @@ router.post('/', auth, async (req, res) => {
 
 router.post('/:contactId/calls', auth, async (req, res) => {
   try {
-    const contact = await Contact.findOne({ _id: req.params.contactId, createdBy: req.user._id });
+    const contact = await Contact.findOne({ _id: req.params.contactId, createdBy: contactOwnerId(req) });
     if (!contact) return res.status(404).json({ message: 'Contact not found' });
 
     const timestamp = req.body.timestamp ? new Date(req.body.timestamp) : new Date();
@@ -138,7 +139,7 @@ router.put('/:contactId', auth, async (req, res) => {
     const duplicateMessage = await rejectDuplicateNumbers(req.body, req.user._id, req.params.contactId);
     if (duplicateMessage) return res.status(409).json({ message: duplicateMessage });
     const contact = await Contact.findOneAndUpdate(
-      { _id: req.params.contactId, createdBy: req.user._id },
+      { _id: req.params.contactId, createdBy: contactOwnerId(req) },
       {
         name: req.body.name,
         callerName: req.body.callerName || '',
@@ -162,7 +163,7 @@ router.put('/:contactId', auth, async (req, res) => {
 
 router.delete('/:contactId', auth, async (req, res) => {
   try {
-    const deleted = await Contact.findOneAndDelete({ _id: req.params.contactId, createdBy: req.user._id });
+    const deleted = await Contact.findOneAndDelete({ _id: req.params.contactId, createdBy: contactOwnerId(req) });
     if (!deleted) return res.status(404).json({ message: 'Contact not found' });
     res.json({ message: 'Contact removed' });
   } catch (error) {

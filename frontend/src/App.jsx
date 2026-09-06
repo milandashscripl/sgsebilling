@@ -43,6 +43,7 @@ const emptyCategoryForm = {
 };
 
 const LEAD_STATUS_OPTIONS = ['Not Yet Called', 'No Response', 'Hot Lead', 'Warm Lead', 'Cool Lead', 'Immediate', 'May Convert', 'Following Up', 'Converted', 'Blacklisted', 'Not Interested'];
+const getWebSetting = (key, fallback) => { try { return JSON.parse(localStorage.getItem('sgse-web-settings') || '{}')[key] ?? fallback; } catch { return fallback; } };
 
 const toLocalDateTimeValue = (date = new Date()) => {
   const pad = (value) => String(value).padStart(2, '0');
@@ -310,34 +311,16 @@ function AuthenticatedApp({ user, setUser, logout }) {
               <small>Business hub</small>
             </div>
           </div>
-          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/dashboard">Dashboard</NavLink>
-          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink>
-          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink>
-          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink>
-          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/setups">Setup library</NavLink>
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
-          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/customers">Customers</NavLink>
-          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink>
-          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/employees">People & payroll</NavLink>
-          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink>
-          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/profile">Shop profile</NavLink>
-          {user.role === 'admin' && <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/users">Users</NavLink>}
+          {user.role !== 'caller' && <><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/dashboard">Dashboard</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/setups">Setup library</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/customers">Customers</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/employees">People & payroll</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/profile">Shop profile</NavLink></>}
+          {user.role === 'admin' && <><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/users">Users & callers</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/settings">Web app settings</NavLink></>}
         </aside>
         <main className="content">
           <Routes>
-            <Route path="/dashboard" element={<Dashboard user={user} />} />
-            <Route path="/items" element={<ItemsPage />} />
-            <Route path="/stock" element={<StockPage />} />
-            <Route path="/billing" element={<BillingPage user={user} />} />
-            <Route path="/setups" element={<SetupLibraryPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
-            <Route path="/customers" element={<CustomersPage user={user} />} />
-            <Route path="/accounting" element={<AccountingPage />} />
-            <Route path="/employees" element={<EmployeesPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/profile" element={<ShopProfilePage user={user} setUser={setUser} />} />
-            {user.role === 'admin' && <Route path="/users" element={<UsersPage />} />}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            {user.role !== 'caller' && <><Route path="/dashboard" element={<Dashboard user={user} />} /><Route path="/items" element={<ItemsPage />} /><Route path="/stock" element={<StockPage />} /><Route path="/billing" element={<BillingPage user={user} />} /><Route path="/setups" element={<SetupLibraryPage />} /><Route path="/customers" element={<CustomersPage user={user} />} /><Route path="/accounting" element={<AccountingPage />} /><Route path="/employees" element={<EmployeesPage />} /><Route path="/reports" element={<ReportsPage />} /><Route path="/profile" element={<ShopProfilePage user={user} setUser={setUser} />} /></>}
+            {user.role === 'admin' && <><Route path="/users" element={<UsersPage />} /><Route path="/settings" element={<WebAppSettingsPage />} /></>}
+            <Route path="*" element={<Navigate to={user.role === 'caller' ? '/contacts' : '/dashboard'} replace />} />
           </Routes>
         </main>
       </div>
@@ -346,7 +329,7 @@ function AuthenticatedApp({ user, setUser, logout }) {
 }
 
 function Login({ setUser }) {
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ identifier: '', password: '' });
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -362,7 +345,7 @@ function Login({ setUser }) {
       localStorage.setItem('user', JSON.stringify(res.data.user));
       api.defaults.headers.common.Authorization = `Bearer ${token}`;
       setUser(res.data.user);
-      navigate('/dashboard');
+      navigate(res.data.user.role === 'caller' ? '/contacts' : '/dashboard');
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Login failed';
       setError(message);
@@ -381,8 +364,8 @@ function Login({ setUser }) {
       <p className="auth-subtitle">Manage business billing, inventory, and payroll from a single dashboard.</p>
       {error && <p className="error">{error}</p>}
       <label className="auth-field-label">
-        <span>Email address</span>
-        <input placeholder="you@company.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <span>Email address or caller ID</span>
+        <input placeholder="you@company.com or caller name" value={form.identifier} onChange={(e) => setForm({ ...form, identifier: e.target.value })} />
       </label>
       <label className="auth-field-label">
         <span>Password</span>
@@ -869,7 +852,7 @@ function Dashboard({ user }) {
     });
   }, []);
 
-  const lowStockItems = items.filter((item) => Number(item.stock || 0) <= 5);
+  const lowStockItems = items.filter((item) => Number(item.stock || 0) <= Number(getWebSetting('lowStockThreshold', 5)));
   const netSales = (summary.totalSales || 0) - (summary.totalReturns || 0);
   const marginRate = summary.totalSales ? Math.max(0, Math.min(100, ((summary.totalSales - summary.totalPurchases) / Math.max(summary.totalSales, 1)) * 100)) : 0;
   const inventoryValue = items.reduce((sum, item) => sum + Number(item.stock || 0) * Number(item.salePrice || 0), 0);
@@ -2906,7 +2889,7 @@ function StockPage() {
 
   useEffect(() => { load(); }, []);
 
-  const lowStock = items.filter((item) => Number(item.stock || 0) <= 5);
+  const lowStock = items.filter((item) => Number(item.stock || 0) <= Number(getWebSetting('lowStockThreshold', 5)));
   const inventoryValue = items.reduce((sum, item) => sum + Number(item.stock || 0) * Number(item.salePrice || 0), 0);
 
   return (
@@ -3331,22 +3314,67 @@ function ShopProfilePage({ user, setUser }) {
 
 function UsersPage() {
   const [users, setUsers] = useState([]);
+  const [callerName, setCallerName] = useState('');
+  const [callerPhone, setCallerPhone] = useState('');
+  const [message, setMessage] = useState('');
+  const [callerEdits, setCallerEdits] = useState({});
 
-  useEffect(() => { api.get('/users').then((res) => setUsers(res.data)); }, []);
+  const load = () => api.get('/users').then((res) => setUsers(res.data)).catch(() => setMessage('Unable to load users'));
+  useEffect(() => { load(); }, []);
+  const addCaller = async (event) => {
+    event.preventDefault();
+    try {
+      const response = await api.post('/users/callers', { name: callerName, phone: callerPhone, password: '123456' });
+      setMessage(`Caller created. Login ID: ${response.data.name} | Password: 123456`);
+      setCallerName('');
+      setCallerPhone('');
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to create caller');
+    }
+  };
+  const updateCaller = async (caller) => {
+    try {
+      const edit = callerEdits[caller.id] || {};
+      await api.put(`/users/callers/${caller.id}`, edit);
+      setMessage(`Caller ${edit.name || caller.name} updated`);
+      await load();
+    } catch (error) { setMessage(error.response?.data?.message || 'Unable to update caller'); }
+  };
+  const removeCaller = async (caller) => {
+    if (!window.confirm(`Remove caller ${caller.name}?`)) return;
+    try { await api.delete(`/users/callers/${caller.id}`); setMessage('Caller removed'); await load(); } catch (error) { setMessage(error.response?.data?.message || 'Unable to remove caller'); }
+  };
 
   return (
-    <div>
-      <h3>User administration</h3>
+    <div className="admin-users-page">
+      <div className="page-header"><p className="eyebrow">Team access</p><h3>Users & callers</h3><p className="muted">Create focused caller accounts so staff can work leads without accessing business finances.</p></div>
+      {message && <p className="status-message">{message}</p>}
+      <form className="panel caller-create-panel" onSubmit={addCaller}>
+        <div><p className="eyebrow">Caller access</p><h4>Add a caller</h4><p className="muted">The caller signs in with this exact name as the ID and the initial password <strong>123456</strong>.</p></div>
+        <div className="form-grid"><label>Caller name<input required value={callerName} onChange={(event) => setCallerName(event.target.value)} /></label><label>Phone number<input value={callerPhone} onChange={(event) => setCallerPhone(event.target.value)} /></label></div>
+        <button className="btn primary" type="submit">Create caller account</button>
+      </form>
       <div className="panel">
         {users.map((user) => (
           <div className="list-row" key={user._id}>
-            <div><strong>{user.name}</strong><div>{user.email}</div></div>
-            <div>{user.role}</div>
+            <div className="admin-user-main"><strong>{user.name}</strong><div className="muted">{user.email}{user.role === 'caller' ? ' • Login with name or email' : ''}</div>{user.role === 'caller' && <div className="caller-controls"><input placeholder="Caller ID / name" value={callerEdits[user.id]?.name ?? user.name} onChange={(event) => setCallerEdits((current) => ({ ...current, [user.id]: { ...current[user.id], name: event.target.value } }))} /><input placeholder="Login email" value={callerEdits[user.id]?.email ?? user.email} onChange={(event) => setCallerEdits((current) => ({ ...current, [user.id]: { ...current[user.id], email: event.target.value } }))} /><input placeholder="New password (optional)" type="password" value={callerEdits[user.id]?.password || ''} onChange={(event) => setCallerEdits((current) => ({ ...current, [user.id]: { ...current[user.id], password: event.target.value } }))} /><button className="btn secondary" type="button" onClick={() => updateCaller(user)}>Save access</button><button className="btn danger-outline" type="button" onClick={() => removeCaller(user)}>Remove</button></div>}</div>
+            <span className={`status-badge ${user.role === 'caller' ? 'status-following-up' : 'status-may-convert'}`}>{user.role}</span>
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function WebAppSettingsPage() {
+  const defaults = { lowStockThreshold: 5, quotationValidity: 15, currency: 'INR', showPayroll: true, showAnalytics: true, compactContacts: false, autoReminder: true };
+  const [settings, setSettings] = useState(() => { try { return { ...defaults, ...JSON.parse(localStorage.getItem('sgse-web-settings') || '{}') }; } catch { return defaults; } });
+  const [message, setMessage] = useState('');
+  useEffect(() => { api.get('/users/settings').then((response) => { const next = { ...defaults, ...(response.data || {}) }; setSettings(next); localStorage.setItem('sgse-web-settings', JSON.stringify(next)); }).catch(() => setMessage('Using local settings until the server is available')); }, []);
+  const update = (field, value) => setSettings((current) => ({ ...current, [field]: value }));
+  const save = async (event) => { event.preventDefault(); try { const response = await api.put('/users/settings', settings); setSettings(response.data); localStorage.setItem('sgse-web-settings', JSON.stringify(response.data)); setMessage('Web app settings saved for this shop'); } catch (error) { setMessage(error.response?.data?.message || 'Unable to save web app settings'); } };
+  return <div className="settings-page"><div className="page-header"><p className="eyebrow">Control center</p><h3>Web app settings</h3><p className="muted">Keep the office workflow, documents, alerts, and dashboard behavior configured in one place.</p></div><form className="panel settings-panel" onSubmit={save}><div className="settings-section"><div><h4>Operations</h4><p className="muted">Defaults used across inventory and quotations.</p></div><div className="form-grid"><label>Low stock threshold<input type="number" min="0" value={settings.lowStockThreshold} onChange={(event) => update('lowStockThreshold', Number(event.target.value))} /></label><label>Quotation validity (days)<input type="number" min="1" value={settings.quotationValidity} onChange={(event) => update('quotationValidity', Number(event.target.value))} /></label><label>Currency<select value={settings.currency} onChange={(event) => update('currency', event.target.value)}><option value="INR">INR - Indian Rupee</option><option value="USD">USD - US Dollar</option></select></label></div></div><div className="settings-section"><div><h4>Workspace modules</h4><p className="muted">Choose what the admin workspace emphasizes.</p></div><div className="settings-toggle-grid"><label><input type="checkbox" checked={settings.showPayroll} onChange={(event) => update('showPayroll', event.target.checked)} /> Show payroll dashboard</label><label><input type="checkbox" checked={settings.showAnalytics} onChange={(event) => update('showAnalytics', event.target.checked)} /> Show analytics dashboard</label><label><input type="checkbox" checked={settings.compactContacts} onChange={(event) => update('compactContacts', event.target.checked)} /> Compact contacts workspace</label><label><input type="checkbox" checked={settings.autoReminder} onChange={(event) => update('autoReminder', event.target.checked)} /> Enable service reminders</label></div></div>{message && <p className="status-message">{message}</p>}<button className="btn primary" type="submit">Save web app settings</button></form></div>;
 }
 
 const emptyEmployee = {
