@@ -6,6 +6,7 @@ import { API_BASE_URL } from './config';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import { downloadInvoicePdf } from './utils/invoicePdf';
 import { calculateGstAmount, calculateTaxableValue, getEffectiveGstRate } from './utils/gstMath';
+import { calculateEmi } from './utils/emiMath';
 
 const API = API_BASE_URL;
 
@@ -312,12 +313,14 @@ function AuthenticatedApp({ user, setUser, logout }) {
             </div>
           </div>
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
+          <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/emi-calculator">EMI calculator</NavLink>
           {user.role !== 'caller' && <><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/dashboard">Dashboard</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/setups">Setup library</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/customers">Customers</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/employees">People & payroll</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/profile">Shop profile</NavLink></>}
           {user.role === 'admin' && <><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/users">Users & callers</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/settings">Web app settings</NavLink></>}
         </aside>
         <main className="content">
           <Routes>
             <Route path="/contacts" element={<ContactsPage user={user} />} />
+            <Route path="/emi-calculator" element={<EmiCalculatorPage />} />
             {user.role !== 'caller' && <><Route path="/dashboard" element={<Dashboard user={user} />} /><Route path="/items" element={<ItemsPage />} /><Route path="/stock" element={<StockPage />} /><Route path="/billing" element={<BillingPage user={user} />} /><Route path="/setups" element={<SetupLibraryPage />} /><Route path="/customers" element={<CustomersPage user={user} />} /><Route path="/accounting" element={<AccountingPage />} /><Route path="/employees" element={<EmployeesPage />} /><Route path="/reports" element={<ReportsPage />} /><Route path="/profile" element={<ShopProfilePage user={user} setUser={setUser} />} /></>}
             {user.role === 'admin' && <><Route path="/users" element={<UsersPage />} /><Route path="/settings" element={<WebAppSettingsPage />} /></>}
             <Route path="*" element={<Navigate to={user.role === 'caller' ? '/contacts' : '/dashboard'} replace />} />
@@ -3381,6 +3384,59 @@ function UsersPage() {
       </div>
     </div>
   );
+}
+
+function EmiCalculatorPage() {
+  const [form, setForm] = useState({ loanAmount: '200000', downPayment: '0', annualRate: '10.5', tenureMonths: '60', processingFeeRate: '1', extraMonthlyPayment: '0', monthlyIncome: '50000' });
+  const [compareTenure, setCompareTenure] = useState('36');
+  const [showSchedule, setShowSchedule] = useState(false);
+  const result = calculateEmi(form);
+  const compareResult = calculateEmi({ ...form, tenureMonths: compareTenure, extraMonthlyPayment: 0 });
+  const affordabilityRatio = Number(form.monthlyIncome) > 0 ? (result.emi / Number(form.monthlyIncome)) * 100 : 0;
+  const affordabilityLabel = affordabilityRatio <= 30 ? 'Comfortable range' : affordabilityRatio <= 45 ? 'Review your budget' : 'High monthly commitment';
+  const money = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const applyPreset = (preset) => setForm((current) => ({ ...current, ...preset }));
+
+  const downloadSchedule = () => {
+    const rows = [['Month', 'Opening balance', 'EMI', 'Principal', 'Interest', 'Closing balance'], ...result.schedule.map((row) => [row.month, row.openingBalance, row.emi, row.principalPaid, row.interest, row.closingBalance])];
+    const csv = rows.map((row) => row.join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'emi-amortization-schedule.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return <div className="emi-page">
+    <div className="page-header"><p className="eyebrow">Finance toolkit</p><h3>EMI calculator</h3><p className="muted">Plan solar, equipment, vehicle, or working-capital finance with a clear reducing-balance estimate.</p></div>
+    <div className="emi-layout">
+      <section className="panel emi-input-panel">
+        <div className="panel-header"><div><h4>Loan details</h4><p className="muted">Change any value to update the estimate instantly.</p></div><span className="emi-badge">Reducing balance</span></div>
+        <label>Start with a preset<select value="" onChange={(event) => { const preset = event.target.value; if (preset === 'solar') applyPreset({ loanAmount: '500000', annualRate: '9.5', tenureMonths: '84', processingFeeRate: '1' }); if (preset === 'vehicle') applyPreset({ loanAmount: '800000', annualRate: '10.5', tenureMonths: '60', processingFeeRate: '1.5' }); if (preset === 'equipment') applyPreset({ loanAmount: '300000', annualRate: '11.5', tenureMonths: '48', processingFeeRate: '1' }); }}><option value="">Choose a common plan</option><option value="solar">Solar project</option><option value="vehicle">Vehicle finance</option><option value="equipment">Equipment finance</option></select></label>
+        <div className="form-grid">
+          <label>Asset or loan amount<input type="number" min="0" step="1000" value={form.loanAmount} onChange={(event) => update('loanAmount', event.target.value)} /></label>
+          <label>Down payment<input type="number" min="0" step="1000" value={form.downPayment} onChange={(event) => update('downPayment', event.target.value)} /></label>
+          <label>Annual interest rate (%)<input type="number" min="0" step="0.01" value={form.annualRate} onChange={(event) => update('annualRate', event.target.value)} /></label>
+          <label>Tenure (months)<input type="number" min="1" step="1" value={form.tenureMonths} onChange={(event) => update('tenureMonths', event.target.value)} /></label>
+          <label>Processing fee (%)<input type="number" min="0" step="0.01" value={form.processingFeeRate} onChange={(event) => update('processingFeeRate', event.target.value)} /></label>
+          <label>Extra monthly payment<input type="number" min="0" step="500" value={form.extraMonthlyPayment} onChange={(event) => update('extraMonthlyPayment', event.target.value)} /></label>
+          <label>Monthly take-home income<input type="number" min="0" step="1000" value={form.monthlyIncome} onChange={(event) => update('monthlyIncome', event.target.value)} /></label>
+        </div>
+        <div className={`emi-affordability ${affordabilityRatio > 45 ? 'risk' : affordabilityRatio > 30 ? 'watch' : ''}`}><strong>{affordabilityLabel}</strong><span>{affordabilityRatio ? `${affordabilityRatio.toFixed(1)}% of monthly income` : 'Add income to see affordability'}</span></div>
+        <p className="muted emi-note">Extra monthly payments can shorten the payoff period. Lenders may apply taxes, insurance, rounding, or other charges separately.</p>
+      </section>
+      <section className="emi-result-panel">
+        <div className="emi-highlight"><span>Estimated monthly EMI</span><strong>{money(result.emi + result.extraMonthlyPayment)}</strong><small>{result.tenureMonths ? `${result.tenureMonths - result.monthsSaved} payments with your extra contribution` : 'Enter a valid tenure'}</small></div>
+        <div className="emi-metrics"><div><span>Loan principal</span><strong>{money(result.principal)}</strong></div><div><span>Total interest</span><strong>{money(result.totalInterest)}</strong></div><div><span>Total repayment</span><strong>{money(result.totalPayment)}</strong></div><div><span>Time saved</span><strong>{result.monthsSaved} months</strong></div></div>
+        <div className="emi-actions"><button className="btn primary" type="button" onClick={() => setShowSchedule((visible) => !visible)}>{showSchedule ? 'Hide schedule' : 'View amortization'}</button><button className="btn secondary" type="button" onClick={downloadSchedule} disabled={!result.schedule.length}>Download CSV</button><button className="btn outline" type="button" onClick={() => window.print()}>Print estimate</button></div>
+      </section>
+    </div>
+    <section className="panel emi-compare"><div className="panel-header"><div><h4>Compare a shorter tenure</h4><p className="muted">See the trade-off between a lower interest bill and a higher monthly payment.</p></div><select value={compareTenure} onChange={(event) => setCompareTenure(event.target.value)}><option value="24">24 months</option><option value="36">36 months</option><option value="48">48 months</option><option value="60">60 months</option><option value="84">84 months</option></select></div><div className="emi-compare-grid"><div><span>Current plan</span><strong>{money(result.emi)}</strong><small>{result.tenureMonths} months · {money(result.totalInterest)} interest</small></div><div className="compare-arrow">→</div><div><span>Compared plan</span><strong>{money(compareResult.emi)}</strong><small>{compareResult.tenureMonths} months · {money(compareResult.totalInterest)} interest</small></div><div className="emi-saving"><span>Interest difference</span><strong>{money(result.totalInterest - compareResult.totalInterest)}</strong><small>{compareResult.totalInterest <= result.totalInterest ? 'potential interest saved' : 'additional interest'}</small></div></div></section>
+    <section className="panel emi-breakdown"><div className="panel-header"><div><h4>Cost breakdown</h4><p className="muted">Upfront payment plus the financed repayment and fee.</p></div><strong className="emi-total-outflow">{money(result.totalOutflow)}</strong></div><div className="emi-breakdown-bar"><span style={{ width: `${result.totalOutflow ? (result.downPayment / result.totalOutflow) * 100 : 0}%` }} /><span style={{ width: `${result.totalOutflow ? (result.totalPayment / result.totalOutflow) * 100 : 0}%` }} /><span style={{ width: `${result.totalOutflow ? (result.processingFee / result.totalOutflow) * 100 : 0}%` }} /></div><div className="emi-legend"><span><i className="down-payment" /> Down payment {money(result.downPayment)}</span><span><i className="repayment" /> Repayment {money(result.totalPayment)}</span><span><i className="fee" /> Processing fee {money(result.processingFee)}</span></div></section>
+    {showSchedule && <section className="panel emi-schedule"><div className="panel-header"><div><h4>Amortization schedule</h4><p className="muted">Principal and interest by payment month.</p></div></div><div className="table-scroll"><table className="table"><thead><tr><th>Month</th><th>Opening balance</th><th>EMI</th><th>Principal</th><th>Interest</th><th>Closing balance</th></tr></thead><tbody>{result.schedule.map((row) => <tr key={row.month}><td>{row.month}</td><td>{money(row.openingBalance)}</td><td>{money(row.emi)}</td><td>{money(row.principalPaid)}</td><td>{money(row.interest)}</td><td>{money(row.closingBalance)}</td></tr>)}</tbody></table></div></section>}
+  </div>;
 }
 
 function WebAppSettingsPage() {
