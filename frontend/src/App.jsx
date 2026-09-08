@@ -428,7 +428,7 @@ function Login({ setUser }) {
     setError('');
     try {
       const res = await api.post('/auth/login', form);
-      const slides = Array.isArray(settings.heroSlides) && settings.heroSlides.length ? settings.heroSlides : DEFAULT_HERO_SLIDES;
+      const token = res?.data?.token;
       if (!token) throw new Error('No authentication token returned');
 
       localStorage.setItem('token', token);
