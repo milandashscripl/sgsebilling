@@ -324,32 +324,39 @@ function PublicApp({ setUser }) {
         {slide.imageUrl && <div className="hero-slide-image" style={{ backgroundImage: `url(${slide.imageUrl})` }} aria-hidden="true" />}
         <div className="hero-glow glow-one" />
         <div className="hero-glow glow-two" />
-        <div className="hero-logo-wrap">
-          <div className="hero-logo">SG</div>
-          <span>{settings.siteTitle}</span>
-        </div>
-        <div className="hero-badges">
-          <span className="feature-pill">GST-ready</span>
-          <span className="feature-pill soft">Inventory synced</span>
-        </div>
-        <div>
-          <p className="eyebrow">{slide.kicker} · {settings.siteTagline}</p>
-          <h1 key={activeSlide}>{slide.title}</h1>
-          <p key={`copy-${activeSlide}`}>{slide.copy}</p>
-          <ul className="feature-list">
-            <li>Fast invoice generation</li>
-            <li>Smart stock tracking</li>
-            <li>Professional GST billing</li>
-          </ul>
-          <div className="hero-actions">
-            <Link className="btn primary" to={slide.buttonLink || '/login'}>{slide.buttonLabel || copy.open}</Link>
-            <Link className="btn secondary" to="/register">{copy.register}</Link>
+        <div className="hero-copy">
+          <div className="hero-logo-wrap">
+            <div className="hero-logo">SG</div>
+            <span>{settings.siteTitle}</span>
           </div>
+          <div className="hero-badges">
+            <span className="feature-pill">GST-ready</span>
+            <span className="feature-pill soft">Inventory synced</span>
+          </div>
+          <div>
+            <p className="eyebrow">{slide.kicker} · {settings.siteTagline}</p>
+            <h1 key={activeSlide}>{slide.title}</h1>
+            <p key={`copy-${activeSlide}`}>{slide.copy}</p>
+            <ul className="feature-list">
+              <li>Fast invoice generation</li>
+              <li>Smart stock tracking</li>
+              <li>Professional GST billing</li>
+            </ul>
+            <div className="hero-actions">
+              <Link className="btn primary" to={slide.buttonLink || '/login'}>{slide.buttonLabel || copy.open}</Link>
+              <Link className="btn secondary" to="/register">{copy.register}</Link>
+            </div>
+          </div>
+          <div className="hero-slider-controls" aria-label="Hero slides"><span className="hero-slide-count">{slide.stat}</span><span className="hero-slide-accent">{slide.accent}</span><div className="hero-dots">{slides.map((item, index) => <button key={item.stat} type="button" className={index === activeSlide ? 'active' : ''} aria-label={`Show slide ${index + 1}`} aria-pressed={index === activeSlide} onClick={() => setActiveSlide(index)} />)}</div></div>
+
+          <div className="hero-stats">{stats.slice(0, 4).map((stat) => <div key={`${stat.value}-${stat.label}`}><strong>{stat.value}</strong><span>{stat.label}</span></div>)}</div>
         </div>
-
-        <div className="hero-slider-controls" aria-label="Hero slides"><span className="hero-slide-count">{slide.stat}</span><span className="hero-slide-accent">{slide.accent}</span><div className="hero-dots">{slides.map((item, index) => <button key={item.stat} type="button" className={index === activeSlide ? 'active' : ''} aria-label={`Show slide ${index + 1}`} aria-pressed={index === activeSlide} onClick={() => setActiveSlide(index)} />)}</div></div>
-
-        <div className="hero-stats">{stats.slice(0, 4).map((stat) => <div key={`${stat.value}-${stat.label}`}><strong>{stat.value}</strong><span>{stat.label}</span></div>)}</div>
+        <div className="hero-preview" aria-label="Workspace preview">
+          <div className="preview-window-bar"><span /><span /><span /><small>Today&apos;s workspace</small></div>
+          <div className="preview-heading"><div><span>Overview</span><strong>Everything in motion</strong></div><b>Live</b></div>
+          <div className="preview-metrics">{stats.slice(0, 3).map((stat) => <div key={`preview-${stat.value}-${stat.label}`}><small>{stat.label}</small><strong>{stat.value}</strong><i /></div>)}</div>
+          <div className="preview-activity"><div className="preview-activity-heading"><span>Recent activity</span><small>Updated now</small></div><div><b className="preview-dot green" /><span>New invoice ready</span><strong>Paid</strong></div><div><b className="preview-dot gold" /><span>Caller queue assigned</span><strong>12 leads</strong></div><div><b className="preview-dot blue" /><span>Stock is up to date</span><strong>Synced</strong></div></div>
+        </div>
       </div>
 
       <section className="public-proof-strip"><span>Designed for the work between the big moments</span><strong>GST-ready</strong><strong>Caller-friendly</strong><strong>Finance-aware</strong><strong>Built to scale</strong></section>
