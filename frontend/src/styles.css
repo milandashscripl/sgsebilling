@@ -1429,6 +1429,75 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #3F9AE8
 .caller-queue-banner small { color: #60756a; }
 @media (max-width: 760px) { .caller-sync-panel { align-items: stretch; flex-direction: column; } .caller-controls { grid-template-columns: 1fr; } }
 
+/* Caller filter panel */
+.caller-tabs {
+  position: relative;
+  align-items: center;
+  gap: 9px;
+  margin-top: 2px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(46,139,98,0.16);
+  border-radius: 18px;
+  background: linear-gradient(120deg, rgba(236,248,240,0.96), rgba(255,253,242,0.96));
+  box-shadow: 0 10px 24px rgba(31,91,67,0.07);
+}
+.caller-tabs::before {
+  content: '';
+  position: absolute;
+  top: -42px;
+  right: 8%;
+  width: 160px;
+  height: 100px;
+  border-radius: 50%;
+  background: rgba(213,138,18,0.12);
+  filter: blur(10px);
+  pointer-events: none;
+}
+.caller-tabs-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 5px;
+  color: #245b45;
+}
+.caller-tabs-label::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2e8b62;
+  box-shadow: 0 0 0 5px rgba(46,139,98,0.12);
+  animation: callerStatusPulse 2.2s ease-in-out infinite;
+}
+.caller-tabs .btn {
+  position: relative;
+  z-index: 1;
+  border-color: rgba(46,139,98,0.22);
+  color: #286448;
+  background: rgba(255,255,255,0.68);
+  box-shadow: 0 2px 5px rgba(31,91,67,0.04);
+  animation: callerChipIn 0.42s ease both;
+}
+.caller-tabs .btn:nth-of-type(2) { animation-delay: 0.05s; }
+.caller-tabs .btn:nth-of-type(3) { animation-delay: 0.1s; }
+.caller-tabs .btn:nth-of-type(4) { animation-delay: 0.15s; }
+.caller-tabs .btn:nth-of-type(5) { animation-delay: 0.2s; }
+.caller-tabs .btn:nth-of-type(6) { animation-delay: 0.25s; }
+.caller-tabs .btn:hover { transform: translateY(-2px); border-color: rgba(46,139,98,0.42); background: #fff; box-shadow: 0 7px 14px rgba(31,91,67,0.11); }
+.caller-tabs .btn.primary { border-color: #2e8b62; background: linear-gradient(135deg, #2e8b62, #3da979); color: #fff; box-shadow: 0 6px 14px rgba(46,139,98,0.24); }
+.caller-tabs .btn.primary:hover { background: linear-gradient(135deg, #267653, #359768); }
+
+@keyframes callerChipIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes callerStatusPulse {
+  0%, 100% { box-shadow: 0 0 0 5px rgba(46,139,98,0.12); }
+  50% { box-shadow: 0 0 0 8px rgba(46,139,98,0.04); }
+}
+
 /* Keep the workspace chrome in place while the active view scrolls. */
 @media (min-width: 901px) {
   .app-shell { padding-top: 112px; }
