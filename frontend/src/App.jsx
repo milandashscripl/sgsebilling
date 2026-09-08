@@ -217,7 +217,7 @@ function App() {
   );
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${user ? 'workspace-shell' : 'public-shell'}`}>
       <ErrorBoundary>
         {user ? <AuthenticatedApp user={user} setUser={setUser} logout={logout} /> : <PublicApp setUser={setUser} />}
       </ErrorBoundary>
