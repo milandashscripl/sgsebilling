@@ -238,15 +238,77 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+function AuroraCanvas() {
+  const canvasRef = React.useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const context = canvas.getContext('2d');
+    const particles = Array.from({ length: 34 }, (_, index) => ({
+      x: (index * 83) % 1000,
+      y: (index * 47) % 650,
+      radius: 1.5 + (index % 4) * 0.7,
+      speed: 0.08 + (index % 5) * 0.025,
+      phase: index * 0.7
+    }));
+    let animationFrame = 0;
+    const resize = () => {
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = canvas.clientWidth * pixelRatio;
+      canvas.height = canvas.clientHeight * pixelRatio;
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    };
+    const draw = (time) => {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      context.clearRect(0, 0, width, height);
+      const glow = context.createRadialGradient(width * 0.72, height * 0.22, 0, width * 0.72, height * 0.22, width * 0.6);
+      glow.addColorStop(0, 'rgba(91, 210, 198, 0.18)');
+      glow.addColorStop(1, 'rgba(91, 210, 198, 0)');
+      context.fillStyle = glow;
+      context.fillRect(0, 0, width, height);
+      particles.forEach((particle) => {
+        const x = (particle.x + time * particle.speed) % (width + 30) - 15;
+        const y = particle.y + Math.sin(time * 0.0005 + particle.phase) * 18;
+        context.beginPath();
+        context.arc(x, y, particle.radius, 0, Math.PI * 2);
+        context.fillStyle = 'rgba(197, 243, 239, 0.55)';
+        context.fill();
+      });
+      animationFrame = requestAnimationFrame(draw);
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    animationFrame = requestAnimationFrame(draw);
+    return () => { cancelAnimationFrame(animationFrame); window.removeEventListener('resize', resize); };
+  }, []);
+
+  return <canvas className="aurora-canvas" ref={canvasRef} aria-hidden="true" />;
+}
+
 function PublicApp({ setUser }) {
   const location = useLocation();
   const authRoute = location.pathname === '/login' || location.pathname === '/register';
   const [settings, setSettings] = useState(() => ({ ...DEFAULT_WEB_SETTINGS, ...(() => { try { return JSON.parse(localStorage.getItem('sgse-web-settings') || '{}'); } catch { return {}; } })() }));
+  const [activeSlide, setActiveSlide] = useState(0);
   useEffect(() => { api.get('/users/public-settings').then((response) => setSettings((current) => ({ ...current, ...(response.data || {}) }))).catch(() => {}); }, []);
+  const slides = [
+    { kicker: 'The daily command center', title: 'Make every sale feel organised.', copy: 'Invoices, stock, GST, contacts, and follow-ups move together so your team can focus on customers.', stat: '01 / 03', accent: 'Billing that keeps pace' },
+    { kicker: 'From first call to final payment', title: 'Turn busy work into a clear pipeline.', copy: 'Give callers a focused workspace and give admins the visibility to act before good leads go cold.', stat: '02 / 03', accent: 'People-first operations' },
+    { kicker: 'Numbers you can trust', title: 'See the health of your business at a glance.', copy: 'Accounting, reports, payroll, and planning tools give every decision a useful next step.', stat: '03 / 03', accent: 'A calmer way to grow' }
+  ];
+  useEffect(() => {
+    if (authRoute || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const timer = window.setInterval(() => setActiveSlide((current) => (current + 1) % slides.length), 6500);
+    return () => window.clearInterval(timer);
+  }, [authRoute, slides.length]);
+  const slide = slides[activeSlide];
   return (
-    <div className={`public-site ${authRoute ? 'auth-route' : ''}`}>
+    <div id="top" className={`public-site ${authRoute ? 'auth-route' : ''}`}>
       <header className="public-nav"><a className="public-brand" href="#top"><span className="public-brand-mark">SG</span><span>{settings.siteTitle}</span></a><nav><a href="#about">About</a><a href="#contact">Contact</a><Link className="btn primary" to="/login">Login</Link></nav></header>
       <div className="hero-card">
+        <AuroraCanvas />
         <div className="hero-glow glow-one" />
         <div className="hero-glow glow-two" />
         <div className="hero-logo-wrap">
@@ -258,9 +320,9 @@ function PublicApp({ setUser }) {
           <span className="feature-pill soft">Inventory synced</span>
         </div>
         <div>
-          <p className="eyebrow">{settings.siteTagline}</p>
-          <h1>{settings.siteTitle}</h1>
-          <p>{settings.siteDescription}</p>
+          <p className="eyebrow">{slide.kicker} · {settings.siteTagline}</p>
+          <h1 key={activeSlide}>{slide.title}</h1>
+          <p key={`copy-${activeSlide}`}>{slide.copy}</p>
           <ul className="feature-list">
             <li>Fast invoice generation</li>
             <li>Smart stock tracking</li>
@@ -271,6 +333,8 @@ function PublicApp({ setUser }) {
             <Link className="btn secondary" to="/register">Create account</Link>
           </div>
         </div>
+
+        <div className="hero-slider-controls" aria-label="Hero slides"><span className="hero-slide-count">{slide.stat}</span><span className="hero-slide-accent">{slide.accent}</span><div className="hero-dots">{slides.map((item, index) => <button key={item.stat} type="button" className={index === activeSlide ? 'active' : ''} aria-label={`Show slide ${index + 1}`} aria-pressed={index === activeSlide} onClick={() => setActiveSlide(index)} />)}</div></div>
 
         <div className="hero-stats">
           <div>
@@ -287,6 +351,8 @@ function PublicApp({ setUser }) {
           </div>
         </div>
       </div>
+
+      <section className="public-proof-strip"><span>Designed for the work between the big moments</span><strong>GST-ready</strong><strong>Caller-friendly</strong><strong>Finance-aware</strong><strong>Built to scale</strong></section>
 
       {settings.showPublicAbout !== false && <section className="public-section public-about" id="about"><div><p className="eyebrow">One workspace, less friction</p><h2>{settings.aboutTitle}</h2></div><p>{settings.aboutText}</p><div className="public-feature-grid"><div><strong>Billing</strong><span>GST-ready invoices and clean payment tracking.</span></div><div><strong>Operations</strong><span>Stock, contacts, callers, and payroll in one view.</span></div><div><strong>Finance</strong><span>Reports, accounts, and planning tools for every day.</span></div></div></section>}
 
