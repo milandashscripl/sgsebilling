@@ -100,6 +100,20 @@ router.delete('/callers/:id', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
+router.get('/public-settings', async (req, res) => {
+  try {
+    const query = req.query.ownerId ? { _id: req.query.ownerId } : { role: 'admin' };
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findOne(query).select('appSettings shopName shopAddress phone email shopLogoUrl').lean();
+      return res.json({ ...(user?.appSettings || {}), shopName: user?.shopName, shopAddress: user?.shopAddress, phone: user?.phone, email: user?.email, shopLogoUrl: user?.shopLogoUrl });
+    }
+    const user = authStore.users.find((entry) => query._id ? String(entry.id) === String(query._id) : entry.role === 'admin');
+    res.json({ ...(user?.appSettings || {}), shopName: user?.shopName, shopAddress: user?.shopAddress, phone: user?.phone, email: user?.email, shopLogoUrl: user?.shopLogoUrl });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.get('/settings', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
   if (mongoose.connection.readyState === 1) {
@@ -111,7 +125,30 @@ router.get('/settings', auth, async (req, res) => {
 
 router.put('/settings', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
-  const settings = { lowStockThreshold: Math.max(0, Number(req.body.lowStockThreshold ?? 5)), quotationValidity: Math.max(1, Number(req.body.quotationValidity ?? 15)), currency: req.body.currency || 'INR', showPayroll: req.body.showPayroll !== false, showAnalytics: req.body.showAnalytics !== false, compactContacts: req.body.compactContacts === true, autoReminder: req.body.autoReminder !== false };
+  const settings = {
+    lowStockThreshold: Math.max(0, Number(req.body.lowStockThreshold ?? 5)),
+    quotationValidity: Math.max(1, Number(req.body.quotationValidity ?? 15)),
+    currency: req.body.currency || 'INR',
+    showPayroll: req.body.showPayroll !== false,
+    showAnalytics: req.body.showAnalytics !== false,
+    compactContacts: req.body.compactContacts === true,
+    autoReminder: req.body.autoReminder !== false,
+    siteTitle: String(req.body.siteTitle || 'SGSE Billing Suite').trim(),
+    siteTagline: String(req.body.siteTagline || 'Modern billing and stock management').trim(),
+    siteDescription: String(req.body.siteDescription || 'Run sales, stock, purchases, and GST workflows from one professional workspace.').trim(),
+    aboutTitle: String(req.body.aboutTitle || 'Built for busy business teams').trim(),
+    aboutText: String(req.body.aboutText || 'Keep billing, contacts, stock, finance, and team operations moving from one reliable workspace.').trim(),
+    contactCta: String(req.body.contactCta || 'Talk to our team').trim(),
+    publicPhone: String(req.body.publicPhone || '').trim(),
+    publicEmail: String(req.body.publicEmail || '').trim(),
+    primaryColor: /^#[0-9a-f]{6}$/i.test(req.body.primaryColor) ? req.body.primaryColor : '#186FAF',
+    accentColor: /^#[0-9a-f]{6}$/i.test(req.body.accentColor) ? req.body.accentColor : '#E59D2D',
+    surfaceColor: /^#[0-9a-f]{6}$/i.test(req.body.surfaceColor) ? req.body.surfaceColor : '#F6F9FC',
+    darkMode: req.body.darkMode === true,
+    showCalculator: req.body.showCalculator !== false,
+    showPublicContact: req.body.showPublicContact !== false,
+    showPublicAbout: req.body.showPublicAbout !== false
+  };
   if (mongoose.connection.readyState === 1) await User.findByIdAndUpdate(req.user._id, { appSettings: settings });
   else { const user = authStore.findUserById(req.user._id); if (user) user.appSettings = settings; }
   res.json(settings);

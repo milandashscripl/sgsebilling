@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Routes, Route, Navigate, Link, NavLink, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
@@ -45,6 +45,7 @@ const emptyCategoryForm = {
 
 const LEAD_STATUS_OPTIONS = ['Not Yet Called', 'No Response', 'Hot Lead', 'Warm Lead', 'Cool Lead', 'Immediate', 'May Convert', 'Following Up', 'Converted', 'Blacklisted', 'Not Interested'];
 const getWebSetting = (key, fallback) => { try { return JSON.parse(localStorage.getItem('sgse-web-settings') || '{}')[key] ?? fallback; } catch { return fallback; } };
+const DEFAULT_WEB_SETTINGS = { siteTitle: 'SGSE Billing Suite', siteTagline: 'Modern billing and stock management', siteDescription: 'Run sales, stock, purchases, and GST workflows from one professional workspace.', aboutTitle: 'Built for busy business teams', aboutText: 'Keep billing, contacts, stock, finance, and team operations moving from one reliable workspace.', contactCta: 'Talk to our team', primaryColor: '#186FAF', accentColor: '#E59D2D', surfaceColor: '#F6F9FC', darkMode: false, showCalculator: true, showPublicContact: true, showPublicAbout: true };
 
 const toLocalDateTimeValue = (date = new Date()) => {
   const pad = (value) => String(value).padStart(2, '0');
@@ -172,6 +173,17 @@ function App() {
     `);
   }, [user]);
 
+  useEffect(() => {
+    api.get('/users/public-settings').then((response) => {
+      const settings = { ...DEFAULT_WEB_SETTINGS, ...(response.data || {}) };
+      localStorage.setItem('sgse-web-settings', JSON.stringify(settings));
+      document.documentElement.style.setProperty('--brand-primary', settings.primaryColor);
+      document.documentElement.style.setProperty('--brand-accent', settings.accentColor);
+      document.documentElement.style.setProperty('--site-surface', settings.surfaceColor);
+      document.documentElement.classList.toggle('theme-dark', settings.darkMode === true);
+    }).catch(() => {});
+  }, []);
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -227,23 +239,28 @@ class ErrorBoundary extends React.Component {
 }
 
 function PublicApp({ setUser }) {
+  const location = useLocation();
+  const authRoute = location.pathname === '/login' || location.pathname === '/register';
+  const [settings, setSettings] = useState(() => ({ ...DEFAULT_WEB_SETTINGS, ...(() => { try { return JSON.parse(localStorage.getItem('sgse-web-settings') || '{}'); } catch { return {}; } })() }));
+  useEffect(() => { api.get('/users/public-settings').then((response) => setSettings((current) => ({ ...current, ...(response.data || {}) }))).catch(() => {}); }, []);
   return (
-    <div className="public-screen">
+    <div className={`public-site ${authRoute ? 'auth-route' : ''}`}>
+      <header className="public-nav"><a className="public-brand" href="#top"><span className="public-brand-mark">SG</span><span>{settings.siteTitle}</span></a><nav><a href="#about">About</a><a href="#contact">Contact</a><Link className="btn primary" to="/login">Login</Link></nav></header>
       <div className="hero-card">
         <div className="hero-glow glow-one" />
         <div className="hero-glow glow-two" />
         <div className="hero-logo-wrap">
           <div className="hero-logo">SG</div>
-          <span>SGSE</span>
+          <span>{settings.siteTitle}</span>
         </div>
         <div className="hero-badges">
           <span className="feature-pill">GST-ready</span>
           <span className="feature-pill soft">Inventory synced</span>
         </div>
         <div>
-          <p className="eyebrow">Modern billing & stock management</p>
-          <h1>SGSE Billing Suite</h1>
-          <p>Run your sales, stock, purchases, and GST workflows from one premium business dashboard.</p>
+          <p className="eyebrow">{settings.siteTagline}</p>
+          <h1>{settings.siteTitle}</h1>
+          <p>{settings.siteDescription}</p>
           <ul className="feature-list">
             <li>Fast invoice generation</li>
             <li>Smart stock tracking</li>
@@ -271,12 +288,16 @@ function PublicApp({ setUser }) {
         </div>
       </div>
 
+      {settings.showPublicAbout !== false && <section className="public-section public-about" id="about"><div><p className="eyebrow">One workspace, less friction</p><h2>{settings.aboutTitle}</h2></div><p>{settings.aboutText}</p><div className="public-feature-grid"><div><strong>Billing</strong><span>GST-ready invoices and clean payment tracking.</span></div><div><strong>Operations</strong><span>Stock, contacts, callers, and payroll in one view.</span></div><div><strong>Finance</strong><span>Reports, accounts, and planning tools for every day.</span></div></div></section>}
+
+      {settings.showPublicContact !== false && <section className="public-section public-contact" id="contact"><div><p className="eyebrow">Ready when you are</p><h2>{settings.contactCta}</h2><p>Connect with the SGSE team to set up your workspace.</p></div><div className="public-contact-details"><a href={`tel:${settings.publicPhone || ''}`}>{settings.publicPhone || 'Phone available after sign-in'}</a><a href={`mailto:${settings.publicEmail || ''}`}>{settings.publicEmail || 'Email available after sign-in'}</a><Link className="btn primary" to="/login">Open your workspace</Link></div></section>}
+
       <div className="auth-panel">
         <div className="auth-ambient" />
         <Routes>
           <Route path="/login" element={<Login setUser={setUser} />} />
           <Route path="/register" element={<Register setUser={setUser} />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={null} />
         </Routes>
       </div>
     </div>
@@ -3440,13 +3461,18 @@ function EmiCalculatorPage() {
 }
 
 function WebAppSettingsPage() {
-  const defaults = { lowStockThreshold: 5, quotationValidity: 15, currency: 'INR', showPayroll: true, showAnalytics: true, compactContacts: false, autoReminder: true };
+  const defaults = { ...DEFAULT_WEB_SETTINGS, lowStockThreshold: 5, quotationValidity: 15, currency: 'INR', showPayroll: true, showAnalytics: true, compactContacts: false, autoReminder: true, publicPhone: '', publicEmail: '' };
   const [settings, setSettings] = useState(() => { try { return { ...defaults, ...JSON.parse(localStorage.getItem('sgse-web-settings') || '{}') }; } catch { return defaults; } });
   const [message, setMessage] = useState('');
   useEffect(() => { api.get('/users/settings').then((response) => { const next = { ...defaults, ...(response.data || {}) }; setSettings(next); localStorage.setItem('sgse-web-settings', JSON.stringify(next)); }).catch(() => setMessage('Using local settings until the server is available')); }, []);
   const update = (field, value) => setSettings((current) => ({ ...current, [field]: value }));
-  const save = async (event) => { event.preventDefault(); try { const response = await api.put('/users/settings', settings); setSettings(response.data); localStorage.setItem('sgse-web-settings', JSON.stringify(response.data)); setMessage('Web app settings saved for this shop'); } catch (error) { setMessage(error.response?.data?.message || 'Unable to save web app settings'); } };
-  return <div className="settings-page"><div className="page-header"><p className="eyebrow">Control center</p><h3>Web app settings</h3><p className="muted">Keep the office workflow, documents, alerts, and dashboard behavior configured in one place.</p></div><form className="panel settings-panel" onSubmit={save}><div className="settings-section"><div><h4>Operations</h4><p className="muted">Defaults used across inventory and quotations.</p></div><div className="form-grid"><label>Low stock threshold<input type="number" min="0" value={settings.lowStockThreshold} onChange={(event) => update('lowStockThreshold', Number(event.target.value))} /></label><label>Quotation validity (days)<input type="number" min="1" value={settings.quotationValidity} onChange={(event) => update('quotationValidity', Number(event.target.value))} /></label><label>Currency<select value={settings.currency} onChange={(event) => update('currency', event.target.value)}><option value="INR">INR - Indian Rupee</option><option value="USD">USD - US Dollar</option></select></label></div></div><div className="settings-section"><div><h4>Workspace modules</h4><p className="muted">Choose what the admin workspace emphasizes.</p></div><div className="settings-toggle-grid"><label><input type="checkbox" checked={settings.showPayroll} onChange={(event) => update('showPayroll', event.target.checked)} /> Show payroll dashboard</label><label><input type="checkbox" checked={settings.showAnalytics} onChange={(event) => update('showAnalytics', event.target.checked)} /> Show analytics dashboard</label><label><input type="checkbox" checked={settings.compactContacts} onChange={(event) => update('compactContacts', event.target.checked)} /> Compact contacts workspace</label><label><input type="checkbox" checked={settings.autoReminder} onChange={(event) => update('autoReminder', event.target.checked)} /> Enable service reminders</label></div></div>{message && <p className="status-message">{message}</p>}<button className="btn primary" type="submit">Save web app settings</button></form></div>;
+  const save = async (event) => { event.preventDefault(); try { const response = await api.put('/users/settings', settings); setSettings(response.data); localStorage.setItem('sgse-web-settings', JSON.stringify(response.data)); previewTheme(); setMessage('Web app settings saved for this shop'); } catch (error) { setMessage(error.response?.data?.message || 'Unable to save web app settings'); } };
+  const previewTheme = () => { document.documentElement.style.setProperty('--brand-primary', settings.primaryColor); document.documentElement.style.setProperty('--brand-accent', settings.accentColor); document.documentElement.style.setProperty('--site-surface', settings.surfaceColor); document.documentElement.classList.toggle('theme-dark', settings.darkMode); };
+  return <div className="settings-page"><div className="page-header"><p className="eyebrow">Control center</p><h3>Web app settings</h3><p className="muted">Control the workspace, public website, navigation, and visual identity from one place.</p></div><form className="panel settings-panel" onSubmit={save}>
+    <div className="settings-section"><div><h4>Brand and public website</h4><p className="muted">These fields shape the indexed home page visitors see before login.</p></div><div className="form-grid"><label>Website title<input value={settings.siteTitle} onChange={(event) => update('siteTitle', event.target.value)} /></label><label>Hero tagline<input value={settings.siteTagline} onChange={(event) => update('siteTagline', event.target.value)} /></label><label className="span-full">Hero description<textarea value={settings.siteDescription} onChange={(event) => update('siteDescription', event.target.value)} /></label><label>About heading<input value={settings.aboutTitle} onChange={(event) => update('aboutTitle', event.target.value)} /></label><label>About copy<textarea value={settings.aboutText} onChange={(event) => update('aboutText', event.target.value)} /></label><label>Contact CTA<input value={settings.contactCta} onChange={(event) => update('contactCta', event.target.value)} /></label><label>Public phone<input value={settings.publicPhone} onChange={(event) => update('publicPhone', event.target.value)} /></label><label>Public email<input type="email" value={settings.publicEmail} onChange={(event) => update('publicEmail', event.target.value)} /></label></div></div>
+    <div className="settings-section"><div><h4>Theme and appearance</h4><p className="muted">Preview the visual identity immediately, then save it for every visitor.</p></div><div className="theme-control-grid"><label>Primary color<span className="color-control"><input type="color" value={settings.primaryColor} onChange={(event) => { update('primaryColor', event.target.value); previewTheme(); }} /><input value={settings.primaryColor} onChange={(event) => update('primaryColor', event.target.value)} /></span></label><label>Accent color<span className="color-control"><input type="color" value={settings.accentColor} onChange={(event) => { update('accentColor', event.target.value); previewTheme(); }} /><input value={settings.accentColor} onChange={(event) => update('accentColor', event.target.value)} /></span></label><label>Surface color<span className="color-control"><input type="color" value={settings.surfaceColor} onChange={(event) => { update('surfaceColor', event.target.value); previewTheme(); }} /><input value={settings.surfaceColor} onChange={(event) => update('surfaceColor', event.target.value)} /></span></label></div><div className="settings-toggle-grid"><label><input type="checkbox" checked={settings.darkMode} onChange={(event) => { update('darkMode', event.target.checked); previewTheme(); }} /> Use dark theme</label><label><input type="checkbox" checked={settings.showPublicAbout} onChange={(event) => update('showPublicAbout', event.target.checked)} /> Show about section</label><label><input type="checkbox" checked={settings.showPublicContact} onChange={(event) => update('showPublicContact', event.target.checked)} /> Show contact section</label><label><input type="checkbox" checked={settings.showCalculator} onChange={(event) => update('showCalculator', event.target.checked)} /> Show EMI calculator link</label></div></div>
+    <div className="settings-section"><div><h4>Operations and modules</h4><p className="muted">Set defaults and decide which workspace tools remain visible.</p></div><div className="form-grid"><label>Low stock threshold<input type="number" min="0" value={settings.lowStockThreshold} onChange={(event) => update('lowStockThreshold', Number(event.target.value))} /></label><label>Quotation validity (days)<input type="number" min="1" value={settings.quotationValidity} onChange={(event) => update('quotationValidity', Number(event.target.value))} /></label><label>Currency<select value={settings.currency} onChange={(event) => update('currency', event.target.value)}><option value="INR">INR - Indian Rupee</option><option value="USD">USD - US Dollar</option></select></label></div><div className="settings-toggle-grid"><label><input type="checkbox" checked={settings.showPayroll} onChange={(event) => update('showPayroll', event.target.checked)} /> Show payroll dashboard</label><label><input type="checkbox" checked={settings.showAnalytics} onChange={(event) => update('showAnalytics', event.target.checked)} /> Show analytics dashboard</label><label><input type="checkbox" checked={settings.compactContacts} onChange={(event) => update('compactContacts', event.target.checked)} /> Compact contacts workspace</label><label><input type="checkbox" checked={settings.autoReminder} onChange={(event) => update('autoReminder', event.target.checked)} /> Enable service reminders</label></div></div>
+    {message && <p className="status-message">{message}</p>}<div className="settings-actions"><button className="btn primary" type="submit">Save all settings</button><button className="btn outline" type="button" onClick={() => { setSettings(defaults); previewTheme(); }}>Reset form</button></div></form></div>;
 }
 
 const emptyEmployee = {
