@@ -325,10 +325,6 @@ function PublicApp({ setUser }) {
         <div className="hero-glow glow-one" />
         <div className="hero-glow glow-two" />
         <div className="hero-copy">
-          <div className="hero-logo-wrap">
-            <div className="hero-logo">SG</div>
-            <span>{settings.siteTitle}</span>
-          </div>
           <div className="hero-badges">
             <span className="feature-pill">GST-ready</span>
             <span className="feature-pill soft">Inventory synced</span>
@@ -344,7 +340,7 @@ function PublicApp({ setUser }) {
             </ul>
             <div className="hero-actions">
               <Link className="btn primary" to={slide.buttonLink || '/login'}>{slide.buttonLabel || copy.open}</Link>
-              <Link className="btn secondary" to="/register">{copy.register}</Link>
+              {slide.buttonLink !== '/register' && <Link className="btn secondary" to="/register">{copy.register}</Link>}
             </div>
           </div>
           <div className="hero-slider-controls" aria-label="Hero slides"><span className="hero-slide-count">{slide.stat}</span><span className="hero-slide-accent">{slide.accent}</span><div className="hero-dots">{slides.map((item, index) => <button key={item.stat} type="button" className={index === activeSlide ? 'active' : ''} aria-label={`Show slide ${index + 1}`} aria-pressed={index === activeSlide} onClick={() => setActiveSlide(index)} />)}</div></div>

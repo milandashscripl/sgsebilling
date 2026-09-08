@@ -1811,8 +1811,13 @@ body { background: radial-gradient(circle at 8% 0%, rgba(242,189,69,0.16), trans
   .public-shell .hero-card h1 { font-size: clamp(2.8rem, 8vw, 4.5rem); }
 }
 @media (max-width: 560px) {
-  .public-shell .hero-card { padding: 132px 20px 28px; row-gap: 24px; }
-  .public-shell .hero-logo-wrap { margin-bottom: 16px; }
+  .public-shell .public-nav { position: absolute; top: 12px; left: 12px; right: 12px; flex-direction: row; align-items: center; padding: 9px 10px; }
+  .public-shell .public-brand { min-width: 0; gap: 8px; font-size: 0.82rem; }
+  .public-shell .public-brand-mark { width: 34px; height: 34px; border-radius: 10px; }
+  .public-shell .public-nav nav { width: auto; gap: 0; }
+  .public-shell .public-nav nav > a:not(.btn) { display: none; }
+  .public-shell .public-nav .btn { padding: 9px 14px; font-size: 0.8rem; }
+  .public-shell .hero-card { padding: 112px 20px 28px; row-gap: 24px; }
   .public-shell .hero-card h1 { font-size: clamp(2.45rem, 13vw, 3.45rem); }
   .public-shell .feature-list { grid-template-columns: 1fr; gap: 7px; }
   .public-shell .hero-actions { display: grid; grid-template-columns: 1fr; gap: 9px; }
