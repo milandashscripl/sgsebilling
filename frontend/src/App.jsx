@@ -217,7 +217,7 @@ function App() {
   );
 
   return (
-    <div className={`app-shell ${user ? 'workspace-shell' : 'public-shell'}`}>
+    <div className={`app-shell ${user ? 'workspace-shell' : 'public-shell'} ${user?.role === 'caller' ? 'caller-shell' : ''}`}>
       <ErrorBoundary>
         {user ? <AuthenticatedApp user={user} setUser={setUser} logout={logout} /> : <PublicApp setUser={setUser} />}
       </ErrorBoundary>
@@ -381,7 +381,7 @@ function AuthenticatedApp({ user, setUser, logout }) {
           {user.shopLogoUrl ? <img src={user.shopLogoUrl} alt={user.shopName || 'Shop logo'} style={{ width: 34, height: 34, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }} /> : <span className="sidebar-brand-mark" style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 }}>{(user.shopName || 'SG').slice(0, 2).toUpperCase()}</span>}
           <div>
             <h2>{user.shopName || 'SGSE Billing'}</h2>
-            <p>{user.role === 'admin' ? 'Admin control center' : 'Sales and inventory workspace'}</p>
+            <p>{user.role === 'admin' ? 'Admin control center' : user.role === 'caller' ? 'Caller workspace' : 'Sales and inventory workspace'}</p>
           </div>
         </div>
         <div className="topbar-actions">
@@ -391,7 +391,7 @@ function AuthenticatedApp({ user, setUser, logout }) {
       </nav>
       <div className="dashboard-shell">
         {sidebarOpen && <button className="sidebar-backdrop" type="button" aria-label="Close navigation" onClick={closeSidebar} />}
-        <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <aside className={`sidebar ${user.role === 'caller' ? 'caller-sidebar' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}>
           <div className="sidebar-brand">
             {user.shopLogoUrl ? <img src={user.shopLogoUrl} alt={user.shopName || 'Shop logo'} style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'cover' }} /> : <span className="sidebar-brand-mark">{(user.shopName || 'SG').slice(0, 2).toUpperCase()}</span>}
             <div>
@@ -399,6 +399,7 @@ function AuthenticatedApp({ user, setUser, logout }) {
               <small>Business hub</small>
             </div>
           </div>
+          {user.role === 'caller' && <div className="caller-sidebar-card"><div className="caller-sidebar-avatar">{(user.name || 'C').slice(0, 1).toUpperCase()}</div><div><span>Caller workspace</span><strong>{user.name}</strong><small>Ready for today&apos;s queue</small></div></div>}
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/emi-calculator">EMI calculator</NavLink>
           {user.role !== 'caller' && <><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/dashboard">Dashboard</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/setups">Setup library</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/customers">Customers</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/employees">People & payroll</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/profile">Shop profile</NavLink></>}

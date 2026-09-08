@@ -1654,3 +1654,83 @@ body { background: radial-gradient(circle at 8% 0%, rgba(242,189,69,0.16), trans
   .public-shell .hero-stats span { font-size: 0.65rem; }
   .public-shell .public-proof-strip, .public-shell .public-section { margin-top: 16px; }
 }
+
+/* Caller workspace composition */
+.caller-shell { background: radial-gradient(circle at 72% 0%, rgba(242,189,69,0.13), transparent 25%), #f5f8f1; }
+.caller-shell .topbar { background: rgba(255,253,244,0.97); border-bottom-color: rgba(31,91,67,0.2); }
+.caller-shell .topbar h2 { color: var(--brand-green-deep); }
+.caller-shell .topbar p { color: var(--text-muted); }
+.caller-sidebar { background: linear-gradient(165deg, #123a2b 0%, #0d2c22 62%, #183f2e 100%); }
+.caller-sidebar .sidebar-brand { border-bottom-color: rgba(242,189,69,0.2); }
+.caller-sidebar-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 4px 0 6px;
+  padding: 13px 12px;
+  border: 1px solid rgba(242,189,69,0.22);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(242,189,69,0.18), rgba(255,255,255,0.05));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  animation: callerSidebarReveal 0.55s ease both;
+}
+.caller-sidebar-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #f7cf67, #e59d2d);
+  color: #173126;
+  font-size: 1rem;
+  font-weight: 900;
+}
+.caller-sidebar-card > div:last-child { display: grid; gap: 1px; min-width: 0; }
+.caller-sidebar-card span { color: #f7cf67; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.caller-sidebar-card strong { overflow: hidden; color: #fffdf2; text-overflow: ellipsis; white-space: nowrap; }
+.caller-sidebar-card small { color: rgba(226,239,255,0.68); font-size: 0.72rem; }
+.caller-sidebar .sidebar-link { border-color: transparent; background: rgba(255,255,255,0.035); }
+.caller-sidebar .sidebar-link.active { background: linear-gradient(135deg, #2e8b62, #d6a333); box-shadow: 0 12px 22px rgba(31,91,67,0.34); }
+.caller-shell .contacts-header {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 0;
+  padding: 26px 28px;
+  border: 1px solid rgba(46,139,98,0.16);
+  border-radius: 24px;
+  background: linear-gradient(125deg, #123a2b 0%, #286f50 68%, #e2ad3e 145%);
+  box-shadow: 0 18px 34px rgba(31,91,67,0.18);
+  animation: callerIndexReveal 0.55s ease both;
+}
+.caller-shell .contacts-header::after {
+  content: '';
+  position: absolute;
+  right: -34px;
+  bottom: -72px;
+  width: 210px;
+  height: 210px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 50%;
+  box-shadow: 0 0 0 22px rgba(255,255,255,0.04), 0 0 0 44px rgba(255,255,255,0.035);
+  pointer-events: none;
+}
+.caller-shell .contacts-header > div:first-child { position: relative; z-index: 1; }
+.caller-shell .contacts-header .eyebrow { color: #f7cf67; }
+.caller-shell .contacts-header h3 { color: #fffdf2; font-size: clamp(1.8rem, 3vw, 2.45rem); }
+.caller-shell .contacts-header .caller-queue-note { color: rgba(239,249,239,0.78); }
+.caller-shell .contacts-summary-grid { position: relative; z-index: 1; }
+.caller-shell .contacts-summary-grid .mini-stat { min-width: 82px; background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); backdrop-filter: blur(8px); }
+.caller-shell .contacts-summary-grid .mini-stat-label, .caller-shell .contacts-summary-grid .mini-stat strong { color: #fffdf2; }
+.caller-shell .contacts-summary-grid .mini-stat.warm, .caller-shell .contacts-summary-grid .mini-stat.cool { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); }
+.caller-shell .caller-queue-banner { border-color: rgba(46,139,98,0.25); box-shadow: 0 12px 26px rgba(31,91,67,0.1); }
+
+@keyframes callerSidebarReveal { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes callerIndexReveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 700px) {
+  .caller-shell .contacts-header { padding: 22px 20px; gap: 18px; }
+  .caller-shell .contacts-summary-grid { width: 100%; }
+  .caller-shell .caller-queue-banner { align-items: flex-start; }
+  .caller-shell .caller-queue-banner .status-badge { margin-left: auto; }
+}
