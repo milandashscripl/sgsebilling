@@ -125,6 +125,18 @@ router.get('/settings', auth, async (req, res) => {
 
 router.put('/settings', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+  const safeUrl = (value) => { const text = String(value || '').trim(); return /^https?:\/\//i.test(text) || text.startsWith('/') ? text : ''; };
+  const heroSlides = Array.isArray(req.body.heroSlides) ? req.body.heroSlides.slice(0, 6).map((slide, index) => ({
+    kicker: String(slide?.kicker || `Featured workflow ${index + 1}`).trim().slice(0, 120),
+    title: String(slide?.title || 'Make your work feel organised.').trim().slice(0, 180),
+    copy: String(slide?.copy || '').trim().slice(0, 360),
+    stat: String(slide?.stat || `0${index + 1} / 03`).trim().slice(0, 30),
+    accent: String(slide?.accent || 'Built for better work').trim().slice(0, 100),
+    imageUrl: safeUrl(slide?.imageUrl),
+    buttonLabel: String(slide?.buttonLabel || 'Open workspace').trim().slice(0, 60),
+    buttonLink: safeUrl(slide?.buttonLink) || '/login'
+  })) : undefined;
+  const publicStats = Array.isArray(req.body.publicStats) ? req.body.publicStats.slice(0, 4).map((stat) => ({ value: String(stat?.value || '').trim().slice(0, 30), label: String(stat?.label || '').trim().slice(0, 70) })).filter((stat) => stat.value || stat.label) : undefined;
   const settings = {
     lowStockThreshold: Math.max(0, Number(req.body.lowStockThreshold ?? 5)),
     quotationValidity: Math.max(1, Number(req.body.quotationValidity ?? 15)),
@@ -147,7 +159,14 @@ router.put('/settings', auth, async (req, res) => {
     darkMode: req.body.darkMode === true,
     showCalculator: req.body.showCalculator !== false,
     showPublicContact: req.body.showPublicContact !== false,
-    showPublicAbout: req.body.showPublicAbout !== false
+    showPublicAbout: req.body.showPublicAbout !== false,
+    language: ['en', 'hi', 'od'].includes(req.body.language) ? req.body.language : 'en',
+    themePreset: ['ocean', 'forest', 'graphite', 'coral'].includes(req.body.themePreset) ? req.body.themePreset : 'ocean',
+    fontFamily: ['Manrope', 'DM Sans', 'Plus Jakarta Sans'].includes(req.body.fontFamily) ? req.body.fontFamily : 'Manrope',
+    cornerRadius: Math.min(32, Math.max(8, Number(req.body.cornerRadius ?? 20))),
+    density: ['comfortable', 'compact'].includes(req.body.density) ? req.body.density : 'comfortable',
+    ...(heroSlides ? { heroSlides } : {}),
+    ...(publicStats ? { publicStats } : {})
   };
   if (mongoose.connection.readyState === 1) await User.findByIdAndUpdate(req.user._id, { appSettings: settings });
   else { const user = authStore.findUserById(req.user._id); if (user) user.appSettings = settings; }
