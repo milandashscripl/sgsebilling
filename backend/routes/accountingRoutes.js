@@ -4,6 +4,7 @@ const Account = require('../models/Account');
 const Transaction = require('../models/Transaction');
 const Expense = require('../models/Expense');
 const Invoice = require('../models/Invoice');
+const { randomUUID } = require('crypto');
 
 const router = express.Router();
 
@@ -54,9 +55,10 @@ router.post('/transfer', auth, async (req, res) => {
     const dateStr = new Date().toISOString().slice(0, 10);
     const transferNote = note || `Transfer: ${fromAcc.name} → ${toAcc.name}`;
 
+    const transferGroupId = randomUUID();
     await Promise.all([
-      Transaction.create({ date: dateStr, accountId: fromAcc._id, type: 'expense', amount: amt, paymentMethod: 'transfer', reference: 'Fund Transfer', note: transferNote, createdBy: req.user._id }),
-      Transaction.create({ date: dateStr, accountId: toAcc._id, type: 'income', amount: amt, paymentMethod: 'transfer', reference: 'Fund Transfer', note: transferNote, createdBy: req.user._id })
+      Transaction.create({ date: dateStr, accountId: fromAcc._id, type: 'expense', amount: amt, paymentMethod: 'transfer', reference: 'Fund Transfer', note: transferNote, transferGroupId, createdBy: req.user._id }),
+      Transaction.create({ date: dateStr, accountId: toAcc._id, type: 'income', amount: amt, paymentMethod: 'transfer', reference: 'Fund Transfer', note: transferNote, transferGroupId, createdBy: req.user._id })
     ]);
 
     const [fromBal, toBal] = await Promise.all([
@@ -139,6 +141,30 @@ router.post('/transactions', auth, async (req, res) => {
       createdBy: req.user._id
     });
     res.status(201).json({ ...transaction.toObject(), id: String(transaction._id) });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post('/undo-last', auth, async (req, res) => {
+  try {
+    const [transaction, expense] = await Promise.all([
+      Transaction.findOne({ createdBy: req.user._id }).sort({ createdAt: -1 }),
+      Expense.findOne({ createdBy: req.user._id }).sort({ createdAt: -1 })
+    ]);
+    if (!transaction && !expense) return res.status(404).json({ message: 'There is no accounting entry to undo' });
+
+    const latestTransaction = transaction && (!expense || transaction.createdAt >= expense.createdAt);
+    if (latestTransaction) {
+      const filter = transaction.transferGroupId
+        ? { createdBy: req.user._id, transferGroupId: transaction.transferGroupId }
+        : { _id: transaction._id, createdBy: req.user._id };
+      const result = await Transaction.deleteMany(filter);
+      return res.json({ message: result.deletedCount > 1 ? 'Last fund transfer undone' : 'Last transaction undone', type: 'transaction', deletedCount: result.deletedCount });
+    }
+
+    await Expense.deleteOne({ _id: expense._id, createdBy: req.user._id });
+    res.json({ message: 'Last expense undone', type: 'expense', deletedCount: 1 });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

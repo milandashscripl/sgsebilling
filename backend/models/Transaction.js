@@ -9,6 +9,7 @@ const transactionSchema = new mongoose.Schema({
   customerName: { type: String, default: '' },
   reference: { type: String, default: '' },
   note: { type: String, default: '' },
+  transferGroupId: { type: String, default: '' },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 

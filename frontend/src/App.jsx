@@ -146,6 +146,7 @@ function App() {
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
     if (storedUser) {
       setUser(JSON.parse(storedUser));
+      setLoading(false);
     }
 
     api.get('/auth/me')
@@ -425,11 +426,14 @@ function AuthenticatedApp({ user, setUser, logout }) {
 function Login({ setUser }) {
   const [form, setForm] = useState({ identifier: '', password: '' });
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const submit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setError('');
+    setSubmitting(true);
     try {
       const res = await api.post('/auth/login', form);
       const token = res?.data?.token;
@@ -443,6 +447,8 @@ function Login({ setUser }) {
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Login failed';
       setError(message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -469,7 +475,7 @@ function Login({ setUser }) {
         <label className="checkbox-row"><input type="checkbox" defaultChecked /> Keep me signed in</label>
         <Link to="/register">Create account</Link>
       </div>
-      <button className="btn primary auth-submit" type="submit">Sign in</button>
+      <button className="btn primary auth-submit" type="submit" disabled={submitting}>{submitting ? 'Signing in...' : 'Sign in'}</button>
     </form>
   );
 }
@@ -2714,6 +2720,18 @@ function AccountingPage() {
     }
   };
 
+  const undoLastTransaction = async () => {
+    if (!window.confirm('Undo the most recent accounting entry?')) return;
+    try {
+      const response = await api.post('/accounting/undo-last');
+      setMessage(response.data.message);
+      setAccountingPage(0);
+      await load();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to undo the last accounting entry');
+    }
+  };
+
   const downloadExpenseCsv = async () => {
     try {
       const rows = transactionHistory.map((entry) => [
@@ -2951,7 +2969,7 @@ function AccountingPage() {
       <div className="panel transaction-history-panel">
           <div className="panel-header">
           <div><h4>Complete account history</h4><p className="muted">Latest entries first. Balances are calculated from opening balance in chronological order.</p></div>
-          <strong>{transactionHistory.length} entries</strong>
+          <div className="inline-actions"><strong>{transactionHistory.length} entries</strong><button className="btn danger-outline" type="button" onClick={undoLastTransaction} disabled={!transactionHistory.length}>Undo last entry</button></div>
         </div>
         <input className="history-search" placeholder="Search customer, reference, note, or account" value={historySearch} onChange={(e) => { setHistorySearch(e.target.value); setAccountingPage(0); }} />
         {filteredTransactionHistory.slice(accountingPage * accountingPageSize, (accountingPage + 1) * accountingPageSize).map((entry) => (
@@ -3536,16 +3554,17 @@ function WebAppSettingsPage() {
   const [message, setMessage] = useState('');
   useEffect(() => { api.get('/users/settings').then((response) => { const next = { ...defaults, ...(response.data || {}) }; setSettings(next); localStorage.setItem('sgse-web-settings', JSON.stringify(next)); }).catch(() => setMessage('Using local settings until the server is available')); }, []);
   const update = (field, value) => setSettings((current) => ({ ...current, [field]: value }));
-  const save = async (event) => { event.preventDefault(); try { const response = await api.put('/users/settings', settings); setSettings(response.data); localStorage.setItem('sgse-web-settings', JSON.stringify(response.data)); previewTheme(); setMessage('Web app settings saved for this shop'); } catch (error) { setMessage(error.response?.data?.message || 'Unable to save web app settings'); } };
-  const previewTheme = () => { document.documentElement.style.setProperty('--brand-primary', settings.primaryColor); document.documentElement.style.setProperty('--brand-accent', settings.accentColor); document.documentElement.style.setProperty('--site-surface', settings.surfaceColor); document.documentElement.style.setProperty('--app-font', settings.fontFamily === 'DM Sans' ? 'DM Sans, sans-serif' : settings.fontFamily === 'Plus Jakarta Sans' ? 'Plus Jakarta Sans, sans-serif' : 'Manrope, sans-serif'); document.documentElement.style.setProperty('--radius-lg', `${Number(settings.cornerRadius || 20)}px`); document.documentElement.classList.toggle('theme-dark', settings.darkMode); };
+  const save = async (event) => { event.preventDefault(); try { const response = await api.put('/users/settings', settings); setSettings(response.data); localStorage.setItem('sgse-web-settings', JSON.stringify(response.data)); previewTheme(response.data); setMessage('Web app settings saved for this shop'); } catch (error) { setMessage(error.response?.data?.message || 'Unable to save web app settings'); } };
+  const previewTheme = (nextSettings = settings) => { document.documentElement.style.setProperty('--brand-primary', nextSettings.primaryColor); document.documentElement.style.setProperty('--brand-accent', nextSettings.accentColor); document.documentElement.style.setProperty('--site-surface', nextSettings.surfaceColor); document.documentElement.style.setProperty('--app-font', nextSettings.fontFamily === 'DM Sans' ? 'DM Sans, sans-serif' : nextSettings.fontFamily === 'Plus Jakarta Sans' ? 'Plus Jakarta Sans, sans-serif' : 'Manrope, sans-serif'); document.documentElement.style.setProperty('--radius-lg', `${Number(nextSettings.cornerRadius || 20)}px`); document.documentElement.style.setProperty('--radius-md', `${Math.max(8, Number(nextSettings.cornerRadius || 20) - 6)}px`); document.documentElement.classList.toggle('theme-dark', nextSettings.darkMode === true); };
+  const updateTheme = (field, value) => { const next = { ...settings, [field]: value }; setSettings(next); previewTheme(next); };
   const updateSlide = (index, field, value) => setSettings((current) => ({ ...current, heroSlides: current.heroSlides.map((slide, slideIndex) => slideIndex === index ? { ...slide, [field]: value } : slide) }));
   const updateStat = (index, field, value) => setSettings((current) => ({ ...current, publicStats: current.publicStats.map((stat, statIndex) => statIndex === index ? { ...stat, [field]: value } : stat) }));
-  const choosePreset = (preset) => { const next = { ...settings, themePreset: preset, ...THEME_PRESETS[preset] }; setSettings(next); setTimeout(previewTheme, 0); };
+  const choosePreset = (preset) => { const next = { ...settings, themePreset: preset, ...THEME_PRESETS[preset] }; setSettings(next); previewTheme(next); };
   return <div className="settings-page"><div className="page-header"><p className="eyebrow">Control center</p><h3>Web app settings</h3><p className="muted">Control the workspace, public website, navigation, and visual identity from one place.</p></div><form className="panel settings-panel" onSubmit={save}>
     <div className="settings-section"><div><h4>Language and brand</h4><p className="muted">Set the public language and indexed home page identity.</p></div><div className="form-grid"><label>Public language<select value={settings.language} onChange={(event) => update('language', event.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="od">ଓଡ଼ିଆ</option></select></label><label>Website title<input value={settings.siteTitle} onChange={(event) => update('siteTitle', event.target.value)} /></label><label>Hero tagline<input value={settings.siteTagline} onChange={(event) => update('siteTagline', event.target.value)} /></label><label className="span-full">Hero description<textarea value={settings.siteDescription} onChange={(event) => update('siteDescription', event.target.value)} /></label><label>About heading<input value={settings.aboutTitle} onChange={(event) => update('aboutTitle', event.target.value)} /></label><label>About copy<textarea value={settings.aboutText} onChange={(event) => update('aboutText', event.target.value)} /></label><label>Contact CTA<input value={settings.contactCta} onChange={(event) => update('contactCta', event.target.value)} /></label><label>Public phone<input value={settings.publicPhone} onChange={(event) => update('publicPhone', event.target.value)} /></label><label>Public email<input type="email" value={settings.publicEmail} onChange={(event) => update('publicEmail', event.target.value)} /></label></div></div>
     <div className="settings-section"><div><h4>Hero slider and images</h4><p className="muted">Edit each slide, add a hosted image URL, and choose where its button goes.</p></div><div className="settings-slide-list">{settings.heroSlides.map((slide, index) => <div className="settings-slide-card" key={index}><div className="settings-slide-heading"><strong>Slide {index + 1}</strong>{slide.imageUrl && <img src={slide.imageUrl} alt="" />}</div><div className="form-grid"><label>Kicker<input value={slide.kicker} onChange={(event) => updateSlide(index, 'kicker', event.target.value)} /></label><label>Slide title<input value={slide.title} onChange={(event) => updateSlide(index, 'title', event.target.value)} /></label><label className="span-full">Slide copy<textarea value={slide.copy} onChange={(event) => updateSlide(index, 'copy', event.target.value)} /></label><label>Image URL<input type="url" placeholder="https://.../hero.webp" value={slide.imageUrl} onChange={(event) => updateSlide(index, 'imageUrl', event.target.value)} /></label><label>Button link<input value={slide.buttonLink} onChange={(event) => updateSlide(index, 'buttonLink', event.target.value)} /></label><label>Button label<input value={slide.buttonLabel} onChange={(event) => updateSlide(index, 'buttonLabel', event.target.value)} /></label><label>Accent label<input value={slide.accent} onChange={(event) => updateSlide(index, 'accent', event.target.value)} /></label></div></div>)}</div></div>
     <div className="settings-section"><div><h4>Public numbers</h4><p className="muted">Replace the hero proof points with real business numbers.</p></div><div className="settings-stat-grid">{settings.publicStats.map((stat, index) => <div className="settings-stat-card" key={index}><label>Value<input value={stat.value} onChange={(event) => updateStat(index, 'value', event.target.value)} /></label><label>Label<input value={stat.label} onChange={(event) => updateStat(index, 'label', event.target.value)} /></label></div>)}</div></div>
-    <div className="settings-section"><div><h4>Theme and appearance</h4><p className="muted">Preview the visual identity immediately, then save it for every visitor.</p></div><div className="theme-control-grid"><label>Primary color<span className="color-control"><input type="color" value={settings.primaryColor} onChange={(event) => { update('primaryColor', event.target.value); previewTheme(); }} /><input value={settings.primaryColor} onChange={(event) => update('primaryColor', event.target.value)} /></span></label><label>Accent color<span className="color-control"><input type="color" value={settings.accentColor} onChange={(event) => { update('accentColor', event.target.value); previewTheme(); }} /><input value={settings.accentColor} onChange={(event) => update('accentColor', event.target.value)} /></span></label><label>Surface color<span className="color-control"><input type="color" value={settings.surfaceColor} onChange={(event) => { update('surfaceColor', event.target.value); previewTheme(); }} /><input value={settings.surfaceColor} onChange={(event) => update('surfaceColor', event.target.value)} /></span></label></div><div className="settings-toggle-grid"><label><input type="checkbox" checked={settings.darkMode} onChange={(event) => { update('darkMode', event.target.checked); previewTheme(); }} /> Use dark theme</label><label><input type="checkbox" checked={settings.showPublicAbout} onChange={(event) => update('showPublicAbout', event.target.checked)} /> Show about section</label><label><input type="checkbox" checked={settings.showPublicContact} onChange={(event) => update('showPublicContact', event.target.checked)} /> Show contact section</label><label><input type="checkbox" checked={settings.showCalculator} onChange={(event) => update('showCalculator', event.target.checked)} /> Show EMI calculator link</label></div></div>
+    <div className="settings-section"><div><h4>Theme and appearance</h4><p className="muted">Preview the visual identity immediately, then save it for every visitor.</p></div><div className="theme-control-grid"><label>Primary color<span className="color-control"><input type="color" value={settings.primaryColor} onChange={(event) => updateTheme('primaryColor', event.target.value)} /><input value={settings.primaryColor} onChange={(event) => updateTheme('primaryColor', event.target.value)} /></span></label><label>Accent color<span className="color-control"><input type="color" value={settings.accentColor} onChange={(event) => updateTheme('accentColor', event.target.value)} /><input value={settings.accentColor} onChange={(event) => updateTheme('accentColor', event.target.value)} /></span></label><label>Surface color<span className="color-control"><input type="color" value={settings.surfaceColor} onChange={(event) => updateTheme('surfaceColor', event.target.value)} /><input value={settings.surfaceColor} onChange={(event) => updateTheme('surfaceColor', event.target.value)} /></span></label></div><div className="settings-toggle-grid"><label><input type="checkbox" checked={settings.darkMode} onChange={(event) => updateTheme('darkMode', event.target.checked)} /> Use dark theme</label><label><input type="checkbox" checked={settings.showPublicAbout} onChange={(event) => update('showPublicAbout', event.target.checked)} /> Show about section</label><label><input type="checkbox" checked={settings.showPublicContact} onChange={(event) => update('showPublicContact', event.target.checked)} /> Show contact section</label><label><input type="checkbox" checked={settings.showCalculator} onChange={(event) => update('showCalculator', event.target.checked)} /> Show EMI calculator link</label></div></div>
     <div className="settings-section"><div><h4>Operations and modules</h4><p className="muted">Set defaults and decide which workspace tools remain visible.</p></div><div className="form-grid"><label>Low stock threshold<input type="number" min="0" value={settings.lowStockThreshold} onChange={(event) => update('lowStockThreshold', Number(event.target.value))} /></label><label>Quotation validity (days)<input type="number" min="1" value={settings.quotationValidity} onChange={(event) => update('quotationValidity', Number(event.target.value))} /></label><label>Currency<select value={settings.currency} onChange={(event) => update('currency', event.target.value)}><option value="INR">INR - Indian Rupee</option><option value="USD">USD - US Dollar</option></select></label></div><div className="settings-toggle-grid"><label><input type="checkbox" checked={settings.showPayroll} onChange={(event) => update('showPayroll', event.target.checked)} /> Show payroll dashboard</label><label><input type="checkbox" checked={settings.showAnalytics} onChange={(event) => update('showAnalytics', event.target.checked)} /> Show analytics dashboard</label><label><input type="checkbox" checked={settings.compactContacts} onChange={(event) => update('compactContacts', event.target.checked)} /> Compact contacts workspace</label><label><input type="checkbox" checked={settings.autoReminder} onChange={(event) => update('autoReminder', event.target.checked)} /> Enable service reminders</label></div></div>
     <div className="settings-section"><div><h4>Advanced appearance</h4><p className="muted">Choose a visual preset or fine-tune the workspace shape and typography.</p></div><div className="theme-preset-grid">{Object.keys(THEME_PRESETS).map((preset) => <button type="button" key={preset} className={`theme-preset ${settings.themePreset === preset ? 'selected' : ''}`} onClick={() => choosePreset(preset)}><span style={{ background: THEME_PRESETS[preset].primaryColor }} /><span style={{ background: THEME_PRESETS[preset].accentColor }} /><strong>{preset}</strong></button>)}</div><div className="theme-control-grid"><label>Font family<select value={settings.fontFamily} onChange={(event) => update('fontFamily', event.target.value)}><option>Manrope</option><option>DM Sans</option><option>Plus Jakarta Sans</option></select></label><label>Corner radius<select value={settings.cornerRadius} onChange={(event) => update('cornerRadius', Number(event.target.value))}><option value="8">Sharp</option><option value="14">Balanced</option><option value="20">Soft</option><option value="28">Rounded</option></select></label><label>Layout density<select value={settings.density} onChange={(event) => update('density', event.target.value)}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label></div></div>
     {message && <p className="status-message">{message}</p>}<div className="settings-actions"><button className="btn primary" type="submit">Save all settings</button><button className="btn outline" type="button" onClick={() => { setSettings(defaults); previewTheme(); }}>Reset form</button></div></form></div>;
