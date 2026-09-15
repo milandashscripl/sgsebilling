@@ -1295,6 +1295,7 @@ function Dashboard({ user }) {
 }
 
 function CustomersPage({ user }) {
+  const navigate = useNavigate();
   const CUSTOMER_STAGES = ['Project costing', 'Quotation', 'Documents review', 'PMGSY registration', 'Agreement uploaded', 'Bank loan pending', 'Bank loan disbursed', 'Installation pending', 'Load enhancement', 'Inspection pending', 'Subsidy redeemed', 'Subsidy disbursed', 'Amount pending', 'Closed'];
   const REQUIRED_DOCUMENTS = ['Aadhaar', 'PAN', 'Latest electricity bill', 'Bank passbook', 'Email ID', 'Mobile number'];
   const [convertedContacts, setConvertedContacts] = useState([]);
