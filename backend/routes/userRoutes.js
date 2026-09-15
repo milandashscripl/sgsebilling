@@ -22,9 +22,11 @@ const sanitizePreferences = (body = {}) => ({
 router.get('/preferences', auth, async (req, res) => {
   if (mongoose.connection.readyState === 1) {
     const user = await User.findById(req.user._id).select('appSettings').lean();
-    return res.json({ ...preferenceDefaults, ...(user?.appSettings?.preferences || {}) });
+    const preferences = user?.appSettings?.preferences;
+    return res.json({ ...preferenceDefaults, ...(preferences || {}), configured: Boolean(preferences) });
   }
-  res.json({ ...preferenceDefaults, ...(authStore.findUserById(req.user._id)?.appSettings?.preferences || {}) });
+  const preferences = authStore.findUserById(req.user._id)?.appSettings?.preferences;
+  res.json({ ...preferenceDefaults, ...(preferences || {}), configured: Boolean(preferences) });
 });
 
 router.put('/preferences', auth, async (req, res) => {
@@ -190,7 +192,7 @@ router.put('/settings', auth, async (req, res) => {
     showPublicContact: req.body.showPublicContact !== false,
     showPublicAbout: req.body.showPublicAbout !== false,
     language: ['en', 'hi', 'od'].includes(req.body.language) ? req.body.language : 'en',
-    themePreset: ['ocean', 'forest', 'graphite', 'coral'].includes(req.body.themePreset) ? req.body.themePreset : 'ocean',
+    themePreset: ['ocean', 'forest', 'graphite', 'coral', 'sky', 'amber', 'plum', 'rose', 'slate', 'indigo'].includes(req.body.themePreset) ? req.body.themePreset : 'ocean',
     fontFamily: ['Manrope', 'DM Sans', 'Plus Jakarta Sans', 'Noto Sans'].includes(req.body.fontFamily) ? req.body.fontFamily : 'Manrope',
     fontSize: ['90', '100', '110', '120', '135'].includes(String(req.body.fontSize)) ? String(req.body.fontSize) : '100',
     cornerRadius: Math.min(32, Math.max(8, Number(req.body.cornerRadius ?? 20))),

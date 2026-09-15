@@ -54,6 +54,7 @@ const DEFAULT_HERO_SLIDES = [
 const DEFAULT_STATS = [{ value: '₹2.4L+', label: 'Monthly flow' }, { value: '1200+', label: 'Transactions' }, { value: '99.9%', label: 'Track accuracy' }];
 const THEME_PRESETS = { ocean: { primaryColor: '#186FAF', accentColor: '#E59D2D', surfaceColor: '#F6F9FC' }, forest: { primaryColor: '#26734D', accentColor: '#E1A33A', surfaceColor: '#F3F8F2' }, graphite: { primaryColor: '#334155', accentColor: '#E06C47', surfaceColor: '#F4F5F7' }, coral: { primaryColor: '#C7524A', accentColor: '#2F8FBD', surfaceColor: '#FFF7F3' }, sky: { primaryColor: '#2563EB', accentColor: '#14B8A6', surfaceColor: '#F0F7FF' }, amber: { primaryColor: '#B45309', accentColor: '#0F766E', surfaceColor: '#FFF9ED' }, plum: { primaryColor: '#7C3AED', accentColor: '#F97316', surfaceColor: '#FAF7FF' }, rose: { primaryColor: '#BE123C', accentColor: '#0891B2', surfaceColor: '#FFF5F7' }, slate: { primaryColor: '#475569', accentColor: '#16A34A', surfaceColor: '#F5F7FA' }, indigo: { primaryColor: '#4338CA', accentColor: '#EAB308', surfaceColor: '#F5F6FF' } };
 const PUBLIC_TRANSLATIONS = { en: { about: 'About', contact: 'Contact', login: 'Login', register: 'Create account', open: 'Open workspace', aboutEyebrow: 'One workspace, less friction', contactEyebrow: 'Ready when you are', contactText: 'Connect with the SGSE team to set up your workspace.' }, hi: { about: 'हमारे बारे में', contact: 'संपर्क', login: 'लॉग इन', register: 'खाता बनाएं', open: 'वर्कस्पेस खोलें', aboutEyebrow: 'एक जगह, आसान काम', contactEyebrow: 'जब आप तैयार हों', contactText: 'अपना वर्कस्पेस शुरू करने के लिए SGSE टीम से जुड़ें।' }, od: { about: 'ଆମ ବିଷୟରେ', contact: 'ଯୋଗାଯୋଗ', login: 'ଲଗଇନ', register: 'ଖାତା ଖୋଲନ୍ତୁ', open: 'ୱାର୍କସ୍ପେସ ଖୋଲନ୍ତୁ', aboutEyebrow: 'ଗୋଟିଏ ସ୍ଥାନ, ସହଜ କାମ', contactEyebrow: 'ଆପଣ ପ୍ରସ୍ତୁତ ହେଲେ', contactText: 'ୱାର୍କସ୍ପେସ ଆରମ୍ଭ କରିବାକୁ SGSE ଟିମ ସହ ଯୋଗାଯୋଗ କରନ୍ତୁ।' } };
+const WORKSPACE_TRANSLATIONS = { en: { theme: 'Theme', size: 'Text size', language: 'Language', font: 'Font', admin: 'Admin control center', caller: 'Caller workspace', user: 'Sales and inventory workspace', logout: 'Logout' }, hi: { theme: 'रंग', size: 'पाठ आकार', language: 'भाषा', font: 'फ़ॉन्ट', admin: 'व्यवस्थापक नियंत्रण केंद्र', caller: 'कॉलर कार्यक्षेत्र', user: 'बिक्री और इन्वेंटरी कार्यक्षेत्र', logout: 'लॉग आउट' }, od: { theme: 'ରଙ୍ଗ', size: 'ପାଠ ଆକାର', language: 'ଭାଷା', font: 'ଫଣ୍ଟ', admin: 'ଆଡମିନ ନିୟନ୍ତ୍ରଣ କେନ୍ଦ୍ର', caller: 'କଲର କାର୍ଯ୍ୟକ୍ଷେତ୍ର', user: 'ବିକ୍ରୟ ଏବଂ ଇନଭେଣ୍ଟୋରୀ କାର୍ଯ୍ୟକ୍ଷେତ୍ର', logout: 'ଲଗଆଉଟ' } };
 const DEFAULT_WEB_SETTINGS = { siteTitle: 'SGSE Billing Suite', siteTagline: 'Modern billing and stock management', siteDescription: 'Run sales, stock, purchases, and GST workflows from one professional workspace.', aboutTitle: 'Built for busy business teams', aboutText: 'Keep billing, contacts, stock, finance, and team operations moving from one reliable workspace.', contactCta: 'Talk to our team', primaryColor: '#186FAF', accentColor: '#E59D2D', surfaceColor: '#F6F9FC', darkMode: false, showCalculator: true, showPublicContact: true, showPublicAbout: true, language: 'en', themePreset: 'ocean', fontFamily: 'Manrope', fontSize: '100', cornerRadius: 20, density: 'comfortable', heroSlides: DEFAULT_HERO_SLIDES, publicStats: DEFAULT_STATS };
 
 const applyWorkspacePreferences = (preferences = {}) => {
@@ -393,19 +394,23 @@ function PublicApp({ setUser }) {
 
 function AuthenticatedApp({ user, setUser, logout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [preferences, setPreferences] = useState(() => ({ themePreset: 'ocean', fontFamily: 'Manrope', fontSize: '100', language: 'en', density: 'comfortable', darkMode: false, ...(() => { try { return JSON.parse(localStorage.getItem('sgse-user-preferences') || '{}'); } catch { return {}; } })() }));
+  const [preferences, setPreferences] = useState(() => { try { const personal = JSON.parse(localStorage.getItem('sgse-user-preferences') || '{}'); const site = JSON.parse(localStorage.getItem('sgse-web-settings') || '{}'); return { themePreset: site.themePreset || 'ocean', primaryColor: site.primaryColor, accentColor: site.accentColor, surfaceColor: site.surfaceColor, fontFamily: site.fontFamily || 'Manrope', fontSize: site.fontSize || '100', language: site.language || 'en', density: site.density || 'comfortable', darkMode: site.darkMode === true, ...personal }; } catch { return { themePreset: 'ocean', fontFamily: 'Manrope', fontSize: '100', language: 'en', density: 'comfortable', darkMode: false }; } });
   const closeSidebar = () => setSidebarOpen(false);
   useEffect(() => {
     applyWorkspacePreferences(preferences);
     localStorage.setItem('sgse-user-preferences', JSON.stringify(preferences));
   }, [preferences]);
-  useEffect(() => { api.get('/users/preferences').then((response) => setPreferences((current) => ({ ...current, ...(response.data || {}) }))).catch(() => {}); }, []);
+  useEffect(() => { api.get('/users/preferences').then((response) => { if (!response.data?.configured) return; const { configured, ...storedPreferences } = response.data; setPreferences((current) => ({ ...current, ...storedPreferences })); }).catch(() => {}); }, []);
   const updatePreference = async (field, value) => {
     const next = { ...preferences, [field]: value };
     setPreferences(next);
     try { await api.put('/users/preferences', next); } catch { setPreferences(preferences); }
   };
-  const chooseTheme = (themePreset) => updatePreference('themePreset', themePreset);
+  const chooseTheme = (themePreset) => {
+    const next = { ...preferences, themePreset, primaryColor: undefined, accentColor: undefined, surfaceColor: undefined };
+    setPreferences(next);
+    api.put('/users/preferences', next).catch(() => setPreferences(preferences));
+  };
   return (
     <div>
       <nav className="topbar">
@@ -414,18 +419,18 @@ function AuthenticatedApp({ user, setUser, logout }) {
           {user.shopLogoUrl ? <img src={user.shopLogoUrl} alt={user.shopName || 'Shop logo'} style={{ width: 34, height: 34, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }} /> : <span className="sidebar-brand-mark" style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 }}>{(user.shopName || 'SG').slice(0, 2).toUpperCase()}</span>}
           <div>
             <h2>{user.shopName || 'SGSE Billing'}</h2>
-            <p>{user.role === 'admin' ? 'Admin control center' : user.role === 'caller' ? 'Caller workspace' : 'Sales and inventory workspace'}</p>
+            <p>{(WORKSPACE_TRANSLATIONS[preferences.language] || WORKSPACE_TRANSLATIONS.en)[user.role === 'admin' ? 'admin' : user.role === 'caller' ? 'caller' : 'user']}</p>
           </div>
         </div>
         <div className="topbar-actions">
           <div className="topbar-preferences" aria-label="Workspace preferences">
-            <select aria-label="Theme" value={preferences.themePreset} onChange={(event) => chooseTheme(event.target.value)}>{Object.keys(THEME_PRESETS).map((theme) => <option key={theme} value={theme}>{theme.charAt(0).toUpperCase() + theme.slice(1)}</option>)}</select>
-            <select aria-label="Font size" value={preferences.fontSize} onChange={(event) => updatePreference('fontSize', event.target.value)}><option value="90">Small text</option><option value="100">Standard text</option><option value="110">Large text</option><option value="120">Extra large</option><option value="135">Maximum text</option></select>
-            <select aria-label="Language" value={preferences.language} onChange={(event) => updatePreference('language', event.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="od">ଓଡ଼ିଆ</option></select>
-            <select aria-label="Font family" value={preferences.fontFamily} onChange={(event) => updatePreference('fontFamily', event.target.value)}><option>Manrope</option><option>DM Sans</option><option>Plus Jakarta Sans</option><option>Noto Sans</option></select>
+            <label><span>{(WORKSPACE_TRANSLATIONS[preferences.language] || WORKSPACE_TRANSLATIONS.en).theme}</span><select aria-label="Theme" value={preferences.themePreset} onChange={(event) => chooseTheme(event.target.value)}>{Object.keys(THEME_PRESETS).map((theme) => <option key={theme} value={theme}>{theme.charAt(0).toUpperCase() + theme.slice(1)}</option>)}</select></label>
+            <label><span>{(WORKSPACE_TRANSLATIONS[preferences.language] || WORKSPACE_TRANSLATIONS.en).size}</span><select aria-label="Font size" value={preferences.fontSize} onChange={(event) => updatePreference('fontSize', event.target.value)}><option value="90">Small</option><option value="100">Standard</option><option value="110">Large</option><option value="120">Extra large</option><option value="135">Maximum</option></select></label>
+            <label><span>{(WORKSPACE_TRANSLATIONS[preferences.language] || WORKSPACE_TRANSLATIONS.en).language}</span><select aria-label="Language" value={preferences.language} onChange={(event) => updatePreference('language', event.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="od">ଓଡ଼ିଆ</option></select></label>
+            <label><span>{(WORKSPACE_TRANSLATIONS[preferences.language] || WORKSPACE_TRANSLATIONS.en).font}</span><select aria-label="Font family" value={preferences.fontFamily} onChange={(event) => updatePreference('fontFamily', event.target.value)}><option>Manrope</option><option>DM Sans</option><option>Plus Jakarta Sans</option><option>Noto Sans</option></select></label>
           </div>
           <span className="chip">{user.name}</span>
-          <button className="btn secondary" onClick={logout}>Logout</button>
+          <button className="btn secondary" onClick={logout}>{(WORKSPACE_TRANSLATIONS[preferences.language] || WORKSPACE_TRANSLATIONS.en).logout}</button>
         </div>
       </nav>
       <div className="dashboard-shell">
