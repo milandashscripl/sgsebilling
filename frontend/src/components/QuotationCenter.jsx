@@ -72,6 +72,8 @@ export default function QuotationCenter({ user }) {
   useEffect(() => {
     if (!location.state?.customer) return;
     setForm((current) => ({ ...current, ...location.state.customer }));
+    setView('builder');
+    setMessage(`Quotation draft ready for ${location.state.customer.clientName || 'this customer'}`);
     navigate(location.pathname, { replace: true, state: null });
   }, [location, navigate]);
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
