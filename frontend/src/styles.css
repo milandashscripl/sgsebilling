@@ -685,6 +685,26 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .quotation-page { display: grid; gap: 18px; }
 .quotation-header { align-items: flex-start; }
 .quotation-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--panel-border); }
+.quotation-dashboard-button { border: 0; background: transparent; color: var(--text-muted); padding: 10px 4px; font-weight: 700; }
+.quotation-dashboard-button.active { color: var(--brand-primary); }
+.quotation-dashboard { display: grid; gap: 18px; }
+.quotation-hero { display: flex; justify-content: space-between; gap: 20px; padding: 22px; background: linear-gradient(135deg, #0d2c33, #123b43); color: #eefcf8; }
+.quotation-hero h4 { margin: 8px 0; font-size: 1.6rem; }
+.quotation-hero p { max-width: 680px; }
+.quotation-badge { display: inline-flex; padding: 6px 10px; border: 1px solid #4b9e96; border-radius: 999px; color: #a6eee1; font-size: .7rem; font-weight: 800; }
+.quotation-current-site { display: grid; gap: 4px; align-content: center; min-width: 190px; }
+.quotation-current-site span, .quotation-current-site small { color: #a8c7c4; font-size: .75rem; }
+.quotation-dashboard-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.quotation-dashboard-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; }
+.quotation-month-bars { height: 190px; display: grid; grid-template-columns: repeat(12, 1fr); align-items: end; gap: 8px; padding: 18px 4px 0; border-bottom: 1px solid var(--panel-border); }
+.quotation-month-bars div { height: 100%; display: grid; grid-template-rows: 1fr auto; gap: 6px; align-items: end; text-align: center; }
+.quotation-month-bars span { display: block; min-height: 12px; border-radius: 5px 5px 0 0; background: linear-gradient(180deg, #4fc37b, #176f90); }
+.quotation-month-bars small { color: var(--text-muted); font-size: .7rem; }
+.quotation-last-quote { display: grid; gap: 7px; padding: 14px; border: 1px solid var(--panel-border); border-radius: 10px; }
+.quotation-last-quote span, .quotation-last-quote small { color: var(--text-muted); font-size: .8rem; }
+.quotation-last-quote .btn { margin-top: 6px; }
+@media (max-width: 920px) { .quotation-hero, .quotation-dashboard-grid { grid-template-columns: 1fr; display: grid; } .quotation-dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .quotation-dashboard-kpis { grid-template-columns: 1fr; } .quotation-month-bars { gap: 3px; } }
 .quotation-tabs { overflow-x: auto; scrollbar-width: thin; }
 .quotation-tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); padding: 10px 4px; font-weight: 700; }
 .quotation-tabs button.active { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
