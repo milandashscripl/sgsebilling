@@ -4,6 +4,7 @@ import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import QuotationCenter from './components/QuotationCenter';
 import { downloadInvoicePdf } from './utils/invoicePdf';
 import { calculateGstAmount, calculateTaxableValue, getEffectiveGstRate } from './utils/gstMath';
 import { calculateEmi } from './utils/emiMath';
@@ -407,13 +408,14 @@ function AuthenticatedApp({ user, setUser, logout }) {
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/contacts">Contacts</NavLink>
           <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/emi-calculator">EMI calculator</NavLink>
           {user.role !== 'caller' && <><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/dashboard">Dashboard</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/items">Items</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/stock">Stock</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/billing">Billing</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/setups">Setup library</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/customers">Customers</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/accounting">Accounting</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/employees">People & payroll</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/reports">Reports</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/profile">Shop profile</NavLink></>}
+          {user.role !== 'caller' && <NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/quotations">3D quotations</NavLink>}
           {user.role === 'admin' && <><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/users">Users & callers</NavLink><NavLink onClick={closeSidebar} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} to="/settings">Web app settings</NavLink></>}
         </aside>
         <main className="content">
           <Routes>
             <Route path="/contacts" element={<ContactsPage user={user} />} />
             <Route path="/emi-calculator" element={<EmiCalculatorPage />} />
-            {user.role !== 'caller' && <><Route path="/dashboard" element={<Dashboard user={user} />} /><Route path="/items" element={<ItemsPage />} /><Route path="/stock" element={<StockPage />} /><Route path="/billing" element={<BillingPage user={user} />} /><Route path="/setups" element={<SetupLibraryPage />} /><Route path="/customers" element={<CustomersPage user={user} />} /><Route path="/accounting" element={<AccountingPage />} /><Route path="/employees" element={<EmployeesPage />} /><Route path="/reports" element={<ReportsPage />} /><Route path="/profile" element={<ShopProfilePage user={user} setUser={setUser} />} /></>}
+            {user.role !== 'caller' && <><Route path="/dashboard" element={<Dashboard user={user} />} /><Route path="/items" element={<ItemsPage />} /><Route path="/stock" element={<StockPage />} /><Route path="/billing" element={<BillingPage user={user} />} /><Route path="/setups" element={<SetupLibraryPage />} /><Route path="/customers" element={<CustomersPage user={user} />} /><Route path="/accounting" element={<AccountingPage />} /><Route path="/employees" element={<EmployeesPage />} /><Route path="/reports" element={<ReportsPage />} /><Route path="/profile" element={<ShopProfilePage user={user} setUser={setUser} />} /><Route path="/quotations" element={<QuotationCenter user={user} />} /></>}
             {user.role === 'admin' && <><Route path="/users" element={<UsersPage />} /><Route path="/settings" element={<WebAppSettingsPage />} /></>}
             <Route path="*" element={<Navigate to={user.role === 'caller' ? '/contacts' : '/dashboard'} replace />} />
           </Routes>
