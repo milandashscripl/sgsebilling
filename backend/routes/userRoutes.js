@@ -9,6 +9,35 @@ const bcrypt = require('bcryptjs');
 const router = express.Router();
 const callerEmailFromName = (name) => `${String(name).toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`;
 
+const preferenceDefaults = { themePreset: 'ocean', fontFamily: 'Manrope', fontSize: '100', language: 'en', density: 'comfortable', darkMode: false };
+const sanitizePreferences = (body = {}) => ({
+  themePreset: ['ocean', 'forest', 'graphite', 'coral', 'sky', 'amber', 'plum', 'rose', 'slate', 'indigo'].includes(body.themePreset) ? body.themePreset : preferenceDefaults.themePreset,
+  fontFamily: ['Manrope', 'DM Sans', 'Plus Jakarta Sans', 'Noto Sans'].includes(body.fontFamily) ? body.fontFamily : preferenceDefaults.fontFamily,
+  fontSize: ['90', '100', '110', '120', '135'].includes(String(body.fontSize)) ? String(body.fontSize) : preferenceDefaults.fontSize,
+  language: ['en', 'hi', 'od'].includes(body.language) ? body.language : preferenceDefaults.language,
+  density: ['comfortable', 'compact'].includes(body.density) ? body.density : preferenceDefaults.density,
+  darkMode: body.darkMode === true
+});
+
+router.get('/preferences', auth, async (req, res) => {
+  if (mongoose.connection.readyState === 1) {
+    const user = await User.findById(req.user._id).select('appSettings').lean();
+    return res.json({ ...preferenceDefaults, ...(user?.appSettings?.preferences || {}) });
+  }
+  res.json({ ...preferenceDefaults, ...(authStore.findUserById(req.user._id)?.appSettings?.preferences || {}) });
+});
+
+router.put('/preferences', auth, async (req, res) => {
+  const preferences = sanitizePreferences(req.body);
+  if (mongoose.connection.readyState === 1) {
+    await User.findByIdAndUpdate(req.user._id, { $set: { 'appSettings.preferences': preferences } });
+  } else {
+    const user = authStore.findUserById(req.user._id);
+    if (user) user.appSettings = { ...(user.appSettings || {}), preferences };
+  }
+  res.json(preferences);
+});
+
 router.get('/', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
@@ -162,14 +191,17 @@ router.put('/settings', auth, async (req, res) => {
     showPublicAbout: req.body.showPublicAbout !== false,
     language: ['en', 'hi', 'od'].includes(req.body.language) ? req.body.language : 'en',
     themePreset: ['ocean', 'forest', 'graphite', 'coral'].includes(req.body.themePreset) ? req.body.themePreset : 'ocean',
-    fontFamily: ['Manrope', 'DM Sans', 'Plus Jakarta Sans'].includes(req.body.fontFamily) ? req.body.fontFamily : 'Manrope',
+    fontFamily: ['Manrope', 'DM Sans', 'Plus Jakarta Sans', 'Noto Sans'].includes(req.body.fontFamily) ? req.body.fontFamily : 'Manrope',
+    fontSize: ['90', '100', '110', '120', '135'].includes(String(req.body.fontSize)) ? String(req.body.fontSize) : '100',
     cornerRadius: Math.min(32, Math.max(8, Number(req.body.cornerRadius ?? 20))),
     density: ['comfortable', 'compact'].includes(req.body.density) ? req.body.density : 'comfortable',
     ...(heroSlides ? { heroSlides } : {}),
     ...(publicStats ? { publicStats } : {})
   };
-  if (mongoose.connection.readyState === 1) await User.findByIdAndUpdate(req.user._id, { appSettings: settings });
-  else { const user = authStore.findUserById(req.user._id); if (user) user.appSettings = settings; }
+  if (mongoose.connection.readyState === 1) {
+    const current = await User.findById(req.user._id).select('appSettings.preferences').lean();
+    await User.findByIdAndUpdate(req.user._id, { appSettings: { ...settings, preferences: current?.appSettings?.preferences || preferenceDefaults } });
+  } else { const user = authStore.findUserById(req.user._id); if (user) user.appSettings = { ...settings, preferences: user.appSettings?.preferences || preferenceDefaults }; }
   res.json(settings);
 });
 

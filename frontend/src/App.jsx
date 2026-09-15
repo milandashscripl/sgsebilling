@@ -52,9 +52,24 @@ const DEFAULT_HERO_SLIDES = [
   { kicker: 'Numbers you can trust', title: 'See the health of your business at a glance.', copy: 'Accounting, reports, payroll, and planning tools give every decision a useful next step.', stat: '03 / 03', accent: 'A calmer way to grow', imageUrl: '', buttonLabel: 'Explore finance', buttonLink: '/login' }
 ];
 const DEFAULT_STATS = [{ value: '₹2.4L+', label: 'Monthly flow' }, { value: '1200+', label: 'Transactions' }, { value: '99.9%', label: 'Track accuracy' }];
-const THEME_PRESETS = { ocean: { primaryColor: '#186FAF', accentColor: '#E59D2D', surfaceColor: '#F6F9FC' }, forest: { primaryColor: '#26734D', accentColor: '#E1A33A', surfaceColor: '#F3F8F2' }, graphite: { primaryColor: '#334155', accentColor: '#E06C47', surfaceColor: '#F4F5F7' }, coral: { primaryColor: '#C7524A', accentColor: '#2F8FBD', surfaceColor: '#FFF7F3' } };
+const THEME_PRESETS = { ocean: { primaryColor: '#186FAF', accentColor: '#E59D2D', surfaceColor: '#F6F9FC' }, forest: { primaryColor: '#26734D', accentColor: '#E1A33A', surfaceColor: '#F3F8F2' }, graphite: { primaryColor: '#334155', accentColor: '#E06C47', surfaceColor: '#F4F5F7' }, coral: { primaryColor: '#C7524A', accentColor: '#2F8FBD', surfaceColor: '#FFF7F3' }, sky: { primaryColor: '#2563EB', accentColor: '#14B8A6', surfaceColor: '#F0F7FF' }, amber: { primaryColor: '#B45309', accentColor: '#0F766E', surfaceColor: '#FFF9ED' }, plum: { primaryColor: '#7C3AED', accentColor: '#F97316', surfaceColor: '#FAF7FF' }, rose: { primaryColor: '#BE123C', accentColor: '#0891B2', surfaceColor: '#FFF5F7' }, slate: { primaryColor: '#475569', accentColor: '#16A34A', surfaceColor: '#F5F7FA' }, indigo: { primaryColor: '#4338CA', accentColor: '#EAB308', surfaceColor: '#F5F6FF' } };
 const PUBLIC_TRANSLATIONS = { en: { about: 'About', contact: 'Contact', login: 'Login', register: 'Create account', open: 'Open workspace', aboutEyebrow: 'One workspace, less friction', contactEyebrow: 'Ready when you are', contactText: 'Connect with the SGSE team to set up your workspace.' }, hi: { about: 'हमारे बारे में', contact: 'संपर्क', login: 'लॉग इन', register: 'खाता बनाएं', open: 'वर्कस्पेस खोलें', aboutEyebrow: 'एक जगह, आसान काम', contactEyebrow: 'जब आप तैयार हों', contactText: 'अपना वर्कस्पेस शुरू करने के लिए SGSE टीम से जुड़ें।' }, od: { about: 'ଆମ ବିଷୟରେ', contact: 'ଯୋଗାଯୋଗ', login: 'ଲଗଇନ', register: 'ଖାତା ଖୋଲନ୍ତୁ', open: 'ୱାର୍କସ୍ପେସ ଖୋଲନ୍ତୁ', aboutEyebrow: 'ଗୋଟିଏ ସ୍ଥାନ, ସହଜ କାମ', contactEyebrow: 'ଆପଣ ପ୍ରସ୍ତୁତ ହେଲେ', contactText: 'ୱାର୍କସ୍ପେସ ଆରମ୍ଭ କରିବାକୁ SGSE ଟିମ ସହ ଯୋଗାଯୋଗ କରନ୍ତୁ।' } };
-const DEFAULT_WEB_SETTINGS = { siteTitle: 'SGSE Billing Suite', siteTagline: 'Modern billing and stock management', siteDescription: 'Run sales, stock, purchases, and GST workflows from one professional workspace.', aboutTitle: 'Built for busy business teams', aboutText: 'Keep billing, contacts, stock, finance, and team operations moving from one reliable workspace.', contactCta: 'Talk to our team', primaryColor: '#186FAF', accentColor: '#E59D2D', surfaceColor: '#F6F9FC', darkMode: false, showCalculator: true, showPublicContact: true, showPublicAbout: true, language: 'en', themePreset: 'ocean', fontFamily: 'Manrope', cornerRadius: 20, density: 'comfortable', heroSlides: DEFAULT_HERO_SLIDES, publicStats: DEFAULT_STATS };
+const DEFAULT_WEB_SETTINGS = { siteTitle: 'SGSE Billing Suite', siteTagline: 'Modern billing and stock management', siteDescription: 'Run sales, stock, purchases, and GST workflows from one professional workspace.', aboutTitle: 'Built for busy business teams', aboutText: 'Keep billing, contacts, stock, finance, and team operations moving from one reliable workspace.', contactCta: 'Talk to our team', primaryColor: '#186FAF', accentColor: '#E59D2D', surfaceColor: '#F6F9FC', darkMode: false, showCalculator: true, showPublicContact: true, showPublicAbout: true, language: 'en', themePreset: 'ocean', fontFamily: 'Manrope', fontSize: '100', cornerRadius: 20, density: 'comfortable', heroSlides: DEFAULT_HERO_SLIDES, publicStats: DEFAULT_STATS };
+
+const applyWorkspacePreferences = (preferences = {}) => {
+  const root = document.documentElement;
+  const theme = THEME_PRESETS[preferences.themePreset] || THEME_PRESETS.ocean;
+  root.style.setProperty('--brand-primary', preferences.primaryColor || theme.primaryColor);
+  root.style.setProperty('--brand-accent', preferences.accentColor || theme.accentColor);
+  root.style.setProperty('--site-surface', preferences.surfaceColor || theme.surfaceColor);
+  root.style.setProperty('--app-font', preferences.fontFamily === 'DM Sans' ? 'DM Sans, sans-serif' : preferences.fontFamily === 'Plus Jakarta Sans' ? 'Plus Jakarta Sans, sans-serif' : preferences.fontFamily === 'Noto Sans' ? 'Noto Sans, sans-serif' : 'Manrope, sans-serif');
+  root.style.setProperty('--app-font-scale', `${Math.min(1.35, Math.max(0.9, Number(preferences.fontSize || 100) / 100))}`);
+  root.style.setProperty('--radius-lg', `${Number(preferences.cornerRadius || 20)}px`);
+  root.style.setProperty('--radius-md', `${Math.max(8, Number(preferences.cornerRadius || 20) - 6)}px`);
+  root.lang = preferences.language || 'en';
+  root.classList.toggle('density-compact', preferences.density === 'compact');
+  root.classList.toggle('theme-dark', preferences.darkMode === true);
+};
 
 const toLocalDateTimeValue = (date = new Date()) => {
   const pad = (value) => String(value).padStart(2, '0');
@@ -196,6 +211,7 @@ function App() {
       document.documentElement.lang = settings.language || 'en';
       document.documentElement.classList.toggle('density-compact', settings.density === 'compact');
       document.documentElement.classList.toggle('theme-dark', settings.darkMode === true);
+      applyWorkspacePreferences(settings);
     }).catch(() => {});
   }, []);
 
@@ -377,7 +393,19 @@ function PublicApp({ setUser }) {
 
 function AuthenticatedApp({ user, setUser, logout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [preferences, setPreferences] = useState(() => ({ themePreset: 'ocean', fontFamily: 'Manrope', fontSize: '100', language: 'en', density: 'comfortable', darkMode: false, ...(() => { try { return JSON.parse(localStorage.getItem('sgse-user-preferences') || '{}'); } catch { return {}; } })() }));
   const closeSidebar = () => setSidebarOpen(false);
+  useEffect(() => {
+    applyWorkspacePreferences(preferences);
+    localStorage.setItem('sgse-user-preferences', JSON.stringify(preferences));
+  }, [preferences]);
+  useEffect(() => { api.get('/users/preferences').then((response) => setPreferences((current) => ({ ...current, ...(response.data || {}) }))).catch(() => {}); }, []);
+  const updatePreference = async (field, value) => {
+    const next = { ...preferences, [field]: value };
+    setPreferences(next);
+    try { await api.put('/users/preferences', next); } catch { setPreferences(preferences); }
+  };
+  const chooseTheme = (themePreset) => updatePreference('themePreset', themePreset);
   return (
     <div>
       <nav className="topbar">
@@ -390,6 +418,12 @@ function AuthenticatedApp({ user, setUser, logout }) {
           </div>
         </div>
         <div className="topbar-actions">
+          <div className="topbar-preferences" aria-label="Workspace preferences">
+            <select aria-label="Theme" value={preferences.themePreset} onChange={(event) => chooseTheme(event.target.value)}>{Object.keys(THEME_PRESETS).map((theme) => <option key={theme} value={theme}>{theme.charAt(0).toUpperCase() + theme.slice(1)}</option>)}</select>
+            <select aria-label="Font size" value={preferences.fontSize} onChange={(event) => updatePreference('fontSize', event.target.value)}><option value="90">Small text</option><option value="100">Standard text</option><option value="110">Large text</option><option value="120">Extra large</option><option value="135">Maximum text</option></select>
+            <select aria-label="Language" value={preferences.language} onChange={(event) => updatePreference('language', event.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="od">ଓଡ଼ିଆ</option></select>
+            <select aria-label="Font family" value={preferences.fontFamily} onChange={(event) => updatePreference('fontFamily', event.target.value)}><option>Manrope</option><option>DM Sans</option><option>Plus Jakarta Sans</option><option>Noto Sans</option></select>
+          </div>
           <span className="chip">{user.name}</span>
           <button className="btn secondary" onClick={logout}>Logout</button>
         </div>
@@ -3569,13 +3603,13 @@ function EmiCalculatorPage() {
 }
 
 function WebAppSettingsPage() {
-  const defaults = { ...DEFAULT_WEB_SETTINGS, lowStockThreshold: 5, quotationValidity: 15, currency: 'INR', showPayroll: true, showAnalytics: true, compactContacts: false, autoReminder: true, publicPhone: '', publicEmail: '' };
+  const defaults = { ...DEFAULT_WEB_SETTINGS, lowStockThreshold: 5, quotationValidity: 15, currency: 'INR', showPayroll: true, showAnalytics: true, compactContacts: false, autoReminder: true, publicPhone: '', publicEmail: '', fontSize: '100' };
   const [settings, setSettings] = useState(() => { try { return { ...defaults, ...JSON.parse(localStorage.getItem('sgse-web-settings') || '{}') }; } catch { return defaults; } });
   const [message, setMessage] = useState('');
   useEffect(() => { api.get('/users/settings').then((response) => { const next = { ...defaults, ...(response.data || {}) }; setSettings(next); localStorage.setItem('sgse-web-settings', JSON.stringify(next)); }).catch(() => setMessage('Using local settings until the server is available')); }, []);
   const update = (field, value) => setSettings((current) => ({ ...current, [field]: value }));
   const save = async (event) => { event.preventDefault(); try { const response = await api.put('/users/settings', settings); setSettings(response.data); localStorage.setItem('sgse-web-settings', JSON.stringify(response.data)); previewTheme(response.data); setMessage('Web app settings saved for this shop'); } catch (error) { setMessage(error.response?.data?.message || 'Unable to save web app settings'); } };
-  const previewTheme = (nextSettings = settings) => { document.documentElement.style.setProperty('--brand-primary', nextSettings.primaryColor); document.documentElement.style.setProperty('--brand-accent', nextSettings.accentColor); document.documentElement.style.setProperty('--site-surface', nextSettings.surfaceColor); document.documentElement.style.setProperty('--app-font', nextSettings.fontFamily === 'DM Sans' ? 'DM Sans, sans-serif' : nextSettings.fontFamily === 'Plus Jakarta Sans' ? 'Plus Jakarta Sans, sans-serif' : 'Manrope, sans-serif'); document.documentElement.style.setProperty('--radius-lg', `${Number(nextSettings.cornerRadius || 20)}px`); document.documentElement.style.setProperty('--radius-md', `${Math.max(8, Number(nextSettings.cornerRadius || 20) - 6)}px`); document.documentElement.classList.toggle('theme-dark', nextSettings.darkMode === true); };
+  const previewTheme = (nextSettings = settings) => { applyWorkspacePreferences(nextSettings); };
   const updateTheme = (field, value) => { const next = { ...settings, [field]: value }; setSettings(next); previewTheme(next); };
   const updateSlide = (index, field, value) => setSettings((current) => ({ ...current, heroSlides: current.heroSlides.map((slide, slideIndex) => slideIndex === index ? { ...slide, [field]: value } : slide) }));
   const updateStat = (index, field, value) => setSettings((current) => ({ ...current, publicStats: current.publicStats.map((stat, statIndex) => statIndex === index ? { ...stat, [field]: value } : stat) }));
@@ -3587,6 +3621,7 @@ function WebAppSettingsPage() {
     <div className="settings-section"><div><h4>Theme and appearance</h4><p className="muted">Preview the visual identity immediately, then save it for every visitor.</p></div><div className="theme-control-grid"><label>Primary color<span className="color-control"><input type="color" value={settings.primaryColor} onChange={(event) => updateTheme('primaryColor', event.target.value)} /><input value={settings.primaryColor} onChange={(event) => updateTheme('primaryColor', event.target.value)} /></span></label><label>Accent color<span className="color-control"><input type="color" value={settings.accentColor} onChange={(event) => updateTheme('accentColor', event.target.value)} /><input value={settings.accentColor} onChange={(event) => updateTheme('accentColor', event.target.value)} /></span></label><label>Surface color<span className="color-control"><input type="color" value={settings.surfaceColor} onChange={(event) => updateTheme('surfaceColor', event.target.value)} /><input value={settings.surfaceColor} onChange={(event) => updateTheme('surfaceColor', event.target.value)} /></span></label></div><div className="settings-toggle-grid"><label><input type="checkbox" checked={settings.darkMode} onChange={(event) => updateTheme('darkMode', event.target.checked)} /> Use dark theme</label><label><input type="checkbox" checked={settings.showPublicAbout} onChange={(event) => update('showPublicAbout', event.target.checked)} /> Show about section</label><label><input type="checkbox" checked={settings.showPublicContact} onChange={(event) => update('showPublicContact', event.target.checked)} /> Show contact section</label><label><input type="checkbox" checked={settings.showCalculator} onChange={(event) => update('showCalculator', event.target.checked)} /> Show EMI calculator link</label></div></div>
     <div className="settings-section"><div><h4>Operations and modules</h4><p className="muted">Set defaults and decide which workspace tools remain visible.</p></div><div className="form-grid"><label>Low stock threshold<input type="number" min="0" value={settings.lowStockThreshold} onChange={(event) => update('lowStockThreshold', Number(event.target.value))} /></label><label>Quotation validity (days)<input type="number" min="1" value={settings.quotationValidity} onChange={(event) => update('quotationValidity', Number(event.target.value))} /></label><label>Currency<select value={settings.currency} onChange={(event) => update('currency', event.target.value)}><option value="INR">INR - Indian Rupee</option><option value="USD">USD - US Dollar</option></select></label></div><div className="settings-toggle-grid"><label><input type="checkbox" checked={settings.showPayroll} onChange={(event) => update('showPayroll', event.target.checked)} /> Show payroll dashboard</label><label><input type="checkbox" checked={settings.showAnalytics} onChange={(event) => update('showAnalytics', event.target.checked)} /> Show analytics dashboard</label><label><input type="checkbox" checked={settings.compactContacts} onChange={(event) => update('compactContacts', event.target.checked)} /> Compact contacts workspace</label><label><input type="checkbox" checked={settings.autoReminder} onChange={(event) => update('autoReminder', event.target.checked)} /> Enable service reminders</label></div></div>
     <div className="settings-section"><div><h4>Advanced appearance</h4><p className="muted">Choose a visual preset or fine-tune the workspace shape and typography.</p></div><div className="theme-preset-grid">{Object.keys(THEME_PRESETS).map((preset) => <button type="button" key={preset} className={`theme-preset ${settings.themePreset === preset ? 'selected' : ''}`} onClick={() => choosePreset(preset)}><span style={{ background: THEME_PRESETS[preset].primaryColor }} /><span style={{ background: THEME_PRESETS[preset].accentColor }} /><strong>{preset}</strong></button>)}</div><div className="theme-control-grid"><label>Font family<select value={settings.fontFamily} onChange={(event) => update('fontFamily', event.target.value)}><option>Manrope</option><option>DM Sans</option><option>Plus Jakarta Sans</option></select></label><label>Corner radius<select value={settings.cornerRadius} onChange={(event) => update('cornerRadius', Number(event.target.value))}><option value="8">Sharp</option><option value="14">Balanced</option><option value="20">Soft</option><option value="28">Rounded</option></select></label><label>Layout density<select value={settings.density} onChange={(event) => update('density', event.target.value)}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label></div></div>
+    <div className="settings-section accessibility-settings"><div><h4>Workspace accessibility</h4><p className="muted">These controls apply to navigation, forms, dashboards, and panels for every account.</p></div><div className="theme-control-grid"><label>Readable font size<select value={settings.fontSize} onChange={(event) => update('fontSize', event.target.value)}><option value="90">Small</option><option value="100">Standard</option><option value="110">Large</option><option value="120">Extra large</option><option value="135">Maximum</option></select></label><label>Interface language<select value={settings.language} onChange={(event) => update('language', event.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option><option value="od">ଓଡ଼ିଆ</option></select></label><label>Workspace font<select value={settings.fontFamily} onChange={(event) => update('fontFamily', event.target.value)}><option>Manrope</option><option>DM Sans</option><option>Plus Jakarta Sans</option><option>Noto Sans</option></select></label></div></div>
     {message && <p className="status-message">{message}</p>}<div className="settings-actions"><button className="btn primary" type="submit">Save all settings</button><button className="btn outline" type="button" onClick={() => { setSettings(defaults); previewTheme(); }}>Reset form</button></div></form></div>;
 }
 
