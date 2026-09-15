@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import { API_BASE_URL } from './config';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import QuotationCenter from './components/QuotationCenter';
+import LoadingState from './components/LoadingState';
 import { downloadInvoicePdf } from './utils/invoicePdf';
 import { calculateGstAmount, calculateTaxableValue, getEffectiveGstRate } from './utils/gstMath';
 import { calculateEmi } from './utils/emiMath';
@@ -165,7 +166,6 @@ function App() {
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
     if (storedUser) {
       setUser(JSON.parse(storedUser));
-      setLoading(false);
     }
 
     api.get('/auth/me')
@@ -906,7 +906,7 @@ function ContactsPage({ user }) {
           </div>
         </div>
 
-        {loading ? <p className="muted">Loading...</p> : (
+        {loading ? <LoadingState label="Loading contacts" /> : (
           filtered.length === 0 ? <p className="muted empty-state-inline">No contacts in this pipeline.</p> : (
             <div className="contacts-list">
               {filtered.slice(0, visibleContacts).map((c) => {
@@ -3123,7 +3123,7 @@ function StockPage() {
           }} />
         </div>
 
-        {loading ? <p className="muted">Loading stock...</p> : (
+        {loading ? <LoadingState label="Loading stock levels" /> : (
           <div className="table-responsive">
             <table className="table">
               <thead>
@@ -3361,7 +3361,7 @@ function ReportsPage() {
       <div className="panel">
         <h4>Calling Report ({calls.length} contacts)</h4>
         {loading ? (
-          <p className="muted">Loading...</p>
+          <LoadingState label="Loading reports and call activity" />
         ) : calls.length > 0 ? (
           <table className="table">
             <thead>
