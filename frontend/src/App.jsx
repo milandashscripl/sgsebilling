@@ -1283,6 +1283,8 @@ function CustomersPage({ user }) {
   const [convertedContacts, setConvertedContacts] = useState([]);
   const [customerStorageReady, setCustomerStorageReady] = useState(false);
   const [showDirectCustomer, setShowDirectCustomer] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerStageFilter, setCustomerStageFilter] = useState('All');
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [customerForm, setCustomerForm] = useState({ name: '', mobile: '', aadharNumber: '', address: '', pincode: '', locationLat: '', locationLng: '', project: '', pmgsyId: '', systemCapacity: '', panelBrand: '', inverterModel: '', installationDate: '', warrantyExpiry: '', nextServiceDate: '', quotationAmount: '', approvedBankLoan: '', bankLoanDisbursed: '', disbursementType: 'partial', downPayment: '', marginMoney: '', loadEnhancementPayment: '', earthingAmount: '', dcWireAmount: '', acWireAmount: '', inspectionStatus: 'Pending', subsidyRedeemed: '', subsidyDisbursed: '', pendingAmount: '', stage: 'Project costing', documents: Object.fromEntries(REQUIRED_DOCUMENTS.map((document) => [document, 'provided'])) });
   const [customers, setCustomers] = useState([
@@ -1361,6 +1363,14 @@ function CustomersPage({ user }) {
   useEffect(() => { if (customerStorageReady) localStorage.setItem('sgse-customers', JSON.stringify(customers)); }, [customers, customerStorageReady]);
 
   const customerRows = useMemo(() => [...convertedContacts, ...customers], [convertedContacts, customers]);
+  const visibleCustomerRows = useMemo(() => {
+    const query = customerSearch.trim().toLowerCase();
+    return customerRows.filter((customer) => {
+      const matchesSearch = !query || [customer.name, customer.mobile, customer.project, customer.panelBrand, customer.inverterModel].some((value) => String(value || '').toLowerCase().includes(query));
+      const matchesStage = customerStageFilter === 'All' || customer.stage === customerStageFilter || customer.status === customerStageFilter;
+      return matchesSearch && matchesStage;
+    });
+  }, [customerRows, customerSearch, customerStageFilter]);
   const serviceRadar = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -1483,7 +1493,7 @@ function CustomersPage({ user }) {
         <p className="muted">Track project conversion from lead to sanctioned loan, subsidy, and installation handover.</p>
       </div>
 
-      <div className="customer-toolbar"><div><p className="muted">Customers move through one controlled project pipeline. Converted contacts appear here automatically.</p></div><button className="btn primary" type="button" onClick={() => { resetCustomerForm(); setShowDirectCustomer(true); }}>Add direct customer</button></div>
+      <div className="customer-toolbar"><div><p className="muted">Customers move through one controlled project pipeline. Converted contacts appear here automatically.</p><strong className="customer-toolbar-count">{visibleCustomerRows.length} visible · {customerRows.length} total</strong></div><div className="customer-toolbar-actions"><input className="customer-search" placeholder="Search customer, project, phone..." value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} /><select value={customerStageFilter} onChange={(event) => setCustomerStageFilter(event.target.value)}><option>All</option>{CUSTOMER_STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select><button className="btn primary" type="button" onClick={() => { resetCustomerForm(); setShowDirectCustomer(true); }}>Add direct customer</button></div></div>
       {showDirectCustomer && <form className="panel customer-intake-panel" onSubmit={addCustomer}>
         <div className="panel-header compact-header"><div><p className="eyebrow">Customer record</p><h4>{editingCustomerId ? 'Edit customer project' : 'Start a new project'}</h4></div><button className="btn outline" type="button" onClick={() => { setShowDirectCustomer(false); resetCustomerForm(); }}>Close</button></div>
         <div className="form-grid">
@@ -1564,7 +1574,7 @@ function CustomersPage({ user }) {
       </div>
 
       <div className="customer-list-grid">
-        {customerRows.map((customer) => {
+        {visibleCustomerRows.map((customer) => {
           const extraLoadEnhancement = Number(customer.loadEnhancementPayment || 0) > 3747 ? Number(customer.loadEnhancementPayment || 0) - 3747 : 0;
           const projectCost = Number(customer.quotationAmount || 0) + extraLoadEnhancement;
           const pendingProjectBalance = Math.max(0, projectCost - Number(customer.downPayment || 0) - Number(customer.marginMoney || 0) - Number(customer.subsidyRedeemed || 0));
@@ -1608,6 +1618,7 @@ function CustomersPage({ user }) {
             </div>
           );
         })}
+        {!visibleCustomerRows.length && <div className="panel customer-empty-state"><strong>No customer records match this view.</strong><span>Try another search or create a direct customer project.</span><button className="btn primary" type="button" onClick={() => { resetCustomerForm(); setShowDirectCustomer(true); }}>Create customer project</button></div>}
       </div>
     </div>
   );
