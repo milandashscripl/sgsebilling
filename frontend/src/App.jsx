@@ -155,8 +155,10 @@ function App() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
+    const startedAt = performance.now();
+    const finishLoading = () => window.setTimeout(() => setLoading(false), Math.max(0, 1450 - (performance.now() - startedAt)));
     if (!token) {
-      setLoading(false);
+      finishLoading();
       return;
     }
 
@@ -177,7 +179,7 @@ function App() {
         localStorage.removeItem('user');
         setUser(null);
       })
-      .finally(() => setLoading(false));
+      .finally(finishLoading);
   }, []);
 
   useEffect(() => {
@@ -224,14 +226,18 @@ function App() {
   };
 
   if (loading) return (
-    <div className="loading">
+    <div className="loading" role="status" aria-live="polite">
+      <div className="loading-backdrop-grid" aria-hidden="true" />
       <div className="loading-shell">
-        <div className="loading-orbit" aria-hidden="true"><span /><span /><span /></div>
+        <div className="loading-brand-mark">SG</div>
         <div>
+          <span className="loading-kicker">Solar operations platform</span>
           <strong>SGSE Billing</strong>
-          <small>Preparing your solar operations workspace</small>
+          <small>Preparing your workspace for takeoff</small>
           <div className="loading-progress" aria-hidden="true"><span /></div>
+          <div className="loading-status"><span><i /> Secure session</span><span><i /> Live workspace</span></div>
         </div>
+        <div className="loading-orbit" aria-hidden="true"><span /><span /><span /></div>
       </div>
     </div>
   );
@@ -368,6 +374,7 @@ function PublicApp({ setUser }) {
           <div className="hero-stats">{stats.slice(0, 4).map((stat) => <div key={`${stat.value}-${stat.label}`}><strong>{stat.value}</strong><span>{stat.label}</span></div>)}</div>
         </div>
         <div className="hero-preview" aria-label="Workspace preview">
+          <div className="hero-visual-orbit" aria-hidden="true"><span /><span /><span /><b>SGSE<br /><small>SOLAR OS</small></b></div>
           <div className="preview-window-bar"><span /><span /><span /><small>Today&apos;s workspace</small></div>
           <div className="preview-heading"><div><span>Overview</span><strong>Everything in motion</strong></div><b>Live</b></div>
           <div className="preview-metrics">{stats.slice(0, 3).map((stat) => <div key={`preview-${stat.value}-${stat.label}`}><small>{stat.label}</small><strong>{stat.value}</strong><i /></div>)}</div>
