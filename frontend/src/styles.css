@@ -1787,14 +1787,14 @@ body { background: radial-gradient(circle at 8% 0%, rgba(242,189,69,0.16), trans
 /* Public index viewport composition. */
 .public-shell { padding: 0 !important; }
 .public-shell .public-site { gap: 0; padding: 0 0 48px; }
-.public-shell .public-nav { position: absolute; top: 24px; left: clamp(16px, 4vw, 64px); right: clamp(16px, 4vw, 64px); width: auto; max-width: none; margin: 0; }
+.public-shell .public-nav { position: absolute; top: 0; left: 0; right: 0; width: 100%; max-width: none; margin: 0; padding: 14px clamp(24px, 9vw, 144px); border-radius: 0; }
 .public-shell .hero-card { width: 100%; max-width: none; min-height: max(720px, 100svh); margin: 0; padding: 150px clamp(24px, 9vw, 144px) 72px; border-radius: 0; display: grid; align-content: center; }
 .public-shell .hero-card > div:not(.hero-glow):not(.aurora-canvas):not(.hero-slide-image) { max-width: 920px; }
 .public-shell .hero-card .hero-stats { max-width: 920px; }
 .public-shell .public-proof-strip, .public-shell .public-section { margin-top: 28px; }
 .public-shell .public-proof-strip { padding-left: clamp(24px, 9vw, 144px); padding-right: clamp(24px, 9vw, 144px); }
 @media (max-width: 700px) {
-  .public-shell .public-nav { top: 12px; left: 12px; right: 12px; }
+  .public-shell .public-nav { top: 0; left: 0; right: 0; padding: 12px 22px; border-radius: 0; }
   .public-shell .hero-card { min-height: max(760px, 100svh); padding: 170px 22px 48px; border-radius: 0; }
   .public-shell .hero-card h1 { font-size: clamp(2.3rem, 10vw, 3.4rem); line-height: 1.02; }
   .auth-welcome-panel { min-height: 360px; padding: 28px 24px; border-radius: 22px; }.auth-welcome-panel h2 { font-size: 2.2rem; }.auth-welcome-orbit { width: 170px; height: 170px; right: -34px; top: 70px; opacity: .45; }.auth-welcome-metrics { grid-template-columns: 1fr; max-width: 210px; }
