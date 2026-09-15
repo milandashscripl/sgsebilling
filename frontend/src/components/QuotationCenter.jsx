@@ -36,6 +36,29 @@ function calculate(form) {
   return { capacity, annualGeneration, annualValue, cost, subsidy, financed, emi, payback: Math.max(0, cost - subsidy) / Math.max(annualValue, 1), monthsCount };
 }
 
+const SEASON_PRESETS = {
+  Winter: { day: 355, label: '21 Dec' },
+  Spring: { day: 80, label: '21 Mar' },
+  Summer: { day: 172, label: '21 Jun' },
+  Autumn: { day: 266, label: '23 Sep' }
+};
+
+function solarPosition(latitude, day, hour) {
+  const radians = Math.PI / 180;
+  const lat = clamp(latitude, -66, 66) * radians;
+  const declination = (23.45 * Math.sin(radians * (360 / 365) * (day - 81))) * radians;
+  const hourAngle = (hour - 12) * 15 * radians;
+  const altitude = Math.asin(Math.sin(lat) * Math.sin(declination) + Math.cos(lat) * Math.cos(declination) * Math.cos(hourAngle));
+  const azimuth = Math.atan2(Math.sin(hourAngle), Math.cos(hourAngle) * Math.sin(lat) - Math.tan(declination) * Math.cos(lat));
+  return { altitude: altitude / radians, azimuth: (azimuth / radians + 180 + 360) % 360 };
+}
+
+function seasonalGeneration(form, seasonName) {
+  const base = calculate(form).annualGeneration / 12;
+  const factors = { Winter: 0.82, Spring: 1.03, Summer: 1.16, Autumn: 0.99 };
+  return base * (factors[seasonName] || 1);
+}
+
 function ThreeDPreview({ form }) {
   const previewRef = useRef(null);
   const sceneRef = useRef(null);
@@ -43,6 +66,10 @@ function ThreeDPreview({ form }) {
   const cameraRef = useRef(null);
   const controlsRef = useRef(null);
   const plantRef = useRef(null);
+  const sunRef = useRef(null);
+  const sunMarkerRef = useRef(null);
+  const [season, setSeason] = useState('Summer');
+  const [hour, setHour] = useState(12);
   const toggleFullscreen = async () => { if (!document.fullscreenElement) await previewRef.current?.requestFullscreen?.(); else await document.exitFullscreen?.(); };
   const count = Math.max(1, Math.min(200, Math.round(number(form.panelCount, 10))));
   useEffect(() => {
@@ -64,13 +91,17 @@ function ThreeDPreview({ form }) {
     const sun = new THREE.DirectionalLight('#fff4d0', 2.2);
     sun.position.set(8, 14, 8);
     sun.castShadow = true;
-    scene.add(sun);
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -16; sun.shadow.camera.right = 16; sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
+    scene.add(sun); scene.add(sun.target);
+    const sunMarker = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 16), new THREE.MeshBasicMaterial({ color: '#ffd56a' }));
+    scene.add(sunMarker);
     const grid = new THREE.GridHelper(28, 28, '#2b5360', '#16313b');
     grid.position.y = -0.02;
     scene.add(grid);
     const plant = new THREE.Group();
     scene.add(plant);
-    rendererRef.current = renderer; cameraRef.current = camera; controlsRef.current = controls; plantRef.current = plant;
+    rendererRef.current = renderer; cameraRef.current = camera; controlsRef.current = controls; plantRef.current = plant; sunRef.current = sun; sunMarkerRef.current = sunMarker;
     const resize = () => { if (!host.clientWidth || !host.clientHeight) return; camera.aspect = host.clientWidth / host.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(host.clientWidth, host.clientHeight); };
     window.addEventListener('resize', resize);
     let frame = 0;
@@ -78,6 +109,23 @@ function ThreeDPreview({ form }) {
     animate(); resize();
     return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', resize); controls.dispose(); renderer.dispose(); host.replaceChildren(); };
   }, []);
+  useEffect(() => {
+    const sun = sunRef.current;
+    const marker = sunMarkerRef.current;
+    if (!sun || !marker) return;
+    const position = solarPosition(number(form.latitude, 21.333), SEASON_PRESETS[season].day, hour);
+    const altitude = THREE.MathUtils.degToRad(Math.max(8, position.altitude));
+    const azimuth = THREE.MathUtils.degToRad(position.azimuth);
+    const radius = 15;
+    const x = Math.sin(azimuth) * Math.cos(altitude) * radius;
+    const y = Math.sin(altitude) * radius;
+    const z = Math.cos(azimuth) * Math.cos(altitude) * radius;
+    sun.position.set(x, y, z);
+    sun.target.position.set(0, 0, 0);
+    sun.target.updateMatrixWorld();
+    marker.position.set(x, y, z);
+    sun.intensity = Math.max(0.7, 2.2 * Math.sin(altitude));
+  }, [form.latitude, season, hour]);
   useEffect(() => {
     const plant = plantRef.current;
     if (!plant) return;
@@ -115,7 +163,15 @@ function ThreeDPreview({ form }) {
     const inverterLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 0.18), new THREE.MeshBasicMaterial({ color: '#26311f' })); inverterLabel.position.set(inverter.position.x, inverter.position.y + 0.05, inverter.position.z - 0.19); inverterLabel.rotation.x = -Math.PI / 2; plant.add(inverterLabel);
   }, [form, count]);
   const resetCamera = () => { if (!cameraRef.current || !controlsRef.current) return; cameraRef.current.position.set(11, 9, 14); controlsRef.current.target.set(0, 0, 0); controlsRef.current.update(); };
-  return <div className="quotation-3d-wrap quotation-real-3d" ref={previewRef}><div className="quotation-3d-toolbar"><div><strong>Real 3D solar plant layout</strong><small>Flat surface · {form.panelLayout || 'Portrait'} modules · {count} panels</small></div><div className="inline-actions"><button type="button" className="btn secondary" onClick={resetCamera}>Reset view</button><button type="button" className="btn secondary" onClick={toggleFullscreen}>Full screen</button></div></div><div className="quotation-3d-scene" ref={sceneRef} /><div className="quotation-3d-caption">Orbit to inspect · scroll to zoom · panel spacing, tilt, rails, roof size, and inverter position follow the editable design inputs.</div></div>;
+  const position = solarPosition(number(form.latitude, 21.333), SEASON_PRESETS[season].day, hour);
+  const seasonalRows = Object.keys(SEASON_PRESETS).map((name) => ({ name, generation: seasonalGeneration(form, name) }));
+  return <div className="quotation-3d-wrap quotation-real-3d" ref={previewRef}>
+    <div className="quotation-3d-toolbar"><div><strong>Professional solar site simulator</strong><small>{form.roofSurface || 'Flat RCC roof'} · {form.panelLayout || 'Portrait'} modules · {count} panels</small></div><div className="inline-actions"><button type="button" className="btn secondary" onClick={resetCamera}>Reset view</button><button type="button" className="btn secondary" onClick={toggleFullscreen}>Full screen</button></div></div>
+    <div className="quotation-3d-scene" ref={sceneRef} />
+    <div className="solar-simulator-controls"><label>Season<select value={season} onChange={(event) => setSeason(event.target.value)}>{Object.entries(SEASON_PRESETS).map(([name, preset]) => <option key={name} value={name}>{name} · {preset.label}</option>)}</select></label><label>Sun time <strong>{String(hour).padStart(2, '0')}:00</strong><input type="range" min="6" max="18" step="1" value={hour} onChange={(event) => setHour(Number(event.target.value))} /></label><div className="solar-position-readout"><span>Sun altitude <strong>{Math.max(0, position.altitude).toFixed(1)}°</strong></span><span>Solar azimuth <strong>{position.azimuth.toFixed(0)}°</strong></span></div></div>
+    <div className="solar-season-grid">{seasonalRows.map((row) => <div key={row.name} className={row.name === season ? 'active' : ''}><span>{row.name}</span><strong>{Math.round(row.generation).toLocaleString('en-IN')}</strong><small>kWh / month</small></div>)}</div>
+    <div className="quotation-3d-caption">Orbit to inspect the array. Change season and sun time to inspect shadows, solar altitude, azimuth, and indicative generation potential. Final yield should be confirmed with a detailed site survey.</div>
+  </div>;
 }
 
 export default function QuotationCenter({ user }) {

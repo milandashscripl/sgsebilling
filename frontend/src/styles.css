@@ -844,6 +844,20 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .quotation-3d-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .quotation-3d-toolbar .btn { padding: 8px 12px; }
 .quotation-3d-scene { height: 220px; position: relative; perspective: 700px; transform-style: preserve-3d; }
+.solar-simulator-controls { display: grid; grid-template-columns: minmax(150px, .65fr) minmax(220px, 1.35fr) minmax(200px, .9fr); gap: 12px; align-items: end; margin-top: 14px; padding: 12px; border: 1px solid rgba(168,233,221,.18); border-radius: 12px; background: rgba(255,255,255,.05); }
+.solar-simulator-controls label { display: grid; gap: 6px; color: #a9cbc9; font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.solar-simulator-controls select { min-height: 38px; padding: 8px 10px; border-color: rgba(168,233,221,.2); background: rgba(4,24,32,.72); color: #e8fffa; font-size: .82rem; }
+.solar-simulator-controls input[type="range"] { width: 100%; padding: 0; accent-color: #f4c65d; background: transparent; }
+.solar-simulator-controls label strong { color: #f4c65d; font-size: .8rem; }
+.solar-position-readout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.solar-position-readout span { display: grid; gap: 3px; padding: 9px; border-radius: 9px; background: rgba(255,255,255,.06); color: #a9cbc9; font-size: .68rem; }
+.solar-position-readout strong { color: #fff; font-size: .92rem; }
+.solar-season-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.solar-season-grid > div { display: grid; gap: 3px; padding: 10px; border: 1px solid rgba(168,233,221,.12); border-radius: 10px; background: rgba(255,255,255,.04); }
+.solar-season-grid > div.active { border-color: rgba(244,198,93,.68); background: rgba(244,198,93,.10); }
+.solar-season-grid span { color: #a9cbc9; font-size: .7rem; }
+.solar-season-grid strong { color: #f5fffb; font-size: .95rem; }
+.solar-season-grid small { color: #7fa5a3; font-size: .65rem; }
 .quotation-house { position: absolute; width: 62%; height: 40%; left: 19%; bottom: 19%; background: linear-gradient(135deg, #60727c, #263944); transform: rotateX(58deg) rotateZ(-8deg); box-shadow: 20px 22px 0 rgba(0,0,0,.22); }
 .quotation-roof { position: absolute; z-index: 2; width: 68%; height: 52%; left: 16%; top: 18%; display: grid; grid-template-columns: repeat(auto-fit, minmax(24px, 1fr)); transform: rotateX(var(--scene-x)) rotateZ(var(--scene-z)) rotateY(var(--roof-azimuth)) rotateX(var(--roof-tilt)); transform-style: preserve-3d; padding: 5px; background: #274a5b; border: 3px solid #7de0d1; box-shadow: 26px 34px 0 rgba(0,0,0,.22); cursor: grab; touch-action: none; }
 .quotation-roof:active { cursor: grabbing; }
@@ -873,7 +887,7 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .quotation-history-row span { color: var(--text-muted); font-size: .78rem; }
 .btn.danger { color: #a33434; border-color: rgba(194,60,60,.22); background: rgba(194,60,60,.05); }
 @media (max-width: 920px) { .quotation-layout { grid-template-columns: 1fr; } .quotation-summary { position: static; } .quotation-tool-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 620px) { .quotation-header { display: grid; } .quotation-header .inline-actions { width: 100%; } .quotation-header .btn { flex: 1; } .quotation-history-row { grid-template-columns: 1fr; } .quotation-history-row .inline-actions { justify-content: flex-start; } }
+@media (max-width: 620px) { .quotation-header { display: grid; } .quotation-header .inline-actions { width: 100%; } .quotation-header .btn { flex: 1; } .quotation-history-row { grid-template-columns: 1fr; } .quotation-history-row .inline-actions { justify-content: flex-start; } .solar-simulator-controls { grid-template-columns: 1fr; } .solar-season-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .billing-form-panel, .invoice-preview-panel { display: grid; gap: 18px; }
 .billing-form-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .billing-customer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
