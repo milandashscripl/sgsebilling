@@ -1345,6 +1345,24 @@ function CustomersPage({ user }) {
     if (!window.confirm(`Delete the project record for ${customer.name || 'this customer'}?`)) return;
     setCustomers((current) => current.filter((entry) => entry.id !== customer.id));
   };
+  const openCustomerQuotation = (customer) => {
+    navigate('/quotations', {
+      state: {
+        customer: {
+          clientName: customer.name || '',
+          clientContact: customer.mobile || '',
+          clientAddress: customer.address || '',
+          siteName: customer.project || 'Solar project',
+          latitude: customer.locationLat || '',
+          longitude: customer.locationLng || '',
+          capacity: String(customer.systemCapacity || '').replace(/[^0-9.]/g, '') || '5',
+          panelBrand: customer.panelBrand || 'Waaree',
+          inverterBrand: customer.inverterModel || 'Growatt',
+          projectCost: customer.quotationAmount || '325000'
+        }
+      }
+    });
+  };
   const updateCustomerStage = (customerId, stage) => {
     setCustomers((current) => current.map((customer) => customer.id === customerId ? { ...customer, stage, status: stage } : customer));
     setConvertedContacts((current) => current.map((customer) => customer.id === customerId ? { ...customer, stage, status: stage } : customer));
@@ -1504,7 +1522,7 @@ function CustomersPage({ user }) {
                   <h4>{customer.name}</h4>
                   <p className="muted">{customer.project}</p>
                 </div>
-                <div className="inline-actions"><span className="status-badge status-following-up">{customer.status}</span><button className="btn outline" type="button" onClick={() => editCustomer(customer)}>Edit</button><button className="btn outline" type="button" onClick={() => downloadQuotation(customer)}>Quotation PDF</button>{!String(customer.id).startsWith('converted-') && <button className="btn danger-outline" type="button" onClick={() => deleteCustomer(customer)}>Delete</button>}</div>
+                <div className="inline-actions"><span className="status-badge status-following-up">{customer.status}</span><button className="btn outline" type="button" onClick={() => editCustomer(customer)}>Edit</button><button className="btn primary" type="button" onClick={() => openCustomerQuotation(customer)}>Open quotation builder</button><button className="btn outline" type="button" onClick={() => downloadQuotation(customer)}>Quick PDF</button>{!String(customer.id).startsWith('converted-') && <button className="btn danger-outline" type="button" onClick={() => deleteCustomer(customer)}>Delete</button>}</div>
               </div>
 
               <div className="customer-details-grid">
