@@ -141,6 +141,48 @@ button { appearance: none; }
 .auth-subtitle {
   margin: 0 0 6px; color: var(--text-muted); font-size: 0.92rem; line-height: 1.5;
 }
+.auth-feature-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.auth-mini-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(24, 111, 175, 0.08);
+  border: 1px solid rgba(24, 111, 175, 0.12);
+  color: #16406E;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.auth-mini-pill.soft {
+  background: rgba(78, 188, 154, 0.12);
+  border-color: rgba(78, 188, 154, 0.16);
+  color: #176a52;
+}
+.auth-trust-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(24, 111, 175, 0.12);
+  background: linear-gradient(135deg, rgba(24, 111, 175, 0.04), rgba(255, 255, 255, 0.9));
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.auth-trust-strip strong {
+  color: #16406E;
+  font-size: 0.8rem;
+}
 .auth-field-label { display: grid; gap: 8px; font-size: 0.82rem; font-weight: 700; color: #25557f; }
 .auth-field-label span { padding-left: 4px; }
 .auth-extra-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; margin-bottom: 8px; font-size: 0.82rem; color: var(--text-muted); }
@@ -730,6 +772,33 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .quotation-page { display: grid; gap: 18px; }
 .quotation-header { align-items: flex-start; }
 .quotation-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--panel-border); }
+.customer-quote-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(36, 114, 82, 0.16);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.10), rgba(255, 255, 255, 0.92));
+  box-shadow: 0 14px 28px rgba(31, 91, 67, 0.08);
+}
+.customer-quote-banner > div {
+  display: grid;
+  gap: 4px;
+}
+.customer-quote-banner strong {
+  color: #173126;
+  font-size: 1.12rem;
+}
+.customer-quote-banner small {
+  color: #476759;
+  font-size: 0.8rem;
+}
+.customer-quote-banner .eyebrow.small {
+  color: #1f6749;
+  letter-spacing: 0.12em;
+}
 .quotation-dashboard-button { border: 0; background: transparent; color: var(--text-muted); padding: 10px 4px; font-weight: 700; }
 .quotation-dashboard-button.active { color: var(--brand-primary); }
 .quotation-dashboard { display: grid; gap: 18px; }

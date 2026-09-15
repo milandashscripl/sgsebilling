@@ -518,7 +518,11 @@ function Login({ setUser }) {
           <h3>Welcome back</h3>
         </div>
       </div>
-      <p className="auth-subtitle">Manage business billing, inventory, and payroll from a single dashboard.</p>
+      <div className="auth-feature-row">
+        <span className="auth-mini-pill">Live billing</span>
+        <span className="auth-mini-pill soft">Solar ops</span>
+      </div>
+      <p className="auth-subtitle">Manage billing, stock, projects, and customer follow-up from one premium control room.</p>
       {error && <p className="error">{error}</p>}
       <label className="auth-field-label">
         <span>Email address or caller ID</span>
@@ -533,6 +537,10 @@ function Login({ setUser }) {
         <Link to="/register">Create account</Link>
       </div>
       <button className="btn primary auth-submit" type="submit" disabled={submitting}>{submitting ? 'Signing in...' : 'Sign in'}</button>
+      <div className="auth-trust-strip">
+        <span>Trusted by solar teams</span>
+        <strong>24/7 operations</strong>
+      </div>
     </form>
   );
 }
@@ -570,7 +578,11 @@ function Register({ setUser }) {
           <h3>Create an account</h3>
         </div>
       </div>
-      <p className="auth-subtitle">Set up your business workspace and start managing sales instantly.</p>
+      <div className="auth-feature-row">
+        <span className="auth-mini-pill">GST ready</span>
+        <span className="auth-mini-pill soft">Fast setup</span>
+      </div>
+      <p className="auth-subtitle">Set up your business workspace and start managing sales, projects, and billing in minutes.</p>
       {error && <p className="error">{error}</p>}
       <label className="auth-field-label">
         <span>Full name</span>
@@ -589,6 +601,10 @@ function Register({ setUser }) {
         <Link to="/login">Sign in</Link>
       </div>
       <button className="btn primary auth-submit" type="submit">Register</button>
+      <div className="auth-trust-strip">
+        <span>Built for solar teams</span>
+        <strong>From lead to final invoice</strong>
+      </div>
     </form>
   );
 }
