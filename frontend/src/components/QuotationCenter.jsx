@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
@@ -14,13 +14,14 @@ const initialForm = {
 };
 
 const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const clamp = (value, min, max) => Math.min(max, Math.max(min, number(value, min)));
 const money = (value) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(number(value));
 const formatDate = (value) => value ? new Date(value).toLocaleDateString('en-IN') : '-';
 const getToken = () => localStorage.getItem('token');
 
 function calculate(form) {
   const capacity = number(form.capacity, 5);
-  const annualGeneration = capacity * 5.2 * 365 * (1 - 0.14) * (1 - number(form.shading, 5) / 100);
+  const annualGeneration = capacity * 5.2 * 365 * (1 - 0.14) * (1 - clamp(form.shading, 0, 100) / 100);
   const annualValue = annualGeneration * number(form.tariff, 5);
   const cost = number(form.projectCost);
   const subsidy = number(form.centralSubsidy) + number(form.stateSubsidy);
@@ -32,6 +33,7 @@ function calculate(form) {
 }
 
 function ThreeDPreview({ form }) {
+  const previewRef = useRef(null);
   const [rotation, setRotation] = useState({ x: 58, z: -8 });
   const [dragStart, setDragStart] = useState(null);
   const count = Math.max(1, Math.min(36, Math.round(number(form.panelCount, 10))));
@@ -39,7 +41,8 @@ function ThreeDPreview({ form }) {
   const rows = Math.ceil(count / columns);
   const startDrag = (event) => { event.currentTarget.setPointerCapture(event.pointerId); setDragStart({ x: event.clientX, y: event.clientY, rotation }); };
   const drag = (event) => { if (!dragStart) return; setRotation({ x: Math.max(35, Math.min(78, dragStart.rotation.x - (event.clientY - dragStart.y) * 0.25)), z: Math.max(-35, Math.min(35, dragStart.rotation.z + (event.clientX - dragStart.x) * 0.25)) }); };
-  return <div className="quotation-3d-wrap"><div className="quotation-3d-scene" onPointerDown={startDrag} onPointerMove={drag} onPointerUp={() => setDragStart(null)} onPointerCancel={() => setDragStart(null)} style={{ '--roof-tilt': `${number(form.tilt, 20) - 12}deg`, '--roof-azimuth': `${number(form.azimuth, 180) - 180}deg`, '--panel-opacity': `${Math.max(0.35, 1 - number(form.shading, 5) / 140)}`, '--scene-x': `${rotation.x}deg`, '--scene-z': `${rotation.z}deg` }}><div className="quotation-roof">{Array.from({ length: count }, (_, index) => <span key={index} style={{ width: `${100 / columns}%`, height: `${100 / rows}%` }} />)}</div><div className="quotation-house" /><div className="quotation-inverter">INVERTER</div></div><div className="quotation-3d-caption">Manual 3D concept · drag to inspect · {form.roofLength || 8}m × {form.roofWidth || 5}m · {count} modules · {form.shading || 5}% shading</div></div>;
+  const toggleFullscreen = async () => { if (!document.fullscreenElement) await previewRef.current?.requestFullscreen?.(); else await document.exitFullscreen?.(); };
+  return <div className="quotation-3d-wrap" ref={previewRef}><div className="quotation-3d-toolbar"><strong>3D solar plant preview</strong><button type="button" className="btn secondary" onClick={toggleFullscreen}>{document.fullscreenElement === previewRef.current ? 'Exit full screen' : 'Full screen'}</button></div><div className="quotation-3d-scene" onPointerDown={startDrag} onPointerMove={drag} onPointerUp={() => setDragStart(null)} onPointerCancel={() => setDragStart(null)} style={{ '--roof-tilt': `${number(form.tilt, 20) - 12}deg`, '--roof-azimuth': `${number(form.azimuth, 180) - 180}deg`, '--panel-opacity': `${Math.max(0.35, 1 - clamp(form.shading, 0, 100) / 140)}`, '--scene-x': `${rotation.x}deg`, '--scene-z': `${rotation.z}deg` }}><div className="quotation-roof">{Array.from({ length: count }, (_, index) => <span key={index} style={{ width: `${100 / columns}%`, height: `${100 / rows}%` }} />)}</div><div className="quotation-house" /><div className="quotation-inverter">INVERTER</div></div><div className="quotation-3d-caption">Manual 3D concept · drag to inspect · {form.roofLength || 8}m × {form.roofWidth || 5}m · {count} modules · {form.shading || 5}% shading</div></div>;
 }
 
 export default function QuotationCenter({ user }) {
@@ -94,10 +97,10 @@ export default function QuotationCenter({ user }) {
   const updateCalculator = (field, value) => setCalculator((current) => ({ ...current, [field]: value }));
   const calculatorResult = useMemo(() => {
     const bill = number(calculator.monthlyBill); const tariff = number(calculator.tariff, 5); const annualUse = tariff ? bill * 12 / tariff : 0;
-    const performance = Math.max(0.1, 1 - number(calculator.loss, 14) / 100); const size = annualUse / (number(calculator.sunHours, 5) * 365 * performance);
-    const generation = size * number(calculator.sunHours, 5) * 365 * performance; const selfUse = number(calculator.selfUse, 90) / 100;
+    const performance = Math.max(0.1, 1 - clamp(calculator.loss, 0, 90) / 100); const sunHours = clamp(calculator.sunHours, 0.1, 12); const size = annualUse / (sunHours * 365 * performance);
+    const generation = size * sunHours * 365 * performance; const selfUse = clamp(calculator.selfUse, 0, 100) / 100;
     const value = generation * (selfUse * tariff + (1 - selfUse) * number(calculator.exportTariff, 5)); const net = Math.max(0, number(calculator.projectCost) - number(calculator.subsidy));
-    const rows = []; let cumulative = 0; for (let year = 1; year <= 25; year += 1) { const generated = generation * ((1 - number(calculator.degradation, 0.5) / 100) ** (year - 1)); const yearValue = generated * tariff * ((1 + number(calculator.escalation, 3) / 100) ** (year - 1)); cumulative += yearValue; rows.push({ year, generated, yearValue, cumulative }); }
+    const rows = []; let cumulative = 0; const degradation = clamp(calculator.degradation, 0, 10) / 100; const escalation = clamp(calculator.escalation, 0, 30) / 100; for (let year = 1; year <= 25; year += 1) { const generated = generation * ((1 - degradation) ** (year - 1)); const yearValue = generated * tariff * ((1 + escalation) ** (year - 1)); cumulative += yearValue; rows.push({ year, generated, yearValue, cumulative }); }
     return { size, generation, value, payback: net / Math.max(value, 1), rows };
   }, [calculator]);
   const loadWeather = async () => {

@@ -731,6 +731,10 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .quotation-main, .quotation-sidebar { display: grid; gap: 18px; }
 .quotation-number { color: var(--brand-primary); font-size: .75rem; font-weight: 800; }
 .quotation-3d-wrap { margin-top: 18px; border-radius: 14px; overflow: hidden; background: linear-gradient(145deg, #092c3b, #0b1725 58%, #081116); padding: 18px; color: #d9f4f1; }
+.quotation-3d-wrap:fullscreen { width: 100vw; height: 100vh; margin: 0; border-radius: 0; padding: clamp(22px, 5vw, 64px); display: grid; align-content: center; }
+.quotation-3d-wrap:fullscreen .quotation-3d-scene { height: min(70vh, 720px); }
+.quotation-3d-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.quotation-3d-toolbar .btn { padding: 8px 12px; }
 .quotation-3d-scene { height: 220px; position: relative; perspective: 700px; transform-style: preserve-3d; }
 .quotation-house { position: absolute; width: 62%; height: 40%; left: 19%; bottom: 19%; background: linear-gradient(135deg, #60727c, #263944); transform: rotateX(58deg) rotateZ(-8deg); box-shadow: 20px 22px 0 rgba(0,0,0,.22); }
 .quotation-roof { position: absolute; z-index: 2; width: 68%; height: 52%; left: 16%; top: 18%; display: grid; grid-template-columns: repeat(auto-fit, minmax(24px, 1fr)); transform: rotateX(var(--scene-x)) rotateZ(var(--scene-z)) rotateY(var(--roof-azimuth)) rotateX(var(--roof-tilt)); transform-style: preserve-3d; padding: 5px; background: #274a5b; border: 3px solid #7de0d1; box-shadow: 26px 34px 0 rgba(0,0,0,.22); cursor: grab; touch-action: none; }
