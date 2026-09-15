@@ -10,12 +10,13 @@
   },
   "dependencies": {
     "axios": "^1.7.2",
-    "jspdf": "^4.2.1",
     "chart.js": "^4.4.0",
-    "react-chartjs-2": "^5.2.0",
+    "jspdf": "^4.2.1",
     "react": "^18.3.1",
+    "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.21.1"
+    "react-router-dom": "^6.21.1",
+    "three": "^0.160.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
