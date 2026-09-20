@@ -228,6 +228,11 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .emi-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr); gap: 16px; }
 .emi-input-panel, .emi-result-panel, .emi-breakdown, .emi-schedule { padding: 22px; }
 .emi-input-panel { display: grid; gap: 16px; }
+.emi-quick-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+.emi-quick-actions label, .emi-input-panel .form-grid label { display: grid; gap: 5px; }
+.emi-input-panel label small { color: var(--text-muted); font-size: .72rem; font-weight: 500; }
+.emi-range { width: 100%; padding: 0 !important; accent-color: var(--brand-primary); background: transparent !important; border: 0 !important; box-shadow: none !important; }
+.emi-inline-warning { margin: 0; padding: 10px 12px; border-radius: 12px; color: #8a4b08; background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.2); font-size: .82rem; font-weight: 700; }
 .panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .panel-header h4 { margin: 0; color: #123f63; }
 .panel-header p { margin: 4px 0 0; }
@@ -245,6 +250,12 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .emi-metrics strong { color: #fff; font-size: 0.96rem; }
 .emi-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 24px 24px; }
 .emi-actions .btn.secondary, .emi-actions .btn.outline { color: #eaf6ff; border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.09); }
+.emi-result-progress { display: grid; gap: 6px; padding: 0 24px; color: rgba(238,248,255,.78); font-size: .76rem; }
+.emi-result-progress > div:first-child { display: flex; justify-content: space-between; gap: 12px; }
+.emi-result-progress strong { color: #fff; }
+.emi-progress-track { height: 8px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.16); }
+.emi-progress-track span { display: block; height: 100%; border-radius: inherit; background: #f2c75b; }
+.emi-result-progress small { color: rgba(238,248,255,.62); }
 .emi-breakdown { display: grid; gap: 14px; }
 .emi-total-outflow { color: #166534; font-size: 1.15rem; white-space: nowrap; }
 .emi-breakdown-bar { display: flex; height: 14px; overflow: hidden; border-radius: 999px; background: #edf2f6; }
@@ -892,6 +903,7 @@ input::placeholder, select::placeholder, textarea::placeholder { color: #8B97A9;
 .btn.danger { color: #a33434; border-color: rgba(194,60,60,.22); background: rgba(194,60,60,.05); }
 @media (max-width: 920px) { .quotation-layout { grid-template-columns: 1fr; } .quotation-summary { position: static; } .quotation-tool-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .quotation-header { display: grid; } .quotation-header .inline-actions { width: 100%; } .quotation-header .btn { flex: 1; } .quotation-history-row { grid-template-columns: 1fr; } .quotation-history-row .inline-actions { justify-content: flex-start; } .solar-simulator-controls { grid-template-columns: 1fr; } .solar-season-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .emi-quick-actions { grid-template-columns: 1fr; } .emi-quick-actions .btn { width: 100%; } .emi-compare-grid { grid-template-columns: 1fr; } .emi-compare-grid .compare-arrow { transform: rotate(90deg); min-height: 22px; } .emi-result-progress { padding: 0 18px; } }
 .billing-form-panel, .invoice-preview-panel { display: grid; gap: 18px; }
 .billing-form-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .billing-customer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
