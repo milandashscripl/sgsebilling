@@ -79,7 +79,10 @@ function ThreeDPreview({ form }) {
     scene.background = new THREE.Color('#07141b');
     const camera = new THREE.PerspectiveCamera(42, host.clientWidth / Math.max(host.clientHeight, 1), 0.1, 1000);
     camera.position.set(11, 9, 14);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.shadowMap.enabled = true;
@@ -87,8 +90,8 @@ function ThreeDPreview({ form }) {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.target.set(0, 0, 0);
-    scene.add(new THREE.HemisphereLight('#dffcff', '#132b38', 1.5));
-    const sun = new THREE.DirectionalLight('#fff4d0', 2.2);
+    scene.add(new THREE.HemisphereLight('#eafaff', '#132b38', 1.7));
+    const sun = new THREE.DirectionalLight('#fff4d0', 2.8);
     sun.position.set(8, 14, 8);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -143,7 +146,7 @@ function ThreeDPreview({ form }) {
     const rows = Math.max(1, Math.ceil(count / columns));
     const roof = new THREE.Mesh(new THREE.BoxGeometry(roofLength, 0.18, roofWidth), new THREE.MeshStandardMaterial({ color: '#596d72', roughness: 0.82 }));
     roof.position.y = -0.14; roof.rotation.y = azimuth; roof.receiveShadow = true; plant.add(roof);
-    const panelMaterial = new THREE.MeshStandardMaterial({ color: '#145b75', metalness: 0.45, roughness: 0.25, emissive: '#06212c', emissiveIntensity: 0.28 });
+    const panelMaterial = new THREE.MeshPhysicalMaterial({ color: '#0b4262', metalness: 0.62, roughness: 0.18, clearcoat: 0.7, clearcoatRoughness: 0.12, emissive: '#031924', emissiveIntensity: 0.2 });
     const frameMaterial = new THREE.LineBasicMaterial({ color: '#a8e9dd' });
     const railMaterial = new THREE.MeshStandardMaterial({ color: '#a8b3b3', metalness: 0.7, roughness: 0.3 });
     const group = new THREE.Group();
@@ -151,7 +154,7 @@ function ThreeDPreview({ form }) {
     group.rotation.z = -THREE.MathUtils.degToRad(number(form.azimuth, 180) - 180) * 0.12;
     for (let index = 0; index < count; index += 1) {
       const column = index % columns; const row = Math.floor(index / columns);
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(panelW, 0.08, panelD), panelMaterial);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(panelW, 0.08, panelD, 2, 1, 2), panelMaterial);
       panel.position.set((column - (columns - 1) / 2) * (panelW + gap), height + row * (panelD + rowSpacing), 0);
       panel.rotation.x = -tilt; panel.castShadow = true; panel.receiveShadow = true; group.add(panel);
       const edges = new THREE.LineSegments(new THREE.EdgesGeometry(panel.geometry), frameMaterial); edges.position.copy(panel.position); edges.rotation.copy(panel.rotation); group.add(edges);
@@ -225,7 +228,11 @@ export default function QuotationCenter({ user }) {
     catch (error) { setMessage(error.response?.data?.message || 'Unable to delete quotation'); }
   };
   const newQuote = () => { setForm({ ...initialForm }); setActiveQuoteId(null); setView('builder'); setMessage('New quotation ready'); };
-  const downloadPdf = () => downloadQuotationPdf({ form, result, user, quoteNumber: quotes.find((quote) => quote.id === activeQuoteId)?.quoteNumber || 'Draft' });
+  const downloadPdf = () => {
+    const canvas = document.querySelector('.quotation-real-3d canvas');
+    const designImage = canvas?.toDataURL('image/png') || '';
+    downloadQuotationPdf({ form, result, user, designImage, quoteNumber: quotes.find((quote) => quote.id === activeQuoteId)?.quoteNumber || 'Draft' });
+  };
   const updateCalculator = (field, value) => setCalculator((current) => ({ ...current, [field]: value }));
   const calculatorResult = useMemo(() => {
     const bill = number(calculator.monthlyBill); const tariff = number(calculator.tariff, 5); const annualUse = tariff ? bill * 12 / tariff : 0;

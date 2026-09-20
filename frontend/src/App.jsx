@@ -9,6 +9,7 @@ import LoadingState from './components/LoadingState';
 import { downloadInvoicePdf } from './utils/invoicePdf';
 import { calculateGstAmount, calculateTaxableValue, getEffectiveGstRate } from './utils/gstMath';
 import { calculateEmi } from './utils/emiMath';
+import * as XLSX from 'xlsx';
 
 const API = API_BASE_URL;
 
@@ -622,6 +623,8 @@ function ContactsPage({ user }) {
   const [visibleContacts, setVisibleContacts] = useState(20);
   const [expandedContactId, setExpandedContactId] = useState(null);
   const [callerOptions, setCallerOptions] = useState([]);
+  const [importCaller, setImportCaller] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const quickCallerNames = useMemo(() => user?.role === 'caller' ? [user.name] : callerOptions, [callerOptions, user]);
 
@@ -806,6 +809,36 @@ function ContactsPage({ user }) {
     setForm((current) => ({ ...current, callerName: name }));
   };
 
+  const importContacts = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!importCaller) { setMessage('Select a caller before importing contacts'); return; }
+    setImporting(true);
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const key = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const mapped = rows.map((row) => {
+        const values = Object.fromEntries(Object.entries(row).map(([name, value]) => [key(name), value]));
+        const pick = (...names) => names.map((name) => values[name]).find((value) => String(value || '').trim()) || '';
+        return {
+          name: pick('name', 'customername', 'consumername'),
+          contactNumber: pick('contactnumber', 'contact', 'mobilenumber', 'mobile', 'phone', 'phonenumber'),
+          consumerNumber: pick('consumernumber', 'consumerid', 'accountnumber', 'consumer')
+        };
+      }).filter((row) => row.name || row.contactNumber || row.consumerNumber);
+      const response = await api.post('/contacts/import', { rows: mapped, callerName: importCaller });
+      setMessage(`Imported ${response.data.imported} contacts; skipped ${response.data.skipped}`);
+      await loadContacts();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to import this Excel file');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const { counts, duplicateContacts, similarContacts, filtered, tabContacts, callerList } = derived;
 
   return (
@@ -856,6 +889,11 @@ function ContactsPage({ user }) {
           </div>
         </form>
       </div>
+
+      {user?.role !== 'caller' && <div className="panel contact-import-panel">
+        <div className="panel-header"><div><h4>Import contacts from Excel</h4><p className="muted">Columns supported: Name, Consumer Number, and Contact Number. All accepted rows go to the selected caller.</p></div><span className="chip">.xlsx / .xls / .csv</span></div>
+        <div className="contact-import-actions"><select value={importCaller} onChange={(event) => setImportCaller(event.target.value)}><option value="">Select caller</option>{callerOptions.map((name) => <option key={name} value={name}>{name}</option>)}</select><label className="btn primary file-button">{importing ? 'Importing...' : 'Choose Excel file'}<input type="file" accept=".xlsx,.xls,.csv" onChange={importContacts} disabled={importing} /></label></div>
+      </div>}
 
       <div className="panel contact-stream-panel">
         <div className="filter-bar">
@@ -2867,39 +2905,83 @@ function AccountingPage() {
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 12;
-    const lineHeight = 7;
-    let y = 16;
-
-    doc.setFontSize(18);
-    doc.setFont(undefined, 'bold');
-    doc.text('Account Transaction History', margin, y);
-    y += 10;
-
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, margin, y);
-    y += 12;
-
-    doc.setFillColor(238, 243, 255);
-    doc.rect(margin, y - 4, pageWidth - margin * 2, 8, 'F');
-    doc.text('Date / account / entry', margin + 2, y);
-    doc.text('Balance', pageWidth - margin - 22, y, { align: 'right' });
-    y += 10;
-
-    transactionHistory.slice(0, 40).forEach((entry) => {
-      if (y > 260) {
-        doc.addPage();
-        y = 20;
-      }
-      doc.text(`${entry.date} • ${entry.accountName}`, margin + 2, y);
-      doc.text(`₹${Number(entry.balanceAfter || 0).toLocaleString()}`, pageWidth - margin - 2, y, { align: 'right' });
-      y += lineHeight;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 42;
+    const drawHeader = (continued = false) => {
+      doc.setFillColor(18, 63, 99);
+      doc.rect(0, 0, pageWidth, 31, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(17);
+      doc.setFont(undefined, 'bold');
+      doc.text('ACCOUNT STATEMENT', margin, 13);
       doc.setFontSize(8);
-      doc.text(`${entry.type === 'income' ? 'Income' : 'Expense'} • ${entry.description} • ${entry.type === 'income' ? '+' : '-'}₹${Number(entry.amount || 0).toLocaleString()}`, margin + 2, y);
-      y += 4;
-      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text(continued ? 'SGSE Billing Suite • Continued ledger' : 'SGSE Billing Suite • Professional cash book', margin, 21);
+      doc.text(new Date().toLocaleDateString('en-IN'), pageWidth - margin, 21, { align: 'right' });
+      doc.setTextColor(27, 42, 55);
+    };
+    const drawFooter = () => {
+      doc.setDrawColor(210, 220, 228);
+      doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+      doc.setFontSize(7);
+      doc.setTextColor(100, 115, 128);
+      doc.text(`Generated ${new Date().toLocaleString('en-IN')}`, margin, pageHeight - 7);
+      doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+      doc.setTextColor(27, 42, 55);
+    };
+    const drawTableHeader = () => {
+      doc.setFillColor(23, 86, 112);
+      doc.rect(margin, y - 4, contentWidth, 9, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'bold');
+      doc.text('DATE / ACCOUNT', margin + 3, y + 2);
+      doc.text('ENTRY', margin + 64, y + 2);
+      doc.text('CHANGE', pageWidth - margin - 37, y + 2, { align: 'right' });
+      doc.text('BALANCE', pageWidth - margin - 3, y + 2, { align: 'right' });
+      doc.setTextColor(27, 42, 55);
+      y += 11;
+    };
+    drawHeader();
+    doc.setFillColor(241, 247, 251);
+    doc.roundedRect(margin, y - 6, contentWidth, 23, 2, 2, 'F');
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.text('INCOME', margin + 5, y);
+    doc.text('EXPENSES', margin + 62, y);
+    doc.text('NET MOVEMENT', margin + 119, y);
+    doc.setFontSize(13);
+    doc.setFont(undefined, 'bold');
+    doc.text(`₹${Number(summary.incomeTotal || 0).toLocaleString('en-IN')}`, margin + 5, y + 10);
+    doc.text(`₹${Number(summary.expenseTotal || 0).toLocaleString('en-IN')}`, margin + 62, y + 10);
+    doc.text(`₹${Number(summary.netCash || 0).toLocaleString('en-IN')}`, margin + 119, y + 10);
+    y += 31;
+    drawTableHeader();
+    transactionHistory.forEach((entry, index) => {
+      if (y > pageHeight - 25) {
+        drawFooter();
+        doc.addPage();
+        y = 42;
+        drawHeader(true);
+        drawTableHeader();
+      }
+      if (index % 2 === 0) {
+        doc.setFillColor(248, 251, 253);
+        doc.rect(margin, y - 4, contentWidth, 10, 'F');
+      }
+      doc.setFontSize(7.5);
+      doc.setFont(undefined, 'normal');
+      doc.text(doc.splitTextToSize(`${entry.date}\n${entry.accountName}`, 54), margin + 3, y);
+      doc.text(doc.splitTextToSize(entry.description || '-', 62), margin + 64, y);
+      doc.setTextColor(entry.type === 'income' ? 32 : 174, entry.type === 'income' ? 115 : 72, entry.type === 'income' ? 74 : 58);
+      doc.text(`${entry.type === 'income' ? '+' : '-'}₹${Number(entry.amount || 0).toLocaleString('en-IN')}`, pageWidth - margin - 37, y, { align: 'right' });
+      doc.setTextColor(27, 42, 55);
+      doc.text(`₹${Number(entry.balanceAfter || 0).toLocaleString('en-IN')}`, pageWidth - margin - 3, y, { align: 'right' });
+      y += 11;
     });
+    drawFooter();
 
     doc.save('account-transaction-history.pdf');
   };

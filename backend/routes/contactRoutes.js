@@ -109,6 +109,42 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+router.post('/import', auth, async (req, res) => {
+  try {
+    if (req.user.role === 'caller') return res.status(403).json({ message: 'Only admins can import and assign contacts' });
+    const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+    const callerName = String(req.body.callerName || '').trim();
+    if (!rows.length) return res.status(400).json({ message: 'No contact rows were found in the file' });
+    if (!callerName) return res.status(400).json({ message: 'Select a caller for this import' });
+    if (rows.length > 2000) return res.status(400).json({ message: 'Import up to 2,000 contacts at a time' });
+
+    const existing = await Contact.find({ createdBy: contactOwnerId(req) }).select('contactNumber consumerNumber').lean();
+    const usedNumbers = new Set(existing.map((contact) => normalizeValue(contact.contactNumber)).filter(Boolean));
+    const usedConsumers = new Set(existing.map((contact) => normalizeValue(contact.consumerNumber)).filter(Boolean));
+    const contacts = [];
+    const skipped = [];
+
+    rows.forEach((row, index) => {
+      const name = String(row.name || '').trim();
+      const contactNumber = String(row.contactNumber || '').trim();
+      const consumerNumber = String(row.consumerNumber || '').trim();
+      const normalizedNumber = normalizeValue(contactNumber);
+      const normalizedConsumer = normalizeValue(consumerNumber);
+      if (!name || !contactNumber) return skipped.push({ row: index + 2, reason: 'Name and contact number are required' });
+      if (usedNumbers.has(normalizedNumber)) return skipped.push({ row: index + 2, reason: 'Duplicate contact number' });
+      if (normalizedConsumer && usedConsumers.has(normalizedConsumer)) return skipped.push({ row: index + 2, reason: 'Duplicate consumer number' });
+      usedNumbers.add(normalizedNumber);
+      if (normalizedConsumer) usedConsumers.add(normalizedConsumer);
+      contacts.push({ name, contactNumber, consumerNumber, callerName, status: 'Not Yet Called', createdBy: contactOwnerId(req) });
+    });
+
+    const created = contacts.length ? await Contact.insertMany(contacts) : [];
+    res.status(201).json({ imported: created.length, skipped: skipped.length, skippedRows: skipped });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.post('/:contactId/calls', auth, async (req, res) => {
   try {
     const contact = await Contact.findOne({ _id: req.params.contactId, createdBy: contactOwnerId(req) });

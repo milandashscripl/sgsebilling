@@ -18,7 +18,7 @@ const designSvgDataUrl = (form = {}) => {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 };
 
-export function downloadQuotationPdf({ form = {}, result = {}, user = {}, quoteNumber = '' }) {
+export function downloadQuotationPdf({ form = {}, result = {}, user = {}, designImage = '', quoteNumber = '' }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -121,7 +121,9 @@ export function downloadQuotationPdf({ form = {}, result = {}, user = {}, quoteN
   doc.setFont(undefined, 'normal');
   doc.setTextColor(70, 84, 92);
   doc.text('Concept layout generated from the saved quotation design parameters.', margin, 27);
-  if (typeof doc.addSvgAsImage === 'function') {
+  if (designImage) {
+    doc.addImage(designImage, 'PNG', margin, 38, contentWidth, 132, undefined, 'FAST');
+  } else if (typeof doc.addSvgAsImage === 'function') {
     const designSvg = decodeURIComponent(designSvgDataUrl(form).split(',')[1]);
     doc.addSvgAsImage(designSvg, margin, 38, contentWidth, 132);
   } else {
