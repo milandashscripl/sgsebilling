@@ -77,7 +77,8 @@ async function fetchSiteContext(latitude, longitude, signal) {
     return { id: element.id, points, centroid, height: Math.max(2.8, levels * 3), tags: element.tags || {} };
   }).filter((building) => building.points.length >= 3);
   const target = buildings.sort((left, right) => (left.centroid.x ** 2 + left.centroid.z ** 2) - (right.centroid.x ** 2 + right.centroid.z ** 2))[0] || null;
-  return { buildings, targetId: target?.id || null, latitude: centerLatitude, longitude: centerLongitude };
+  const targetBounds = target ? target.points.reduce((bounds, point) => ({ minX: Math.min(bounds.minX, point.x), maxX: Math.max(bounds.maxX, point.x), minZ: Math.min(bounds.minZ, point.z), maxZ: Math.max(bounds.maxZ, point.z) }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }) : null;
+  return { buildings, targetId: target?.id || null, targetHeight: target?.height || 2.8, targetCentroid: target?.centroid || { x: 0, z: 0 }, targetBounds, latitude: centerLatitude, longitude: centerLongitude };
 }
 
 function seasonalGeneration(form, seasonName) {
@@ -203,6 +204,13 @@ function ThreeDPreview({ form }) {
     while (plant.children.length) { const child = plant.children.pop(); child.traverse((node) => { node.geometry?.dispose?.(); node.material?.dispose?.(); }); }
     const roofLength = Math.max(2, number(form.roofLength, 8));
     const roofWidth = Math.max(2, number(form.roofWidth, 5));
+    const mappedRoofHeight = localSiteContext?.targetId ? Math.max(2.8, number(localSiteContext.targetHeight, 2.8)) : 0;
+    const installX = 0;
+    const installZ = 0;
+    const mappedLength = localSiteContext?.targetBounds ? Math.max(2, localSiteContext.targetBounds.maxX - localSiteContext.targetBounds.minX) : roofLength;
+    const mappedWidth = localSiteContext?.targetBounds ? Math.max(2, localSiteContext.targetBounds.maxZ - localSiteContext.targetBounds.minZ) : roofWidth;
+    const effectiveRoofLength = localSiteContext?.targetId ? Math.min(roofLength, mappedLength * 0.88) : roofLength;
+    const effectiveRoofWidth = localSiteContext?.targetId ? Math.min(roofWidth, mappedWidth * 0.88) : roofWidth;
     const tilt = THREE.MathUtils.degToRad(clamp(form.tilt, 0, 45));
     const azimuth = THREE.MathUtils.degToRad(number(form.azimuth, 180) - 180);
     const panelW = form.panelLayout === 'Landscape' ? 2.1 : 1.1;
@@ -212,8 +220,12 @@ function ThreeDPreview({ form }) {
     const height = Math.max(0.12, number(form.mountingHeight, 0.35));
     const columns = Math.max(1, Math.min(Math.ceil(Math.sqrt(count * roofLength / roofWidth)), Math.floor(roofLength / (panelW + gap))));
     const rows = Math.max(1, Math.ceil(count / columns));
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(roofLength, 0.18, roofWidth), new THREE.MeshStandardMaterial({ color: '#596d72', roughness: 0.82 }));
-    roof.position.y = -0.14; roof.rotation.y = azimuth; roof.receiveShadow = true; plant.add(roof);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(effectiveRoofLength, 0.12, effectiveRoofWidth), new THREE.MeshStandardMaterial({ color: '#657477', roughness: 0.82 }));
+    roof.position.set(installX, mappedRoofHeight + 0.02, installZ); roof.rotation.y = azimuth; roof.receiveShadow = true; plant.add(roof);
+    const installMarker = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.45, 32), new THREE.MeshBasicMaterial({ color: '#ffcf57', side: THREE.DoubleSide }));
+    installMarker.rotation.x = -Math.PI / 2;
+    installMarker.position.set(installX, mappedRoofHeight + 0.11, installZ);
+    plant.add(installMarker);
     const siteGroup = new THREE.Group();
     (localSiteContext?.buildings || []).forEach((building) => {
       const shape = new THREE.Shape();
@@ -247,9 +259,9 @@ function ThreeDPreview({ form }) {
       const edges = new THREE.LineSegments(new THREE.EdgesGeometry(panel.geometry), frameMaterial); edges.position.copy(panel.position); edges.rotation.copy(panel.rotation); group.add(edges);
     }
     for (let row = 0; row < rows; row += 1) { const rail = new THREE.Mesh(new THREE.BoxGeometry(Math.min(roofLength * 0.9, columns * (panelW + gap)), 0.05, 0.08), railMaterial); rail.position.set(0, height - 0.05 + row * (panelD + rowSpacing), -panelD / 2); rail.rotation.x = -tilt; group.add(rail); }
-    group.position.y = 0.12; group.rotation.x = tilt; plant.add(group);
+    group.position.set(installX, mappedRoofHeight + 0.12, installZ); group.rotation.x = tilt; plant.add(group);
     const inverter = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.35), new THREE.MeshStandardMaterial({ color: '#e1ba5e', roughness: 0.5 }));
-    inverter.position.set(roofLength * 0.34, 0.5, roofWidth * 0.32); inverter.castShadow = true; plant.add(inverter);
+    inverter.position.set(installX + effectiveRoofLength * 0.34, mappedRoofHeight + 0.5, installZ + effectiveRoofWidth * 0.32); inverter.castShadow = true; plant.add(inverter);
     const inverterLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 0.18), new THREE.MeshBasicMaterial({ color: '#26311f' })); inverterLabel.position.set(inverter.position.x, inverter.position.y + 0.05, inverter.position.z - 0.19); inverterLabel.rotation.x = -Math.PI / 2; plant.add(inverterLabel);
   }, [form, count, localSiteContext]);
   const resetCamera = () => { if (!cameraRef.current || !controlsRef.current) return; cameraRef.current.position.set(11, 9, 14); controlsRef.current.target.set(0, 0, 0); controlsRef.current.update(); };
@@ -260,7 +272,7 @@ function ThreeDPreview({ form }) {
     <div className="quotation-3d-scene" ref={sceneRef} />
     <div className="solar-simulator-controls"><label>Season<select value={season} onChange={(event) => setSeason(event.target.value)}>{Object.entries(SEASON_PRESETS).map(([name, preset]) => <option key={name} value={name}>{name} · {preset.label}</option>)}</select></label><label>Sun time <strong>{String(hour).padStart(2, '0')}:00</strong><input type="range" min="6" max="18" step="1" value={hour} onChange={(event) => setHour(Number(event.target.value))} /></label><div className="solar-position-readout"><span>Sun altitude <strong>{Math.max(0, position.altitude).toFixed(1)}°</strong></span><span>Solar azimuth <strong>{position.azimuth.toFixed(0)}°</strong></span></div></div>
     <div className="solar-season-grid">{seasonalRows.map((row) => <div key={row.name} className={row.name === season ? 'active' : ''}><span>{row.name}</span><strong>{Math.round(row.generation).toLocaleString('en-IN')}</strong><small>kWh / month</small></div>)}</div>
-    <div className="quotation-3d-caption">Exact site origin: {number(form.latitude).toFixed(6)}, {number(form.longitude).toFixed(6)} · {localSiteContext?.buildings?.length ? 'Mapped building footprints are shown on the aerial surface; the array origin is the selected coordinate.' : 'Aerial imagery or mapped buildings were unavailable, so the roof remains editable.'} Generation is an engineering estimate and must be confirmed with roof measurements, shading survey, and commissioning data.</div>
+    <div className="quotation-3d-caption">Installation coordinate: {number(form.latitude).toFixed(6)}, {number(form.longitude).toFixed(6)} · The yellow marker is the exact array origin. {localSiteContext?.buildings?.length ? 'Mapped building footprints set the roof elevation and usable scale.' : 'Aerial imagery or mapped buildings were unavailable, so the roof remains editable.'} Generation is an engineering estimate and must be confirmed with roof measurements, shading survey, and commissioning data.</div>
   </div>;
 }
 
