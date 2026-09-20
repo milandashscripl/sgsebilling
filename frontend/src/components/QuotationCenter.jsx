@@ -59,6 +59,10 @@ const siteMeters = (latitude, longitude, centerLatitude, centerLongitude) => ({
   z: -(latitude - centerLatitude) * 110540
 });
 
+const longitudeToTile = (longitude, zoom) => Math.floor(((longitude + 180) / 360) * (2 ** zoom));
+const latitudeToTile = (latitude, zoom) => Math.floor((1 - Math.asinh(Math.tan(THREE.MathUtils.degToRad(latitude))) / Math.PI) / 2 * (2 ** zoom));
+const aerialTileUrl = (latitude, longitude, zoom = 19) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${latitudeToTile(latitude, zoom)}/${longitudeToTile(longitude, zoom)}`;
+
 async function fetchSiteContext(latitude, longitude, signal) {
   const centerLatitude = number(latitude, 21.333);
   const centerLongitude = number(longitude, 83.617);
@@ -73,12 +77,6 @@ async function fetchSiteContext(latitude, longitude, signal) {
     return { id: element.id, points, centroid, height: Math.max(2.8, levels * 3), tags: element.tags || {} };
   }).filter((building) => building.points.length >= 3);
   const target = buildings.sort((left, right) => (left.centroid.x ** 2 + left.centroid.z ** 2) - (right.centroid.x ** 2 + right.centroid.z ** 2))[0] || null;
-  if (target) {
-    buildings.forEach((building) => {
-      building.points = building.points.map((point) => ({ x: point.x - target.centroid.x, z: point.z - target.centroid.z }));
-      building.centroid = { x: building.centroid.x - target.centroid.x, z: building.centroid.z - target.centroid.z };
-    });
-  }
   return { buildings, targetId: target?.id || null, latitude: centerLatitude, longitude: centerLongitude };
 }
 
@@ -95,6 +93,7 @@ function ThreeDPreview({ form }) {
   const cameraRef = useRef(null);
   const controlsRef = useRef(null);
   const plantRef = useRef(null);
+  const mapRef = useRef(null);
   const sunRef = useRef(null);
   const sunMarkerRef = useRef(null);
   const [season, setSeason] = useState('Summer');
@@ -139,19 +138,48 @@ function ThreeDPreview({ form }) {
     scene.add(sun); scene.add(sun.target);
     const sunMarker = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 16), new THREE.MeshBasicMaterial({ color: '#ffd56a' }));
     scene.add(sunMarker);
-    const grid = new THREE.GridHelper(28, 28, '#2b5360', '#16313b');
-    grid.position.y = -0.02;
-    scene.add(grid);
+    const mapMaterial = new THREE.MeshBasicMaterial({ color: '#263b40', side: THREE.DoubleSide });
+    const mapPlane = new THREE.Mesh(new THREE.PlaneGeometry(620, 620), mapMaterial);
+    mapPlane.rotation.x = -Math.PI / 2;
+    mapPlane.position.y = -0.22;
+    scene.add(mapPlane);
     const plant = new THREE.Group();
     scene.add(plant);
-    rendererRef.current = renderer; cameraRef.current = camera; controlsRef.current = controls; plantRef.current = plant; sunRef.current = sun; sunMarkerRef.current = sunMarker;
+    rendererRef.current = renderer; cameraRef.current = camera; controlsRef.current = controls; plantRef.current = plant; mapRef.current = mapPlane; sunRef.current = sun; sunMarkerRef.current = sunMarker;
     const resize = () => { if (!host.clientWidth || !host.clientHeight) return; camera.aspect = host.clientWidth / host.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(host.clientWidth, host.clientHeight); };
     window.addEventListener('resize', resize);
     let frame = 0;
     const animate = () => { frame = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); };
     animate(); resize();
-    return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', resize); controls.dispose(); renderer.dispose(); host.replaceChildren(); };
+    return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', resize); controls.dispose(); mapMaterial.map?.dispose?.(); mapMaterial.dispose(); mapPlane.geometry.dispose(); renderer.dispose(); host.replaceChildren(); };
   }, []);
+  useEffect(() => {
+    const mapPlane = mapRef.current;
+    const latitude = number(form.latitude);
+    const longitude = number(form.longitude);
+    if (!mapPlane || !latitude || !longitude) return undefined;
+    const zoom = 19;
+    const tileMeters = 40075016.686 * Math.cos(THREE.MathUtils.degToRad(latitude)) / (2 ** zoom);
+    const scale = 2 ** zoom;
+    const fractionalX = (((longitude + 180) / 360) * scale) % 1;
+    const fractionalY = ((1 - Math.asinh(Math.tan(THREE.MathUtils.degToRad(latitude))) / Math.PI) / 2 * scale) % 1;
+    mapPlane.geometry.dispose();
+    mapPlane.geometry = new THREE.PlaneGeometry(tileMeters, tileMeters);
+    mapPlane.position.x = (0.5 - fractionalX) * tileMeters;
+    mapPlane.position.z = (fractionalY - 0.5) * tileMeters;
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+    const texture = loader.load(aerialTileUrl(latitude, longitude, zoom), () => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+    });
+    const material = mapPlane.material;
+    material.map?.dispose?.();
+    material.map = texture;
+    material.color.set('#ffffff');
+    material.needsUpdate = true;
+    return () => texture.dispose();
+  }, [form.latitude, form.longitude]);
   useEffect(() => {
     const sun = sunRef.current;
     const marker = sunMarkerRef.current;
@@ -232,7 +260,7 @@ function ThreeDPreview({ form }) {
     <div className="quotation-3d-scene" ref={sceneRef} />
     <div className="solar-simulator-controls"><label>Season<select value={season} onChange={(event) => setSeason(event.target.value)}>{Object.entries(SEASON_PRESETS).map(([name, preset]) => <option key={name} value={name}>{name} · {preset.label}</option>)}</select></label><label>Sun time <strong>{String(hour).padStart(2, '0')}:00</strong><input type="range" min="6" max="18" step="1" value={hour} onChange={(event) => setHour(Number(event.target.value))} /></label><div className="solar-position-readout"><span>Sun altitude <strong>{Math.max(0, position.altitude).toFixed(1)}°</strong></span><span>Solar azimuth <strong>{position.azimuth.toFixed(0)}°</strong></span></div></div>
     <div className="solar-season-grid">{seasonalRows.map((row) => <div key={row.name} className={row.name === season ? 'active' : ''}><span>{row.name}</span><strong>{Math.round(row.generation).toLocaleString('en-IN')}</strong><small>kWh / month</small></div>)}</div>
-    <div className="quotation-3d-caption">Coordinates: {number(form.latitude).toFixed(6)}, {number(form.longitude).toFixed(6)} · {localSiteContext?.buildings?.length ? 'The highlighted building is centered on the selected coordinate.' : 'No mapped building was available, so the roof remains editable.'} Generation is an engineering estimate and must be confirmed with roof measurements, shading survey, and commissioning data.</div>
+    <div className="quotation-3d-caption">Exact site origin: {number(form.latitude).toFixed(6)}, {number(form.longitude).toFixed(6)} · {localSiteContext?.buildings?.length ? 'Mapped building footprints are shown on the aerial surface; the array origin is the selected coordinate.' : 'Aerial imagery or mapped buildings were unavailable, so the roof remains editable.'} Generation is an engineering estimate and must be confirmed with roof measurements, shading survey, and commissioning data.</div>
   </div>;
 }
 
