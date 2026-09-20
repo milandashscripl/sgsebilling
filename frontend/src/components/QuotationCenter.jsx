@@ -10,7 +10,7 @@ import LoadingState from './LoadingState';
 const api = axios.create({ baseURL: API_BASE_URL });
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const initialForm = {
-  clientName: '', clientContact: '', clientEmail: '', clientAddress: '', siteName: 'Bargarh, Odisha', latitude: '21.333', longitude: '83.617',
+  clientName: '', clientContact: '', clientEmail: '', clientAddress: '', siteName: 'Bargarh, Odisha', latitude: '21.333', longitude: '83.617', solarResource: '',
   segment: 'Residential', systemType: 'On-grid', capacity: '5', panelWattage: '550', panelCount: '10', roofLength: '8', roofWidth: '5', tilt: '20', azimuth: '180', shading: '5',
   tariff: '5', projectCost: '325000', gstRate: '0', centralSubsidy: '78000', stateSubsidy: '60000', financePercent: '80', interestRate: '6', tenureYears: '10',
   roofSurface: 'Flat RCC roof', panelLayout: 'Portrait', panelGap: '0.04', rowSpacing: '0.8', mountingHeight: '0.35',
@@ -25,7 +25,8 @@ const getToken = () => localStorage.getItem('token');
 
 function calculate(form) {
   const capacity = number(form.capacity, 5);
-  const annualGeneration = capacity * 5.2 * 365 * (1 - 0.14) * (1 - clamp(form.shading, 0, 100) / 100);
+  const solarResource = form.solarResource ? number(form.solarResource, 5.2) : 5.2;
+  const annualGeneration = capacity * solarResource * 365 * (1 - 0.14) * (1 - clamp(form.shading, 0, 100) / 100);
   const annualValue = annualGeneration * number(form.tariff, 5);
   const cost = number(form.projectCost);
   const subsidy = number(form.centralSubsidy) + number(form.stateSubsidy);
@@ -53,6 +54,34 @@ function solarPosition(latitude, day, hour) {
   return { altitude: altitude / radians, azimuth: (azimuth / radians + 180 + 360) % 360 };
 }
 
+const siteMeters = (latitude, longitude, centerLatitude, centerLongitude) => ({
+  x: (longitude - centerLongitude) * 111320 * Math.cos(THREE.MathUtils.degToRad(centerLatitude)),
+  z: -(latitude - centerLatitude) * 110540
+});
+
+async function fetchSiteContext(latitude, longitude, signal) {
+  const centerLatitude = number(latitude, 21.333);
+  const centerLongitude = number(longitude, 83.617);
+  const query = `[out:json][timeout:12];way(around:90,${centerLatitude},${centerLongitude})[building];out geom;`;
+  const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, { signal });
+  if (!response.ok) throw new Error('Site map unavailable');
+  const data = await response.json();
+  const buildings = (data.elements || []).map((element) => {
+    const points = (element.geometry || []).map((point) => siteMeters(point.lat, point.lon, centerLatitude, centerLongitude));
+    const centroid = points.reduce((center, point) => ({ x: center.x + point.x / Math.max(points.length, 1), z: center.z + point.z / Math.max(points.length, 1) }), { x: 0, z: 0 });
+    const levels = number(element.tags?.['building:levels'], 1);
+    return { id: element.id, points, centroid, height: Math.max(2.8, levels * 3), tags: element.tags || {} };
+  }).filter((building) => building.points.length >= 3);
+  const target = buildings.sort((left, right) => (left.centroid.x ** 2 + left.centroid.z ** 2) - (right.centroid.x ** 2 + right.centroid.z ** 2))[0] || null;
+  if (target) {
+    buildings.forEach((building) => {
+      building.points = building.points.map((point) => ({ x: point.x - target.centroid.x, z: point.z - target.centroid.z }));
+      building.centroid = { x: building.centroid.x - target.centroid.x, z: building.centroid.z - target.centroid.z };
+    });
+  }
+  return { buildings, targetId: target?.id || null, latitude: centerLatitude, longitude: centerLongitude };
+}
+
 function seasonalGeneration(form, seasonName) {
   const base = calculate(form).annualGeneration / 12;
   const factors = { Winter: 0.82, Spring: 1.03, Summer: 1.16, Autumn: 0.99 };
@@ -70,9 +99,20 @@ function ThreeDPreview({ form }) {
   const sunMarkerRef = useRef(null);
   const [season, setSeason] = useState('Summer');
   const [hour, setHour] = useState(12);
+  const [localSiteContext, setLocalSiteContext] = useState({ buildings: [], targetId: null });
+  useEffect(() => {
+    const latitude = number(form.latitude);
+    const longitude = number(form.longitude);
+    if (!latitude || !longitude) return undefined;
+    const controller = new AbortController();
+    fetchSiteContext(latitude, longitude, controller.signal).then(setLocalSiteContext).catch((error) => {
+      if (error.name !== 'AbortError') setLocalSiteContext({ buildings: [], targetId: null });
+    });
+    return () => controller.abort();
+  }, [form.latitude, form.longitude]);
   const toggleFullscreen = async () => { if (!document.fullscreenElement) await previewRef.current?.requestFullscreen?.(); else await document.exitFullscreen?.(); };
   const count = Math.max(1, Math.min(200, Math.round(number(form.panelCount, 10))));
-  useEffect(() => {
+    useEffect(() => {
     const host = sceneRef.current;
     if (!host) return undefined;
     const scene = new THREE.Scene();
@@ -146,6 +186,25 @@ function ThreeDPreview({ form }) {
     const rows = Math.max(1, Math.ceil(count / columns));
     const roof = new THREE.Mesh(new THREE.BoxGeometry(roofLength, 0.18, roofWidth), new THREE.MeshStandardMaterial({ color: '#596d72', roughness: 0.82 }));
     roof.position.y = -0.14; roof.rotation.y = azimuth; roof.receiveShadow = true; plant.add(roof);
+    const siteGroup = new THREE.Group();
+    (localSiteContext?.buildings || []).forEach((building) => {
+      const shape = new THREE.Shape();
+      building.points.forEach((point, index) => {
+        if (index === 0) shape.moveTo(point.x, -point.z);
+        else shape.lineTo(point.x, -point.z);
+      });
+      shape.closePath();
+      const mesh = new THREE.Mesh(
+        new THREE.ExtrudeGeometry(shape, { depth: building.height, bevelEnabled: false }),
+        new THREE.MeshStandardMaterial({ color: building.id === localSiteContext.targetId ? '#8d9da0' : '#4d6269', roughness: 0.88, metalness: 0.02 })
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = -0.15;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      siteGroup.add(mesh);
+    });
+    plant.add(siteGroup);
     const panelMaterial = new THREE.MeshPhysicalMaterial({ color: '#0b4262', metalness: 0.62, roughness: 0.18, clearcoat: 0.7, clearcoatRoughness: 0.12, emissive: '#031924', emissiveIntensity: 0.2 });
     const frameMaterial = new THREE.LineBasicMaterial({ color: '#a8e9dd' });
     const railMaterial = new THREE.MeshStandardMaterial({ color: '#a8b3b3', metalness: 0.7, roughness: 0.3 });
@@ -164,16 +223,16 @@ function ThreeDPreview({ form }) {
     const inverter = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.35), new THREE.MeshStandardMaterial({ color: '#e1ba5e', roughness: 0.5 }));
     inverter.position.set(roofLength * 0.34, 0.5, roofWidth * 0.32); inverter.castShadow = true; plant.add(inverter);
     const inverterLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 0.18), new THREE.MeshBasicMaterial({ color: '#26311f' })); inverterLabel.position.set(inverter.position.x, inverter.position.y + 0.05, inverter.position.z - 0.19); inverterLabel.rotation.x = -Math.PI / 2; plant.add(inverterLabel);
-  }, [form, count]);
+  }, [form, count, localSiteContext]);
   const resetCamera = () => { if (!cameraRef.current || !controlsRef.current) return; cameraRef.current.position.set(11, 9, 14); controlsRef.current.target.set(0, 0, 0); controlsRef.current.update(); };
   const position = solarPosition(number(form.latitude, 21.333), SEASON_PRESETS[season].day, hour);
   const seasonalRows = Object.keys(SEASON_PRESETS).map((name) => ({ name, generation: seasonalGeneration(form, name) }));
   return <div className="quotation-3d-wrap quotation-real-3d" ref={previewRef}>
-    <div className="quotation-3d-toolbar"><div><strong>Professional solar site simulator</strong><small>{form.roofSurface || 'Flat RCC roof'} · {form.panelLayout || 'Portrait'} modules · {count} panels</small></div><div className="inline-actions"><button type="button" className="btn secondary" onClick={resetCamera}>Reset view</button><button type="button" className="btn secondary" onClick={toggleFullscreen}>Full screen</button></div></div>
+    <div className="quotation-3d-toolbar"><div><strong>{localSiteContext?.buildings?.length ? 'Mapped solar site simulator' : 'Solar site simulator'}</strong><small>{form.roofSurface || 'Flat RCC roof'} · {form.panelLayout || 'Portrait'} modules · {count} panels{localSiteContext?.buildings?.length ? ' · OpenStreetMap building context' : ' · Manual roof context'}</small></div><div className="inline-actions"><button type="button" className="btn secondary" onClick={resetCamera}>Reset view</button><button type="button" className="btn secondary" onClick={toggleFullscreen}>Full screen</button></div></div>
     <div className="quotation-3d-scene" ref={sceneRef} />
     <div className="solar-simulator-controls"><label>Season<select value={season} onChange={(event) => setSeason(event.target.value)}>{Object.entries(SEASON_PRESETS).map(([name, preset]) => <option key={name} value={name}>{name} · {preset.label}</option>)}</select></label><label>Sun time <strong>{String(hour).padStart(2, '0')}:00</strong><input type="range" min="6" max="18" step="1" value={hour} onChange={(event) => setHour(Number(event.target.value))} /></label><div className="solar-position-readout"><span>Sun altitude <strong>{Math.max(0, position.altitude).toFixed(1)}°</strong></span><span>Solar azimuth <strong>{position.azimuth.toFixed(0)}°</strong></span></div></div>
     <div className="solar-season-grid">{seasonalRows.map((row) => <div key={row.name} className={row.name === season ? 'active' : ''}><span>{row.name}</span><strong>{Math.round(row.generation).toLocaleString('en-IN')}</strong><small>kWh / month</small></div>)}</div>
-    <div className="quotation-3d-caption">Orbit to inspect the array. Change season and sun time to inspect shadows, solar altitude, azimuth, and indicative generation potential. Final yield should be confirmed with a detailed site survey.</div>
+    <div className="quotation-3d-caption">Coordinates: {number(form.latitude).toFixed(6)}, {number(form.longitude).toFixed(6)} · {localSiteContext?.buildings?.length ? 'The highlighted building is centered on the selected coordinate.' : 'No mapped building was available, so the roof remains editable.'} Generation is an engineering estimate and must be confirmed with roof measurements, shading survey, and commissioning data.</div>
   </div>;
 }
 
@@ -253,7 +312,7 @@ export default function QuotationCenter({ user }) {
   };
   const loadClimate = async () => {
     setToolLoading(true);
-    try { const end = new Date().getFullYear() - 1; const start = end - 24; const response = await fetch(`https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=ALLSKY_SFC_SW_DWN&community=RE&longitude=${form.longitude}&latitude=${form.latitude}&start=${start}&end=${end}&format=JSON`); const data = await response.json(); const values = data.properties.parameter.ALLSKY_SFC_SW_DWN || {}; const averages = months.map((_, index) => { const entries = Object.entries(values).filter(([key]) => Number(key.slice(4, 6)) - 1 === index).map(([, value]) => Number(value)); return entries.length ? entries.reduce((sum, value) => sum + value, 0) / entries.length : 0; }); setClimate(averages); setMessage(`NASA POWER climate loaded for ${start}-${end}`); } catch { setMessage('Climate data could not be loaded'); } finally { setToolLoading(false); }
+    try { const end = new Date().getFullYear() - 1; const start = end - 24; const response = await fetch(`https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=ALLSKY_SFC_SW_DWN&community=RE&longitude=${form.longitude}&latitude=${form.latitude}&start=${start}&end=${end}&format=JSON`); const data = await response.json(); const values = data.properties.parameter.ALLSKY_SFC_SW_DWN || {}; const averages = months.map((_, index) => { const entries = Object.entries(values).filter(([key]) => Number(key.slice(4, 6)) - 1 === index).map(([, value]) => Number(value)); return entries.length ? entries.reduce((sum, value) => sum + value, 0) / entries.length : 0; }); const validAverages = averages.filter((value) => value > 0); const siteAverage = validAverages.length ? validAverages.reduce((sum, value) => sum + value, 0) / validAverages.length : 5.2; setClimate(averages); update('solarResource', siteAverage.toFixed(2)); setMessage(`NASA POWER climate loaded for ${start}-${end}; generation now uses ${siteAverage.toFixed(2)} kWh/m²/day`); } catch { setMessage('Climate data could not be loaded'); } finally { setToolLoading(false); }
   };
   const saveSettings = async (event) => { event.preventDefault(); try { const response = await api.put('/quotations/settings', settings, { headers: { Authorization: `Bearer ${getToken()}` } }); setSettings(response.data); setMessage('Quotation center settings saved'); } catch (error) { setMessage(error.response?.data?.message || 'Unable to save quotation settings'); } };
 
